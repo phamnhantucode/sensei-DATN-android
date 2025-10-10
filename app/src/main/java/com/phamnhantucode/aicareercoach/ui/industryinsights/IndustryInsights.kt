@@ -22,14 +22,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LineAxis
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.Analytics
 import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -50,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -91,7 +98,9 @@ private data class SalaryRange(
 )
 
 @Composable
-fun IndustryInsightsScreen() {
+fun IndustryInsightsScreen(
+    onNavigateToResumeBuilder: () -> Unit = {}
+) {
     var darkTheme by remember { mutableStateOf(true) }
     val insightMap = remember { sampleInsights() }
     var selectedIndustryId by remember { mutableStateOf(insightMap.keys.first()) }
@@ -110,7 +119,8 @@ fun IndustryInsightsScreen() {
             ) {
                 HeaderSection(
                     darkTheme = darkTheme,
-                    onThemeToggle = { darkTheme = !darkTheme }
+                    onThemeToggle = { darkTheme = !darkTheme },
+                    onNavigateToResumeBuilder = onNavigateToResumeBuilder
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -149,36 +159,136 @@ fun IndustryInsightsScreen() {
 private fun HeaderSection(
     darkTheme: Boolean,
     onThemeToggle: () -> Unit,
+    onNavigateToResumeBuilder: () -> Unit
 ) {
-    Row(
+    var growthToolsExpanded by remember { mutableStateOf(false) }
+    var growthToolsButtonWidth by remember { mutableStateOf(0) }
+    val growthTools = remember {
+        listOf("Build Resume", "Cover Letter", "Interview Prep")
+    }
+    val density = LocalDensity.current
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
     ) {
-        Column {
-            Text(
-                text = "Industry Insights",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Stay on top of market outlooks, salary bands, and in-demand skills.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        IconButton(
-            onClick = onThemeToggle,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Icon(
-                imageVector = if (darkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Analytics,
-                contentDescription = "Toggle theme"
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier.size(32.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = "User avatar",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                Box {
+                    Button(
+                        onClick = { growthToolsExpanded = true },
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            growthToolsButtonWidth = coordinates.size.width
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onBackground
+                        )
+                    ) {
+                        Text(text = "Growth Tools", color = MaterialTheme.colorScheme.background)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Filled.ExpandMore,
+                            tint = MaterialTheme.colorScheme.background,
+                            contentDescription = "Toggle growth tools"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = growthToolsExpanded,
+                        onDismissRequest = { growthToolsExpanded = false },
+                        modifier = if (growthToolsButtonWidth > 0) {
+                            Modifier.width(with(density) { growthToolsButtonWidth.toDp() })
+                        } else {
+                            Modifier
+                        }
+                    ) {
+                        growthTools.forEach { item ->
+                            DropdownMenuItem(
+                                text = { Text(text = item) },
+                                onClick = {
+                                    growthToolsExpanded = false
+                                    when (item) {
+                                        "Build Resume" -> onNavigateToResumeBuilder()
+                                        // Add other navigation handlers here when implemented
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column {
+                Text(
+                    text = "Industry Insights",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Stay on top of market outlooks, salary bands, and in-demand skills.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = onThemeToggle,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            ) {
+                Icon(
+                    imageVector = if (darkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Analytics,
+                    contentDescription = "Toggle theme"
+                )
+            }
         }
     }
 }
