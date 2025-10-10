@@ -755,5 +755,5 @@ private val faqItems = listOf(
 @Composable
 @Preview(showBackground = true)
 private fun OnboardingPreview() {
-    OnboardingScreen()
+//    OnboardingScreen()
 }

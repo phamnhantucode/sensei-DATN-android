@@ -2,16 +2,52 @@ package com.phamnhantucode.aicareercoach.ui.onboarding
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,11 +62,13 @@ data class FormData(
     val subIndustry: String = "",
     val experienceYears: String = "",
     val skills: String = "",
-    val bio: String = ""
+    val bio: String = "",
 )
 
 @Composable
-fun OnboardingScreen() {
+fun OnboardingScreen(
+    onComplete: () -> Unit
+) {
     var isDarkMode by remember { mutableStateOf(true) }
     var currentStep by remember { mutableStateOf(0) }
     var formData by remember { mutableStateOf(FormData()) }
@@ -117,11 +155,13 @@ fun OnboardingScreen() {
                                     formData = formData,
                                     onDataChange = { formData = it }
                                 )
+
                                 1 -> SpecializationExperienceStep(
                                     industries = industries,
                                     formData = formData,
                                     onDataChange = { formData = it }
                                 )
+
                                 2 -> ProfileDetailsStep(
                                     formData = formData,
                                     onDataChange = { formData = it }
@@ -154,7 +194,9 @@ fun OnboardingScreen() {
                                 Button(
                                     onClick = {
                                         if (currentStep < totalSteps - 1) currentStep++
-                                        else { /* Handle completion */ }
+                                        else {
+                                            onComplete()
+                                        }
                                     },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp)
@@ -263,7 +305,7 @@ fun StepHeader(icon: @Composable () -> Unit, title: String, subtitle: String) {
 fun IndustrySelectionStep(
     industries: List<Industry>,
     formData: FormData,
-    onDataChange: (FormData) -> Unit
+    onDataChange: (FormData) -> Unit,
 ) {
     val selectedIndustry = industries.find { it.id == formData.industryId }
 
@@ -306,7 +348,7 @@ fun IndustrySelectionStep(
 fun SpecializationExperienceStep(
     industries: List<Industry>,
     formData: FormData,
-    onDataChange: (FormData) -> Unit
+    onDataChange: (FormData) -> Unit,
 ) {
     val selectedIndustry = industries.find { it.id == formData.industryId }
 
@@ -357,7 +399,7 @@ fun SpecializationExperienceStep(
 @Composable
 fun ProfileDetailsStep(
     formData: FormData,
-    onDataChange: (FormData) -> Unit
+    onDataChange: (FormData) -> Unit,
 ) {
     Column {
         StepHeader(
@@ -442,7 +484,7 @@ fun AssistanceCard(message: String) {
 fun IndustryDropdown(
     industries: List<Industry>,
     selectedIndustry: Industry?,
-    onIndustrySelected: (Industry) -> Unit
+    onIndustrySelected: (Industry) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -485,7 +527,7 @@ fun IndustryDropdown(
 fun SpecializationDropdown(
     subIndustries: List<String>,
     selectedValue: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 

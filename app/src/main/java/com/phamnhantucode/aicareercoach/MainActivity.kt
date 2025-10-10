@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
+import com.phamnhantucode.aicareercoach.ui.navigation.AppNavigation
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 
@@ -25,7 +26,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            OnboardingScreen()
+            AppNavigation()
         }
     }
 }
