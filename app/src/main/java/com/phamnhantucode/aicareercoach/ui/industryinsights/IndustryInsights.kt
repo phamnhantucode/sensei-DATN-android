@@ -16,10 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LineAxis
@@ -51,8 +51,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -78,7 +79,7 @@ private data class IndustryInsight(
     val keyTrends: List<String>,
     val recommendedSkills: List<String>,
     val lastUpdated: LocalDate,
-    val nextUpdate: LocalDate
+    val nextUpdate: LocalDate,
 )
 
 private data class SalaryRange(
@@ -86,7 +87,7 @@ private data class SalaryRange(
     val location: String,
     val min: Int,
     val median: Int,
-    val max: Int
+    val max: Int,
 )
 
 @Composable
@@ -101,7 +102,7 @@ fun IndustryInsightsScreen() {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Column(
+            InsetAwareColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
@@ -138,6 +139,7 @@ fun IndustryInsightsScreen() {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 TrendsAndSkillsRow(insight = selectedInsight)
+
             }
         }
     }
@@ -146,7 +148,7 @@ fun IndustryInsightsScreen() {
 @Composable
 private fun HeaderSection(
     darkTheme: Boolean,
-    onThemeToggle: () -> Unit
+    onThemeToggle: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -184,7 +186,7 @@ private fun HeaderSection(
 @Composable
 private fun DataFreshnessRow(
     lastUpdated: LocalDate,
-    nextUpdate: LocalDate
+    nextUpdate: LocalDate,
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
@@ -217,7 +219,7 @@ private fun DataFreshnessRow(
 private fun IndustrySelector(
     insights: List<IndustryInsight>,
     selectedId: String,
-    onIndustrySelected: (String) -> Unit
+    onIndustrySelected: (String) -> Unit,
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -240,7 +242,7 @@ private fun IndustrySelector(
 
 @Composable
 private fun MarketOverviewSection(
-    insight: IndustryInsight
+    insight: IndustryInsight,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
@@ -278,7 +280,7 @@ private fun MarketOverviewSection(
 private fun MarketOutlookCard(
     modifier: Modifier = Modifier,
     outlook: MarketOutlook,
-    nextUpdate: LocalDate
+    nextUpdate: LocalDate,
 ) {
     val (icon, tint) = marketOutlookVisuals(outlook)
 
@@ -327,7 +329,7 @@ private fun MarketOutlookCard(
 @Composable
 private fun GrowthCard(
     modifier: Modifier = Modifier,
-    growthRate: Float
+    growthRate: Float,
 ) {
     Card(
         modifier = modifier,
@@ -378,7 +380,7 @@ private fun GrowthCard(
 @Composable
 private fun DemandLevelCard(
     modifier: Modifier = Modifier,
-    level: DemandLevel
+    level: DemandLevel,
 ) {
     val (label, color) = when (level) {
         DemandLevel.HIGH -> "High" to Color(0xFF22C55E)
@@ -439,7 +441,7 @@ private fun DemandLevelCard(
 @Composable
 private fun HighlightSkillsCard(
     modifier: Modifier = Modifier,
-    skills: List<String>
+    skills: List<String>,
 ) {
     Card(
         modifier = modifier,
@@ -483,7 +485,7 @@ private fun HighlightSkillsCard(
 
 @Composable
 private fun SalaryRangesCard(
-    salaryRanges: List<SalaryRange>
+    salaryRanges: List<SalaryRange>,
 ) {
     val maxSalary = salaryRanges.maxOfOrNull { it.max }?.coerceAtLeast(1) ?: 1
 
@@ -526,7 +528,7 @@ private fun SalaryRangesCard(
 @Composable
 private fun SalaryRangeRow(
     range: SalaryRange,
-    maxSalary: Int
+    maxSalary: Int,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -590,7 +592,7 @@ private fun SalaryBar(
     label: String,
     value: Int,
     maxSalary: Int,
-    color: Color
+    color: Color,
 ) {
     Column(
         modifier = modifier,
@@ -732,7 +734,7 @@ private fun RecommendedSkillsCard(
 @Composable
 private fun SkillChip(
     label: String,
-    emphasized: Boolean = false
+    emphasized: Boolean = false,
 ) {
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -900,4 +902,10 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
             nextUpdate = today.plusDays(5)
         )
     ).associateBy { it.id }
+}
+
+@Composable
+@Preview(showBackground = true)
+private fun IndustryInsightsScreenPreview() {
+    IndustryInsightsScreen()
 }

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 data class FormData(
@@ -86,7 +87,7 @@ fun OnboardingScreen(
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
+                InsetAwareColumn(
                     modifier = Modifier
                         .widthIn(max = 480.dp)
                         .verticalScroll(rememberScrollState()),
