@@ -1,5 +1,6 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,11 +10,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,12 +38,17 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.WorkOutline
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,23 +56,30 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun ResumeBuilderScreen(
@@ -72,13 +88,32 @@ fun ResumeBuilderScreen(
 ) {
     val resume by viewModel.resume.collectAsState()
     var expandedSection by remember { mutableStateOf<ResumeSection?>(null) }
+    var exportMenuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val latestContext by rememberUpdatedState(context)
+
+    LaunchedEffect(viewModel) {
+        viewModel.exportEvents.collect { event ->
+            when (event) {
+                is ResumeExportResult.Success -> {
+                    val message = "${event.format.displayName} saved to Downloads as ${event.fileName}"
+                    Toast.makeText(latestContext, message, Toast.LENGTH_LONG).show()
+                }
+                is ResumeExportResult.Error -> {
+                    val error = event.throwable.localizedMessage ?: "Unknown error"
+                    val message = "Failed to export ${event.format.displayName}: $error"
+                    Toast.makeText(latestContext, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     AppTheme(darkTheme = true) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            InsetAwareColumn(
+            Column(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Header with back button
@@ -90,7 +125,7 @@ fun ResumeBuilderScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(start = 16.dp, end = 16.dp, top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(), bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -121,20 +156,41 @@ fun ResumeBuilderScreen(
                             }
                         }
 
-                        Button(
-                            onClick = { /* Export resume */ },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.FileDownload,
-                                contentDescription = "Export",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Export")
+                        Box {
+                            Button(
+                                onClick = { exportMenuExpanded = true },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.FileDownload,
+                                    contentDescription = "Export",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Export")
+                            }
+                            DropdownMenu(
+                                expanded = exportMenuExpanded,
+                                onDismissRequest = { exportMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Export as Markdown (.md)") },
+                                    onClick = {
+                                        exportMenuExpanded = false
+                                        viewModel.exportResume(latestContext, ResumeExportFormat.MARKDOWN)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export as PDF (.pdf)") },
+                                    onClick = {
+                                        exportMenuExpanded = false
+                                        viewModel.exportResume(latestContext, ResumeExportFormat.PDF)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -257,6 +313,10 @@ fun ResumeBuilderScreen(
 
                     Spacer(modifier = Modifier.height(80.dp))
                 }
+                Spacer(
+                    modifier = Modifier
+                        .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
+                )
             }
         }
     }
@@ -504,7 +564,12 @@ private fun WorkExperienceItem(
     onUpdate: (WorkExperience) -> Unit,
     onRemove: () -> Unit
 ) {
+    val context = LocalContext.current
     var editedExperience by remember(experience) { mutableStateOf(experience) }
+    var showDatePicker by remember { mutableStateOf<DatePickerType?>(null) }
+    var responsibilitiesText by remember(experience) {
+        mutableStateOf(experience.responsibilities.joinToString("\n"))
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -572,8 +637,160 @@ private fun WorkExperienceItem(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
+            // Date fields
+            val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = editedExperience.startDate?.format(dateFormatter) ?: "",
+                    onValueChange = { },
+                    label = { Text("Start Date") },
+                    modifier = Modifier.weight(1f),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = DatePickerType.START }) {
+                            Icon(Icons.Filled.Edit, "Select date")
+                        }
+                    },
+                    placeholder = { Text("Click to select") }
+                )
+
+                OutlinedTextField(
+                    value = if (editedExperience.isCurrentRole) "Present" else (editedExperience.endDate?.format(dateFormatter) ?: ""),
+                    onValueChange = { },
+                    label = { Text("End Date") },
+                    modifier = Modifier.weight(1f),
+                    readOnly = true,
+                    enabled = !editedExperience.isCurrentRole,
+                    trailingIcon = {
+                        if (!editedExperience.isCurrentRole) {
+                            IconButton(onClick = { showDatePicker = DatePickerType.END }) {
+                                Icon(Icons.Filled.Edit, "Select date")
+                            }
+                        }
+                    },
+                    placeholder = { Text("Click to select") }
+                )
+            }
+
+            // Current Role Checkbox
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Checkbox(
+                    checked = editedExperience.isCurrentRole,
+                    onCheckedChange = {
+                        editedExperience = editedExperience.copy(isCurrentRole = it)
+                        onUpdate(editedExperience)
+                    }
+                )
+                Text("I currently work here")
+            }
+
+            // Responsibilities field with AI button
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Experience in Company",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Button(
+                        onClick = {
+                            // TODO: Implement AI improvement
+                            Toast.makeText(
+                                context,
+                                "AI Improvement coming soon!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Language,
+                            contentDescription = "Improve with AI",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Improve with AI", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = responsibilitiesText,
+                    onValueChange = {
+                        responsibilitiesText = it
+                        val responsibilities = it.split("\n").filter { line -> line.isNotBlank() }
+                        editedExperience = editedExperience.copy(responsibilities = responsibilities)
+                        onUpdate(editedExperience)
+                    },
+                    label = { Text("Responsibilities (one per line)") },
+                    placeholder = { Text("• Led team of 5 engineers\n• Improved performance by 40%\n• Implemented new features") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    maxLines = 5
+                )
+            }
         }
     }
+
+    // Date Picker Dialog
+    if (showDatePicker != null) {
+        val initialDate = when (showDatePicker) {
+            DatePickerType.START -> editedExperience.startDate
+            DatePickerType.END -> editedExperience.endDate
+            else -> null
+        }
+
+        val initialMillis = initialDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = null },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+
+                            editedExperience = when (showDatePicker) {
+                                DatePickerType.START -> editedExperience.copy(startDate = selectedDate)
+                                DatePickerType.END -> editedExperience.copy(endDate = selectedDate)
+                                else -> editedExperience
+                            }
+                            onUpdate(editedExperience)
+                        }
+                        showDatePicker = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDatePicker = null }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+private enum class DatePickerType {
+    START, END
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

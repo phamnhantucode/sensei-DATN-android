@@ -1,9 +1,14 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -12,6 +17,8 @@ class ResumeBuilderViewModel : ViewModel() {
 
     private val _resume = MutableStateFlow(Resume())
     val resume: StateFlow<Resume> = _resume.asStateFlow()
+    private val _exportEvents = MutableSharedFlow<ResumeExportResult>(extraBufferCapacity = 1)
+    val exportEvents: SharedFlow<ResumeExportResult> = _exportEvents.asSharedFlow()
 
     // Personal Info
     fun updatePersonalInfo(personalInfo: PersonalInfo) {
@@ -153,9 +160,12 @@ class ResumeBuilderViewModel : ViewModel() {
         }
     }
 
-    // Export/Save functionality can be added later
-    fun exportResume(): String {
-        // TODO: Implement export to PDF or other formats
-        return "Resume export not yet implemented"
+    fun exportResume(context: Context, format: ResumeExportFormat) {
+        val resumeSnapshot = _resume.value
+        viewModelScope.launch(Dispatchers.IO) {
+            val exporter = ResumeExporter(context)
+            val result = exporter.export(format, resumeSnapshot)
+            _exportEvents.emit(result)
+        }
     }
 }
