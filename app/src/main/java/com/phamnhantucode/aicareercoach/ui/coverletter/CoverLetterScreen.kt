@@ -1,0 +1,455 @@
+package com.phamnhantucode.aicareercoach.ui.coverletter
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.WorkOutline
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.UUID
+import kotlinx.coroutines.launch
+
+data class CoverLetterEntry(
+    val id: String,
+    val companyName: String,
+    val jobTitle: String,
+    val jobDescription: String,
+    val createdAt: Instant
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CoverLetterScreen(
+    onBack: () -> Unit = {},
+    onOpenEditor: (CoverLetterEntry) -> Unit = {}
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val coverLetters = remember { mutableStateListOf(*sampleCoverLetters().toTypedArray()) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+
+    AppTheme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "AI Cover Letters",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    imageVector = Icons.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                        },
+                        actions = {
+                            Button(
+                                onClick = {
+                                    showCreateDialog = true
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.height(36.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = "Create new cover letter"
+                                )
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text(text = "Create New")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                },
+                snackbarHost = { SnackbarHost(snackbarHostState) }
+            ) { innerPadding ->
+                if (coverLetters.isEmpty()) {
+                    EmptyCoverLetterState(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        onCreateNew = { showCreateDialog = true }
+                    )
+                } else {
+                    CoverLetterList(
+                        items = coverLetters,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
+                        onOpen = { entry -> onOpenEditor(entry) },
+                        onDelete = { entry ->
+                            coverLetters.remove(entry)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (showCreateDialog) {
+                CreateCoverLetterDialog(
+                    onDismiss = { showCreateDialog = false },
+                    onCreate = { companyName, jobTitle, jobDescription ->
+                        val entry = CoverLetterEntry(
+                            id = UUID.randomUUID().toString(),
+                            companyName = companyName,
+                            jobTitle = jobTitle,
+                            jobDescription = jobDescription,
+                            createdAt = Instant.now()
+                        )
+                        coverLetters.add(0, entry)
+                        showCreateDialog = false
+                        onOpenEditor(entry)
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("New cover letter drafted")
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverLetterList(
+    items: List<CoverLetterEntry>,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    onOpen: (CoverLetterEntry) -> Unit,
+    onDelete: (CoverLetterEntry) -> Unit
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = contentPadding
+    ) {
+        items(items, key = { it.id }) { entry ->
+            CoverLetterCard(
+                entry = entry,
+                onOpen = { onOpen(entry) },
+                onDelete = { onDelete(entry) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverLetterCard(
+    entry: CoverLetterEntry,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = entry.jobTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    RowWithIconText(
+                        icon = Icons.Filled.WorkOutline,
+                        text = entry.companyName,
+                        contentDescription = "Company name",
+                        maxLines = 1
+                    )
+                    RowWithIconText(
+                        icon = Icons.Filled.Description,
+                        text = entry.jobDescription,
+                        contentDescription = "Job description",
+                        maxLines = 2
+                    )
+                }
+                FilledTonalIconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete cover letter"
+                    )
+                }
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            RowWithIconText(
+                icon = Icons.Filled.Schedule,
+                text = formatTimestamp(entry.createdAt),
+                contentDescription = "Creation time",
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowWithIconText(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    contentDescription: String,
+    maxLines: Int = Int.MAX_VALUE
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            shape = MaterialTheme.shapes.small
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(4.dp)
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun EmptyCoverLetterState(
+    modifier: Modifier = Modifier,
+    onCreateNew: () -> Unit = {}
+) {
+    Box(
+        modifier = modifier.padding(horizontal = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Create your first AI cover letter",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Spin up tailored cover letters and track every role you apply for.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onCreateNew) {
+                Text("Start drafting")
+            }
+        }
+    }
+}
+
+private fun formatTimestamp(instant: Instant): String {
+    val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy • h:mm a", Locale.getDefault())
+    return instant.atZone(ZoneId.systemDefault()).format(formatter)
+}
+
+private fun sampleCoverLetters(): List<CoverLetterEntry> = listOf(
+    CoverLetterEntry(
+        id = "1",
+        companyName = "Acme Corp",
+        jobTitle = "Senior Product Manager",
+        jobDescription = "Lead product strategy for AI-driven customer journey automation.",
+        createdAt = Instant.now().minusSeconds(3600 * 5)
+    ),
+    CoverLetterEntry(
+        id = "2",
+        companyName = "BrightPath Labs",
+        jobTitle = "Product Marketing Lead",
+        jobDescription = "Own GTM launches and storytelling for the data platform portfolio.",
+        createdAt = Instant.now().minusSeconds(3600 * 26)
+    ),
+    CoverLetterEntry(
+        id = "3",
+        companyName = "NeuralWorks",
+        jobTitle = "AI Solutions Architect",
+        jobDescription = "Architect end-to-end AI solutions for enterprise client delivery.",
+        createdAt = Instant.now().minusSeconds(3600 * 72)
+    )
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun CoverLetterScreenPreview() {
+    CoverLetterScreen()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateCoverLetterDialog(
+    onDismiss: () -> Unit,
+    onCreate: (companyName: String, jobTitle: String, jobDescription: String) -> Unit
+) {
+    var companyName by rememberSaveable { mutableStateOf("") }
+    var jobTitle by rememberSaveable { mutableStateOf("") }
+    var jobDescription by rememberSaveable { mutableStateOf("") }
+
+    val isCreateEnabled = companyName.isNotBlank() && jobTitle.isNotBlank() && jobDescription.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create cover letter") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Provide information about the position you're applying for",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = companyName,
+                    onValueChange = { companyName = it },
+                    label = { Text("Company name") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = jobTitle,
+                    onValueChange = { jobTitle = it },
+                    label = { Text("Job title") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = jobDescription,
+                    onValueChange = { jobDescription = it },
+                    label = { Text("Job description") },
+                    minLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onCreate(
+                        companyName.trim(),
+                        jobTitle.trim(),
+                        jobDescription.trim()
+                    )
+                },
+                enabled = isCreateEnabled
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CreateCoverLetterDialogPreview() {
+    AppTheme {
+        CreateCoverLetterDialog(
+            onDismiss = {},
+            onCreate = { _, _, _ -> }
+        )
+    }
+}

@@ -99,7 +99,9 @@ private data class SalaryRange(
 
 @Composable
 fun IndustryInsightsScreen(
-    onNavigateToResumeBuilder: () -> Unit = {}
+    onNavigateToResumeBuilder: () -> Unit = {},
+    onNavigateToInterviewPrep: () -> Unit = {},
+    onNavigateToCoverLetter: () -> Unit = {}
 ) {
     var darkTheme by remember { mutableStateOf(true) }
     val insightMap = remember { sampleInsights() }
@@ -120,7 +122,9 @@ fun IndustryInsightsScreen(
                 HeaderSection(
                     darkTheme = darkTheme,
                     onThemeToggle = { darkTheme = !darkTheme },
-                    onNavigateToResumeBuilder = onNavigateToResumeBuilder
+                    onNavigateToResumeBuilder = onNavigateToResumeBuilder,
+                    onNavigateToInterviewPrep = onNavigateToInterviewPrep,
+                    onNavigateToCoverLetter = onNavigateToCoverLetter
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -159,7 +163,9 @@ fun IndustryInsightsScreen(
 private fun HeaderSection(
     darkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onNavigateToResumeBuilder: () -> Unit
+    onNavigateToResumeBuilder: () -> Unit,
+    onNavigateToInterviewPrep: () -> Unit,
+    onNavigateToCoverLetter: () -> Unit
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -247,7 +253,8 @@ private fun HeaderSection(
                                     growthToolsExpanded = false
                                     when (item) {
                                         "Build Resume" -> onNavigateToResumeBuilder()
-                                        // Add other navigation handlers here when implemented
+                                        "Interview Prep" -> onNavigateToInterviewPrep()
+                                        "Cover Letter" -> onNavigateToCoverLetter()
                                     }
                                 }
                             )
