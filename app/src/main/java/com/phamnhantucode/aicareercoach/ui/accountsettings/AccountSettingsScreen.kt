@@ -19,9 +19,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,44 +39,131 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountSettingsScreen(onBack: () -> Unit) {
+fun AccountSettingsScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: AccountSettingsViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    AccountSettingsContent(
+        uiState = uiState,
+        onBack = onBack,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountSettingsContent(
+    uiState: AccountSettingsUiState,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("Account Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
                     }
                 }
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-        ) {
-            ProfileSection()
-            Spacer(modifier = Modifier.height(16.dp))
-            ConnectedAccountsSection()
-            Spacer(modifier = Modifier.height(16.dp))
-            AppSettingsSection()
+        when {
+            uiState.isLoading -> {
+                AccountSettingsLoadingState(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                )
+            }
+
+            !uiState.isSignedIn -> {
+                AccountSettingsSignedOutState(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 24.dp)
+                )
+            }
+
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ProfileSection(uiState)
+                    ConnectedAccountsSection(uiState.connectedAccounts)
+                    AppSettingsSection()
+                }
+            }
         }
     }
 }
 
 @Composable
-fun ProfileSection() {
+private fun AccountSettingsLoadingState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun AccountSettingsSignedOutState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "You're signed out",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Sign in to manage your profile and connected accounts.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun ProfileSection(uiState: AccountSettingsUiState) {
+    val context = LocalContext.current
+    val displayName = uiState.fullName?.takeUnless { it.isBlank() } ?: "Signed-in user"
+    val email = uiState.primaryEmail ?: "Email not available"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -89,29 +176,43 @@ fun ProfileSection() {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = "User avatar",
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
+            if (!uiState.profileImageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(uiState.profileImageUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Profile image",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "User avatar",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
-                    text = "User Name",
+                    text = displayName,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "user.name@email.com",
+                    text = email,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -121,7 +222,7 @@ fun ProfileSection() {
 }
 
 @Composable
-fun ConnectedAccountsSection() {
+private fun ConnectedAccountsSection(connectedAccounts: List<ConnectedAccountUiState>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -139,15 +240,39 @@ fun ConnectedAccountsSection() {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { /*TODO*/ }) {
-                Text("Connect with Google")
+            if (connectedAccounts.isEmpty()) {
+                Text(
+                    text = "No connected accounts yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    connectedAccounts.forEach { account ->
+                        val providerName = account.providerName.ifBlank { "External account" }
+                        Column {
+                            Text(
+                                text = providerName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            account.emailAddress?.let { emailAddress ->
+                                Text(
+                                    text = emailAddress,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun AppSettingsSection() {
+private fun AppSettingsSection() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -175,7 +300,7 @@ fun AppSettingsSection() {
 }
 
 @Composable
-fun ThemeModeSelector() {
+private fun ThemeModeSelector() {
     var expanded by remember { mutableStateOf(false) }
     var selectedTheme by remember { mutableStateOf("System") }
 
@@ -221,7 +346,7 @@ fun ThemeModeSelector() {
 }
 
 @Composable
-fun LanguageSelector() {
+private fun LanguageSelector() {
     var expanded by remember { mutableStateOf(false) }
     var selectedLanguage by remember { mutableStateOf("English") }
 
@@ -260,7 +385,7 @@ fun LanguageSelector() {
 }
 
 @Composable
-fun FontSelector() {
+private fun FontSelector() {
     var expanded by remember { mutableStateOf(false) }
     var selectedFont by remember { mutableStateOf("Default") }
 
@@ -300,8 +425,29 @@ fun FontSelector() {
 
 @Preview(showBackground = true)
 @Composable
-fun AccountSettingsScreenPreview() {
+private fun AccountSettingsScreenPreview() {
     AppTheme {
-        AccountSettingsScreen { }
+        AccountSettingsContent(
+            uiState = AccountSettingsUiState(
+                isInitialized = true,
+                isLoading = false,
+                isSignedIn = true,
+                fullName = "Ada Lovelace",
+                primaryEmail = "ada.lovelace@example.com",
+                profileImageUrl = null,
+                connectedAccounts = listOf(
+                    ConnectedAccountUiState(
+                        providerName = "Google",
+                        emailAddress = "ada@gmail.com"
+                    ),
+                    ConnectedAccountUiState(
+                        providerName = "GitHub",
+                        emailAddress = "ada@github.com"
+                    )
+                )
+            ),
+            onBack = {}
+        )
     }
 }
+
