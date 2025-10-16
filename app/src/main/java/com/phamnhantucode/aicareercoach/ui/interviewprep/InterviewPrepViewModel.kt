@@ -13,24 +13,6 @@ import kotlin.math.round
 
 class InterviewPrepViewModel : ViewModel() {
 
-    private val _quizState = MutableStateFlow<QuizState?>(null)
-    val quizState: StateFlow<QuizState?> = _quizState.asStateFlow()
-
-    private val _interviewState = MutableStateFlow<InterviewState?>(null)
-    val interviewState: StateFlow<InterviewState?> = _interviewState.asStateFlow()
-
-    private val _userProgress = MutableStateFlow(UserProgress(
-        totalQuizzes = 12,
-        averageScore = 78.5,
-        questionsAnswered = 145,
-        streak = 5,
-        recentScores = listOf(75, 80, 72, 85, 78, 82, 79, 88),
-        completedQuizzes = emptyList()
-    ))
-    val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
-
-    private var timerJob: Job? = null
-
     // Sample quiz questions
     private val quizQuestions = listOf(
         InterviewQuestion(
@@ -126,6 +108,28 @@ class InterviewPrepViewModel : ViewModel() {
         )
     )
 
+    private val _quizState = MutableStateFlow<QuizState?>(null)
+    val quizState: StateFlow<QuizState?> = _quizState.asStateFlow()
+
+    private val _interviewState = MutableStateFlow<InterviewState?>(null)
+    val interviewState: StateFlow<InterviewState?> = _interviewState.asStateFlow()
+
+    private val _userProgress = MutableStateFlow(UserProgress(
+        totalQuizzes = 3,
+        averageScore = 81.6,
+        questionsAnswered = 15,
+        streak = 5,
+        recentScores = listOf(75, 80, 90),
+        completedQuizStates = listOf(
+            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 2), true, LocalDateTime.now().minusDays(1), 80),
+            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 1), true, LocalDateTime.now().minusDays(2), 75),
+            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 1), true, LocalDateTime.now().minusDays(3), 90)
+        )
+    ))
+    val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
+
+    private var timerJob: Job? = null
+
     fun startQuiz() {
         _quizState.value = QuizState(
             questions = quizQuestions,
@@ -190,22 +194,15 @@ class InterviewPrepViewModel : ViewModel() {
     private fun completeQuiz() {
         _quizState.value?.let { state ->
             val score = calculateScore(state.questions, state.answers)
-            val newQuiz = CompletedQuiz(
-                id = System.currentTimeMillis(),
-                score = score,
-                date = LocalDateTime.now(),
-                totalQuestions = state.questions.size
-            )
+            val completedState = state.copy(isComplete = true, finalScore = score)
 
             _userProgress.value = _userProgress.value.copy(
-                completedQuizzes = listOf(newQuiz) + _userProgress.value.completedQuizzes,
+                totalQuizzes = _userProgress.value.totalQuizzes + 1,
+                completedQuizStates = listOf(completedState) + _userProgress.value.completedQuizStates,
                 recentScores = (_userProgress.value.recentScores + score).takeLast(8)
             )
 
-            _quizState.value = state.copy(
-                isComplete = true,
-                finalScore = score
-            )
+            _quizState.value = completedState
         }
     }
 

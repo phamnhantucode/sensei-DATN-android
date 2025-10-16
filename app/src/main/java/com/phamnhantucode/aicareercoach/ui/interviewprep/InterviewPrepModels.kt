@@ -52,16 +52,6 @@ data class InterviewState(
 )
 
 /**
- * Represents a completed quiz for history
- */
-data class CompletedQuiz(
-    val id: Long,
-    val score: Int,
-    val date: LocalDateTime,
-    val totalQuestions: Int
-)
-
-/**
  * User's overall progress and statistics
  */
 data class UserProgress(
@@ -70,7 +60,7 @@ data class UserProgress(
     val questionsAnswered: Int = 0,
     val streak: Int = 0,
     val recentScores: List<Int> = emptyList(),
-    val completedQuizzes: List<CompletedQuiz> = emptyList()
+    val completedQuizStates: List<QuizState> = emptyList()
 )
 
 /**

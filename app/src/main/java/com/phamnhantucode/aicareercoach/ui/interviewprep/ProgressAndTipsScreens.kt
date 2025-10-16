@@ -199,7 +199,7 @@ fun ProgressScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (userProgress.completedQuizzes.isEmpty()) {
+            if (userProgress.completedQuizStates.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -234,7 +234,7 @@ fun ProgressScreen(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    userProgress.completedQuizzes.take(5).forEachIndexed { index, quiz ->
+                    userProgress.completedQuizStates.take(5).forEachIndexed { index, quiz ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
@@ -256,7 +256,7 @@ fun ProgressScreen(
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = quiz.date.format(
+                                        text = quiz.timeStarted.format(
                                             DateTimeFormatter.ofPattern("MMM dd, yyyy")
                                         ),
                                         style = MaterialTheme.typography.bodySmall,
@@ -267,14 +267,14 @@ fun ProgressScreen(
                                     horizontalAlignment = Alignment.End
                                 ) {
                                     Text(
-                                        text = "${quiz.score}%",
+                                        text = "${quiz.finalScore}%",
                                         style = MaterialTheme.typography.headlineSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "${quiz.totalQuestions} questions",
+                                        text = "${quiz.questions.size} questions",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

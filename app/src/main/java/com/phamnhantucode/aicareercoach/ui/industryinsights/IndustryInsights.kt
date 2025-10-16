@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -378,15 +380,21 @@ private fun MarketOverviewSection(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             DemandLevelCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
                 level = insight.demandLevel
             )
             HighlightSkillsCard(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
                 skills = insight.topSkills
             )
         }
@@ -746,16 +754,16 @@ private fun SalaryBar(
 
 @Composable
 private fun TrendsAndSkillsRow(insight: IndustryInsight) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         KeyTrendsCard(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             trends = insight.keyTrends,
         )
         RecommendedSkillsCard(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             skills = insight.recommendedSkills
         )
     }
