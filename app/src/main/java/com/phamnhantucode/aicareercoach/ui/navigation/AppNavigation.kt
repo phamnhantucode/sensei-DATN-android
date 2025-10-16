@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.phamnhantucode.aicareercoach.ui.accountsettings.AccountSettingsScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.editor.CoverLetterEditorScreen
 import com.phamnhantucode.aicareercoach.ui.industryinsights.IndustryInsightsScreen
@@ -68,7 +69,16 @@ fun AppNavigation() {
                 },
                 onNavigateToCoverLetter = {
                     navController.navigate(Screen.CoverLetter.route)
+                },
+                onNavigateToAccountSettings = {
+                    navController.navigate(Screen.AccountSettings.route)
                 }
+            )
+        }
+
+        composable(Screen.AccountSettings.route) {
+            AccountSettingsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

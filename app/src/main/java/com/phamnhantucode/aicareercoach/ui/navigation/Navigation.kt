@@ -10,6 +10,7 @@ sealed class Screen(val route: String) {
     object ResumeBuilder : Screen("resume_builder")
     object InterviewPrep : Screen("interview_prep")
     object CoverLetter : Screen("cover_letter")
+    object AccountSettings : Screen("account_settings")
     object CoverLetterEditor : Screen("cover_letter_editor") {
         private const val JobTitleArg = "jobTitle"
         private const val CompanyArg = "company"

@@ -1,6 +1,7 @@
 package com.phamnhantucode.aicareercoach.ui.industryinsights
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,7 +104,8 @@ private data class SalaryRange(
 fun IndustryInsightsScreen(
     onNavigateToResumeBuilder: () -> Unit = {},
     onNavigateToInterviewPrep: () -> Unit = {},
-    onNavigateToCoverLetter: () -> Unit = {}
+    onNavigateToCoverLetter: () -> Unit = {},
+    onNavigateToAccountSettings: () -> Unit = {}
 ) {
     var darkTheme by remember { mutableStateOf(true) }
     val insightMap = remember { sampleInsights() }
@@ -126,7 +128,8 @@ fun IndustryInsightsScreen(
                     onThemeToggle = { darkTheme = !darkTheme },
                     onNavigateToResumeBuilder = onNavigateToResumeBuilder,
                     onNavigateToInterviewPrep = onNavigateToInterviewPrep,
-                    onNavigateToCoverLetter = onNavigateToCoverLetter
+                    onNavigateToCoverLetter = onNavigateToCoverLetter,
+                    onNavigateToAccountSettings = onNavigateToAccountSettings
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -167,7 +170,8 @@ private fun HeaderSection(
     onThemeToggle: () -> Unit,
     onNavigateToResumeBuilder: () -> Unit,
     onNavigateToInterviewPrep: () -> Unit,
-    onNavigateToCoverLetter: () -> Unit
+    onNavigateToCoverLetter: () -> Unit,
+    onNavigateToAccountSettings: () -> Unit
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -198,7 +202,8 @@ private fun HeaderSection(
                         .background(
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                             shape = CircleShape
-                        ),
+                        )
+                        .clickable { onNavigateToAccountSettings() },
                     contentAlignment = Alignment.Center
                 ) {
                     Surface(
@@ -1032,5 +1037,5 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
 @Composable
 @Preview(showBackground = true)
 private fun IndustryInsightsScreenPreview() {
-    IndustryInsightsScreen()
+    IndustryInsightsScreen(onNavigateToAccountSettings = { })
 }
