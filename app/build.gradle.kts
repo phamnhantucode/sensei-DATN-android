@@ -1,8 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+val localProperties = Properties().also { properties ->
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use(properties::load)
+    }
+}
+
+val neonApiUrl =
+    localProperties.getProperty(
+        "NEON_API_URL",
+        "https://ep-lucky-resonance-adsnlrny.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1"
+    )
+val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
 
 android {
     namespace = "com.phamnhantucode.aicareercoach"
@@ -21,6 +37,8 @@ android {
             "CLERK_PUBLISHABLE_KEY",
             "\"pk_test_YXJyaXZpbmctZm93bC05LmNsZXJrLmFjY291bnRzLmRldiQ\""
         )
+        buildConfigField("String", "NEON_API_URL", "\"$neonApiUrl\"")
+        buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
     }
 
     buildTypes {
@@ -68,4 +86,5 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation(libs.clerk.android)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

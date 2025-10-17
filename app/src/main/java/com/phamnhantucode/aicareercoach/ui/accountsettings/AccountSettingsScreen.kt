@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,6 +65,7 @@ fun AccountSettingsScreen(
     AccountSettingsContent(
         uiState = uiState,
         onBack = onBack,
+        onSignOut = viewModel::signOut,
         modifier = modifier
     )
 }
@@ -72,6 +75,7 @@ fun AccountSettingsScreen(
 private fun AccountSettingsContent(
     uiState: AccountSettingsUiState,
     onBack: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -119,7 +123,11 @@ private fun AccountSettingsContent(
                 ) {
                     ProfileSection(uiState)
                     ConnectedAccountsSection(uiState.connectedAccounts)
-                    AppSettingsSection()
+                    AppSettingsSection(
+                        isSigningOut = uiState.isSigningOut,
+                        signOutError = uiState.signOutError,
+                        onSignOut = onSignOut
+                    )
                 }
             }
         }
@@ -272,7 +280,11 @@ private fun ConnectedAccountsSection(connectedAccounts: List<ConnectedAccountUiS
 }
 
 @Composable
-private fun AppSettingsSection() {
+private fun AppSettingsSection(
+    isSigningOut: Boolean,
+    signOutError: String?,
+    onSignOut: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -295,6 +307,35 @@ private fun AppSettingsSection() {
             LanguageSelector()
             Spacer(modifier = Modifier.height(16.dp))
             FontSelector()
+            Spacer(modifier = Modifier.height(24.dp))
+            if (!signOutError.isNullOrBlank()) {
+                Text(
+                    text = signOutError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            Button(
+                onClick = onSignOut,
+                enabled = !isSigningOut,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isSigningOut) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                Text(text = "Sign out")
+            }
         }
     }
 }
@@ -446,8 +487,8 @@ private fun AccountSettingsScreenPreview() {
                     )
                 )
             ),
-            onBack = {}
+            onBack = {},
+            onSignOut = {}
         )
     }
 }
-

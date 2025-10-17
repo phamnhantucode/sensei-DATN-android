@@ -1,5 +1,6 @@
 package com.phamnhantucode.aicareercoach.ui.login
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clerk.api.Clerk
@@ -7,36 +8,51 @@ import com.clerk.api.network.serialization.ClerkResult
 import com.clerk.api.network.serialization.longErrorMessageOrNull
 import com.clerk.api.network.serialization.onFailure
 import com.clerk.api.network.serialization.onSuccess
+import com.clerk.api.session.fetchToken
 import com.clerk.api.signin.SignIn
 import com.clerk.api.signup.SignUp
 import com.clerk.api.signup.attemptVerification
 import com.clerk.api.signup.prepareVerification
 import com.clerk.api.sso.OAuthProvider
+import com.clerk.api.user.User
+import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 class LoginViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState = _uiState.asStateFlow()
 
+    private var lastSyncedUserId: String? = null
+    private var syncInProgress = false
+
     init {
         combine(
             Clerk.isInitialized,
             Clerk.userFlow
         ) { isInitialized, user ->
-            isInitialized to (user != null)
-        }.onEach { (isInitialized, isSignedIn) ->
+            isInitialized to user
+        }.onEach { (isInitialized, user) ->
             _uiState.update { current ->
                 current.copy(
                     isInitialized = isInitialized,
-                    isSignedIn = isSignedIn
+                    isSignedIn = user != null
                 )
+            }
+            if (user != null) {
+                syncUserIfNeeded(user)
+            } else {
+                lastSyncedUserId = null
             }
         }.launchIn(viewModelScope)
     }
@@ -243,6 +259,68 @@ class LoginViewModel : ViewModel() {
                     }
                 }
         }
+    }
+
+    private fun syncUserIfNeeded(user: User) {
+        val userId = user.id
+        if (syncInProgress) return
+        if (userId == lastSyncedUserId) return
+
+        viewModelScope.launch {
+            syncInProgress = true
+            try {
+                val authToken = fetchNeonAuthToken()
+                if (authToken == null) {
+                    Log.w(TAG, "Unable to obtain Neon auth token; sync skipped.")
+                } else {
+                    NeonUserService.upsertUser(user, authToken)
+                    lastSyncedUserId = userId
+                }
+            } catch (cancellation: CancellationException) {
+                // Coroutine was cancelled (e.g., navigation or ViewModel cleared)
+                // This is expected behavior, so just propagate it without logging
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to sync user ${user.id} with Neon.", error)
+            } finally {
+                syncInProgress = false
+            }
+        }
+    }
+
+    private suspend fun fetchNeonAuthToken(): String? {
+        // Check if coroutine is still active before proceeding
+        if (!coroutineContext.isActive) return null
+
+        val session = Clerk.session
+        if (session == null) {
+            Log.w(TAG, "Clerk session unavailable; cannot fetch Neon auth token.")
+            return BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+        }
+
+        var jwt: String? = null
+        try {
+            session
+                .fetchToken()
+                .onSuccess { tokenResource ->
+                    jwt = tokenResource.jwt
+                }
+                .onFailure { failure ->
+                    Log.e(
+                        TAG,
+                        failure.longErrorMessageOrNull
+                            ?: "Failed to fetch Clerk session token for Neon."
+                    )
+                }
+        } catch (e: CancellationException) {
+            // Silently handle cancellation - don't log it
+            return null
+        }
+        return jwt ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+    }
+
+    companion object {
+        private const val TAG = "LoginViewModel"
     }
 }
 
