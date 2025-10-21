@@ -8,7 +8,7 @@ import com.clerk.api.network.serialization.successOrElse
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 
 /**
  * Internal service for fetching and managing session tokens.
@@ -53,7 +53,7 @@ internal class SessionTokenFetcher(private val jwtManager: JWTManager = JWTManag
     }
 
     // Create new task
-    return coroutineScope {
+    return supervisorScope {
       val deferred = async { fetchToken(session, options) }
 
       // Atomic put-if-absent operation
@@ -61,7 +61,7 @@ internal class SessionTokenFetcher(private val jwtManager: JWTManager = JWTManag
       if (existingTask != null) {
         // Another coroutine beat us to it, cancel our task and use theirs
         deferred.cancel()
-        return@coroutineScope existingTask.await()
+        return@supervisorScope existingTask.await()
       }
 
       // We're the first, execute our task

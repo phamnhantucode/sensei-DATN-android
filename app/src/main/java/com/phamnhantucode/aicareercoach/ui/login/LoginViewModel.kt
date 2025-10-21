@@ -269,10 +269,7 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             syncInProgress = true
             try {
-                val authToken = fetchNeonAuthToken()
-                if (authToken == null) {
-                    Log.w(TAG, "Unable to obtain Neon auth token; sync skipped.")
-                } else {
+                fetchNeonAuthToken { authToken ->
                     NeonUserService.upsertUser(user, authToken)
                     lastSyncedUserId = userId
                 }
@@ -288,35 +285,82 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    private suspend fun fetchNeonAuthToken(): String? {
+    private suspend fun fetchNeonAuthToken(onSuccess: suspend (String) -> Unit) {
         // Check if coroutine is still active before proceeding
-        if (!coroutineContext.isActive) return null
+        if (!coroutineContext.isActive) return
 
+        val fallbackToken = BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+        val basicAuthConfigured =
+            BuildConfig.NEON_DB_ROLE.isNotBlank() && BuildConfig.NEON_DB_PASSWORD.isNotBlank()
         val session = Clerk.session
         if (session == null) {
             Log.w(TAG, "Clerk session unavailable; cannot fetch Neon auth token.")
-            return BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+            if (fallbackToken != null) {
+                onSuccess(fallbackToken)
+            } else if (basicAuthConfigured) {
+                onSuccess("")
+            } else {
+                Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
+            }
+            return
         }
 
-        var jwt: String? = null
-        try {
-            session
-                .fetchToken()
-                .onSuccess { tokenResource ->
-                    jwt = tokenResource.jwt
-                }
-                .onFailure { failure ->
-                    Log.e(
-                        TAG,
-                        failure.longErrorMessageOrNull
-                            ?: "Failed to fetch Clerk session token for Neon."
-                    )
-                }
-        } catch (e: CancellationException) {
-            // Silently handle cancellation - don't log it
-            return null
+        val cachedSessionToken = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
+        if (cachedSessionToken != null) {
+            onSuccess(cachedSessionToken)
+            return
         }
-        return jwt ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+
+        val clerkResult = try {
+            session.fetchToken()
+        } catch (cancellation: CancellationException) {
+            if (fallbackToken != null) {
+                Log.w(TAG, "Clerk session token fetch cancelled; using Neon API key fallback.")
+                onSuccess(fallbackToken)
+            } else if (basicAuthConfigured) {
+                Log.w(TAG, "Clerk session token fetch cancelled; using Neon role/password fallback.")
+                onSuccess("")
+            } else {
+                throw cancellation
+            }
+            return
+        } catch (error: Exception) {
+            Log.e(TAG, "Failed to fetch Clerk session token for Neon.", error)
+            if (fallbackToken != null) {
+                onSuccess(fallbackToken)
+            } else if (basicAuthConfigured) {
+                onSuccess("")
+            } else {
+                Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
+            }
+            return
+        }
+
+        when (clerkResult) {
+            is ClerkResult.Success -> {
+                val jwt = clerkResult.value.jwt?.takeUnless { it.isBlank() }
+                when {
+                    jwt != null -> onSuccess(jwt)
+                    fallbackToken != null -> onSuccess(fallbackToken)
+                    basicAuthConfigured -> onSuccess("")
+                    else -> Log.w(TAG, "Clerk returned an empty Neon auth token; sync skipped.")
+                }
+            }
+            is ClerkResult.Failure -> {
+                Log.e(
+                    TAG,
+                    clerkResult.longErrorMessageOrNull
+                        ?: "Failed to fetch Clerk session token for Neon."
+                )
+                if (fallbackToken != null) {
+                    onSuccess(fallbackToken)
+                } else if (basicAuthConfigured) {
+                    onSuccess("")
+                } else {
+                    Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
+                }
+            }
+        }
     }
 
     companion object {

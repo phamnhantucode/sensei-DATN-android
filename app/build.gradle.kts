@@ -19,6 +19,8 @@ val neonApiUrl =
         "https://ep-lucky-resonance-adsnlrny.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1"
     )
 val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
+val neonDbRole = localProperties.getProperty("NEON_DB_ROLE", "")
+val neonDbPassword = localProperties.getProperty("NEON_DB_PASSWORD", "")
 
 android {
     namespace = "com.phamnhantucode.aicareercoach"
@@ -39,6 +41,8 @@ android {
         )
         buildConfigField("String", "NEON_API_URL", "\"$neonApiUrl\"")
         buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
+        buildConfigField("String", "NEON_DB_ROLE", "\"$neonDbRole\"")
+        buildConfigField("String", "NEON_DB_PASSWORD", "\"$neonDbPassword\"")
     }
 
     buildTypes {
