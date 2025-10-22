@@ -36,6 +36,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedFilterChip
@@ -49,6 +50,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,8 +63,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.LocalDate
@@ -70,95 +74,121 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
-private enum class MarketOutlook {
-    POSITIVE, NEUTRAL, NEGATIVE
-}
-
-private enum class DemandLevel {
-    HIGH, MEDIUM, LOW
-}
-
-private data class IndustryInsight(
-    val id: String,
-    val name: String,
-    val marketOutlook: MarketOutlook,
-    val growthRate: Float,
-    val demandLevel: DemandLevel,
-    val topSkills: List<String>,
-    val salaryRanges: List<SalaryRange>,
-    val keyTrends: List<String>,
-    val recommendedSkills: List<String>,
-    val lastUpdated: LocalDate,
-    val nextUpdate: LocalDate,
-)
-
-private data class SalaryRange(
-    val role: String,
-    val location: String,
-    val min: Int,
-    val median: Int,
-    val max: Int,
-)
-
 @Composable
 fun IndustryInsightsScreen(
     onNavigateToResumeBuilder: () -> Unit = {},
     onNavigateToInterviewPrep: () -> Unit = {},
     onNavigateToCoverLetter: () -> Unit = {},
-    onNavigateToAccountSettings: () -> Unit = {}
+    onNavigateToAccountSettings: () -> Unit = {},
+    viewModel: IndustryInsightsViewModel = viewModel(),
 ) {
     var darkTheme by remember { mutableStateOf(true) }
-    val insightMap = remember { sampleInsights() }
-    var selectedIndustryId by remember { mutableStateOf(insightMap.keys.first()) }
-    val selectedInsight = insightMap[selectedIndustryId] ?: insightMap.values.first()
+    val uiState by viewModel.uiState.collectAsState()
+
+    IndustryInsightsLayout(
+        darkTheme = darkTheme,
+        onThemeToggle = { darkTheme = !darkTheme },
+        uiState = uiState,
+        onRefresh = { viewModel.refreshInsights(forceRefresh = true) },
+        onDismissError = viewModel::clearError,
+        onIndustrySelected = viewModel::selectIndustry,
+        onNavigateToResumeBuilder = onNavigateToResumeBuilder,
+        onNavigateToInterviewPrep = onNavigateToInterviewPrep,
+        onNavigateToCoverLetter = onNavigateToCoverLetter,
+        onNavigateToAccountSettings = onNavigateToAccountSettings
+    )
+}
+
+@Composable
+private fun IndustryInsightsLayout(
+    darkTheme: Boolean,
+    onThemeToggle: () -> Unit,
+    uiState: IndustryInsightsUiState,
+    onRefresh: () -> Unit,
+    onDismissError: () -> Unit,
+    onIndustrySelected: (String) -> Unit,
+    onNavigateToResumeBuilder: () -> Unit,
+    onNavigateToInterviewPrep: () -> Unit,
+    onNavigateToCoverLetter: () -> Unit,
+    onNavigateToAccountSettings: () -> Unit,
+) {
+    val selectedInsight = uiState.selectedInsight
 
     AppTheme(darkTheme = darkTheme) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            InsetAwareColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
-            ) {
-                HeaderSection(
-                    darkTheme = darkTheme,
-                    onThemeToggle = { darkTheme = !darkTheme },
-                    onNavigateToResumeBuilder = onNavigateToResumeBuilder,
-                    onNavigateToInterviewPrep = onNavigateToInterviewPrep,
-                    onNavigateToCoverLetter = onNavigateToCoverLetter,
-                    onNavigateToAccountSettings = onNavigateToAccountSettings
-                )
+            when {
+                selectedInsight == null && uiState.isLoading -> {
+                    IndustryInsightsLoading()
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                selectedInsight == null && uiState.errorMessage != null -> {
+                    IndustryInsightsError(
+                        message = uiState.errorMessage ?: "Unable to load industry insights.",
+                        onRetry = onRefresh
+                    )
+                }
 
-                DataFreshnessRow(
-                    lastUpdated = selectedInsight.lastUpdated,
-                    nextUpdate = selectedInsight.nextUpdate
-                )
+                selectedInsight != null -> {
+                    InsetAwareColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
+                    ) {
+                        HeaderSection(
+                            darkTheme = darkTheme,
+                            onThemeToggle = onThemeToggle,
+                            onNavigateToResumeBuilder = onNavigateToResumeBuilder,
+                            onNavigateToInterviewPrep = onNavigateToInterviewPrep,
+                            onNavigateToCoverLetter = onNavigateToCoverLetter,
+                            onNavigateToAccountSettings = onNavigateToAccountSettings
+                        )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                IndustrySelector(
-                    insights = insightMap.values.toList(),
-                    selectedId = selectedIndustryId,
-                    onIndustrySelected = { selectedIndustryId = it }
-                )
+                        uiState.errorMessage?.let { message ->
+                            ErrorBanner(
+                                message = message,
+                                onDismiss = onDismissError
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        DataFreshnessRow(
+                            lastUpdated = selectedInsight.lastUpdated,
+                            nextUpdate = selectedInsight.nextUpdate,
+                            isRefreshing = uiState.isRefreshing,
+                            onRefresh = onRefresh
+                        )
 
-                MarketOverviewSection(insight = selectedInsight)
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        IndustrySelector(
+                            insights = uiState.insights,
+                            selectedId = selectedInsight.id,
+                            onIndustrySelected = onIndustrySelected
+                        )
 
-                SalaryRangesCard(salaryRanges = selectedInsight.salaryRanges)
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        MarketOverviewSection(insight = selectedInsight)
 
-                TrendsAndSkillsRow(insight = selectedInsight)
+                        Spacer(modifier = Modifier.height(24.dp))
 
+                        SalaryRangesCard(salaryRanges = selectedInsight.salaryRanges)
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        TrendsAndSkillsRow(insight = selectedInsight)
+                    }
+                }
+
+                else -> {
+                    IndustryInsightsLoading()
+                }
             }
         }
     }
@@ -311,37 +341,133 @@ private fun HeaderSection(
 private fun DataFreshnessRow(
     lastUpdated: LocalDate,
     nextUpdate: LocalDate,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            shape = RoundedCornerShape(999.dp),
-            modifier = Modifier.padding(end = 8.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                Text(
+                    text = "Last updated: ${lastUpdated.format(formatter)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
             Text(
-                text = "Last updated: ${lastUpdated.format(formatter)}",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                text = "Next update ${relativeDate(nextUpdate)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(
-            text = "Next update ${relativeDate(nextUpdate)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+
+        if (isRefreshing) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(999.dp))
+            )
+        } else {
+            OutlinedButton(
+                onClick = onRefresh,
+                shape = RoundedCornerShape(999.dp)
+            ) {
+                Text("Refresh insights")
+            }
+        }
+    }
+}
+
+@Composable
+private fun IndustryInsightsLoading() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun IndustryInsightsError(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center
+            )
+            Button(onClick = onRetry) {
+                Text("Try again")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorBanner(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Dismiss")
+            }
+        }
     }
 }
 
 @Composable
 private fun IndustrySelector(
-    insights: List<IndustryInsight>,
+    insights: List<IndustryInsightUiModel>,
     selectedId: String,
     onIndustrySelected: (String) -> Unit,
 ) {
@@ -366,7 +492,7 @@ private fun IndustrySelector(
 
 @Composable
 private fun MarketOverviewSection(
-    insight: IndustryInsight,
+    insight: IndustryInsightUiModel,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(
@@ -615,7 +741,7 @@ private fun HighlightSkillsCard(
 
 @Composable
 private fun SalaryRangesCard(
-    salaryRanges: List<SalaryRange>,
+    salaryRanges: List<SalaryRangeUiModel>,
 ) {
     val maxSalary = salaryRanges.maxOfOrNull { it.max }?.coerceAtLeast(1) ?: 1
 
@@ -657,7 +783,7 @@ private fun SalaryRangesCard(
 
 @Composable
 private fun SalaryRangeRow(
-    range: SalaryRange,
+    range: SalaryRangeUiModel,
     maxSalary: Int,
 ) {
     Column(
@@ -758,7 +884,7 @@ private fun SalaryBar(
 }
 
 @Composable
-private fun TrendsAndSkillsRow(insight: IndustryInsight) {
+private fun TrendsAndSkillsRow(insight: IndustryInsightUiModel) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -927,10 +1053,10 @@ private fun relativeDate(target: LocalDate): String {
     }
 }
 
-private fun sampleInsights(): Map<String, IndustryInsight> {
+private fun sampleInsights(): Map<String, IndustryInsightUiModel> {
     val today = LocalDate.now()
     return listOf(
-        IndustryInsight(
+        IndustryInsightUiModel(
             id = "technology",
             name = "Technology",
             marketOutlook = MarketOutlook.POSITIVE,
@@ -944,11 +1070,11 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
                 "Product Strategy"
             ),
             salaryRanges = listOf(
-                SalaryRange("Machine Learning Engineer", "Remote · US", 115000, 152000, 185000),
-                SalaryRange("Senior Software Engineer", "SF Bay Area · US", 135000, 168000, 210000),
-                SalaryRange("Product Manager", "Austin · US", 110000, 145000, 185000),
-                SalaryRange("Security Engineer", "Seattle · US", 120000, 150000, 195000),
-                SalaryRange("Data Scientist", "New York · US", 118000, 155000, 190000)
+                SalaryRangeUiModel("Machine Learning Engineer", "Remote · US", 115000, 152000, 185000),
+                SalaryRangeUiModel("Senior Software Engineer", "SF Bay Area · US", 135000, 168000, 210000),
+                SalaryRangeUiModel("Product Manager", "Austin · US", 110000, 145000, 185000),
+                SalaryRangeUiModel("Security Engineer", "Seattle · US", 120000, 150000, 195000),
+                SalaryRangeUiModel("Data Scientist", "New York · US", 118000, 155000, 190000)
             ),
             keyTrends = listOf(
                 "Generative AI adoption is driving demand for applied machine learning roles.",
@@ -965,7 +1091,7 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
             lastUpdated = today.minusDays(3),
             nextUpdate = today.plusDays(4)
         ),
-        IndustryInsight(
+        IndustryInsightUiModel(
             id = "finance",
             name = "Financial Services",
             marketOutlook = MarketOutlook.POSITIVE,
@@ -978,11 +1104,11 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
                 "RegTech"
             ),
             salaryRanges = listOf(
-                SalaryRange("Quantitative Analyst", "New York · US", 125000, 160000, 210000),
-                SalaryRange("Risk Manager", "Chicago · US", 105000, 138000, 175000),
-                SalaryRange("FinTech Product Lead", "Remote · US", 115000, 148000, 185000),
-                SalaryRange("Data Engineer", "Toronto · CA", 95000, 130000, 168000),
-                SalaryRange("Compliance Officer", "London · UK", 80000, 110000, 140000)
+                SalaryRangeUiModel("Quantitative Analyst", "New York · US", 125000, 160000, 210000),
+                SalaryRangeUiModel("Risk Manager", "Chicago · US", 105000, 138000, 175000),
+                SalaryRangeUiModel("FinTech Product Lead", "Remote · US", 115000, 148000, 185000),
+                SalaryRangeUiModel("Data Engineer", "Toronto · CA", 95000, 130000, 168000),
+                SalaryRangeUiModel("Compliance Officer", "London · UK", 80000, 110000, 140000)
             ),
             keyTrends = listOf(
                 "Open banking APIs are reshaping payment experiences worldwide.",
@@ -998,7 +1124,7 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
             lastUpdated = today.minusDays(5),
             nextUpdate = today.plusDays(2)
         ),
-        IndustryInsight(
+        IndustryInsightUiModel(
             id = "healthcare",
             name = "Healthcare & Life Sciences",
             marketOutlook = MarketOutlook.POSITIVE,
@@ -1011,11 +1137,11 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
                 "Population Health"
             ),
             salaryRanges = listOf(
-                SalaryRange("Clinical Data Scientist", "Boston · US", 98000, 132000, 170000),
-                SalaryRange("Digital Health PM", "Remote · US", 105000, 140000, 175000),
-                SalaryRange("Healthcare Analyst", "Los Angeles · US", 88000, 118000, 145000),
-                SalaryRange("Telemedicine Lead", "Remote · US", 95000, 125000, 158000),
-                SalaryRange("Regulatory Specialist", "Berlin · DE", 70000, 96000, 125000)
+                SalaryRangeUiModel("Clinical Data Scientist", "Boston · US", 98000, 132000, 170000),
+                SalaryRangeUiModel("Digital Health PM", "Remote · US", 105000, 140000, 175000),
+                SalaryRangeUiModel("Healthcare Analyst", "Los Angeles · US", 88000, 118000, 145000),
+                SalaryRangeUiModel("Telemedicine Lead", "Remote · US", 95000, 125000, 158000),
+                SalaryRangeUiModel("Regulatory Specialist", "Berlin · DE", 70000, 96000, 125000)
             ),
             keyTrends = listOf(
                 "Remote patient monitoring programs are becoming standard offerings.",
@@ -1037,5 +1163,23 @@ private fun sampleInsights(): Map<String, IndustryInsight> {
 @Composable
 @Preview(showBackground = true)
 private fun IndustryInsightsScreenPreview() {
-    IndustryInsightsScreen(onNavigateToAccountSettings = { })
+    val sampleInsights = sampleInsights()
+    val uiState = IndustryInsightsUiState(
+        isLoading = false,
+        insights = sampleInsights.values.toList(),
+        selectedIndustryId = sampleInsights.keys.first(),
+        errorMessage = null
+    )
+    IndustryInsightsLayout(
+        darkTheme = true,
+        onThemeToggle = {},
+        uiState = uiState,
+        onRefresh = {},
+        onDismissError = {},
+        onIndustrySelected = {},
+        onNavigateToResumeBuilder = {},
+        onNavigateToInterviewPrep = {},
+        onNavigateToCoverLetter = {},
+        onNavigateToAccountSettings = {}
+    )
 }

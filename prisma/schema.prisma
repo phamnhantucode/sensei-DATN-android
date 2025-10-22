@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clerkUserId   String         @unique
   email         String         @unique
   name          String?
@@ -28,8 +28,8 @@ model User {
 }
 
 model Assessment {
-  id            String    @id @default(cuid())
-  userId        String
+  id            String    @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
+  userId        String    @db.Uuid
   user          User      @relation(fields: [userId], references: [id])
   quizScore     Float
   questions     Json[]
@@ -42,8 +42,8 @@ model Assessment {
 }
 
 model Resume {
-  id          String   @id @default(cuid())
-  userId      String   @unique
+  id          String   @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
+  userId      String   @unique @db.Uuid
   user        User     @relation(fields: [userId], references: [id])
   content     String   @db.Text
   atsScore    Float?
@@ -53,11 +53,11 @@ model Resume {
 }
 
 model CoverLetter {
-  id              String   @id @default(cuid())
-  userId          String
+  id              String   @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
+  userId          String   @db.Uuid
   user            User     @relation(fields: [userId], references: [id])
-  content         String
-  jobDescription  String?
+  content         String   @db.Text
+  jobDescription  String?  @db.Text
   companyName     String
   jobTitle        String
   status          String   @default("draft")
@@ -68,7 +68,7 @@ model CoverLetter {
 }
 
 model IndustryInsight {
-  id            String   @id @default(cuid())
+  id            String   @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
   industry      String   @unique
 
   users         User[]
@@ -77,12 +77,12 @@ model IndustryInsight {
 
   growthRate    Float
   demandLevel   String
-  topSkills     String[]
+  topSkills     String[]  @default([])
 
   marketOutlook String
-  keyTrends     String[]
+  keyTrends     String[]  @default([])
 
-  recommendedSkills String[]
+  recommendedSkills String[] @default([])
 
   lastUpdated   DateTime @default(now())
   nextUpdate    DateTime

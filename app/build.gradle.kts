@@ -21,6 +21,7 @@ val neonApiUrl =
 val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
 val neonDbRole = localProperties.getProperty("NEON_DB_ROLE", "")
 val neonDbPassword = localProperties.getProperty("NEON_DB_PASSWORD", "")
+val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY", "")
 
 android {
     namespace = "com.phamnhantucode.aicareercoach"
@@ -43,6 +44,7 @@ android {
         buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
         buildConfigField("String", "NEON_DB_ROLE", "\"$neonDbRole\"")
         buildConfigField("String", "NEON_DB_PASSWORD", "\"$neonDbPassword\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
 
     buildTypes {
@@ -64,6 +66,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/DEPENDENCIES"
+        }
     }
 }
 
