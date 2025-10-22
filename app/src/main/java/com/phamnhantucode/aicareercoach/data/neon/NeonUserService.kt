@@ -5,6 +5,7 @@ import android.util.Log
 import com.clerk.api.user.User
 import com.phamnhantucode.aicareercoach.BuildConfig
 import java.io.IOException
+import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -76,6 +77,11 @@ object NeonUserService {
             val bodyString = response.body?.string()
             if (!response.isSuccessful) {
                 val errorMessage = bodyString ?: "Empty response body"
+                if (response.code == 409 && bodyString?.contains("duplicate key value") == true) {
+                    Log.i(TAG, "Neon record exists for ${user.id}; attempting to update instead.")
+                    updateExistingUser(apiUrl, authorizationHeader, user, payload)
+                    return@withContext
+                }
                 throw IOException("Neon query failed (${response.code}): $errorMessage")
             }
             Log.d(TAG, "Synced Clerk user ${user.id} with Neon.")
@@ -100,6 +106,33 @@ object NeonUserService {
         return combined
             ?: user.username?.takeUnless { it.isBlank() }
             ?: resolvePrimaryEmail(user)
+    }
+
+    private fun updateExistingUser(
+        apiUrl: String,
+        authorizationHeader: String,
+        user: User,
+        payload: JSONObject,
+    ) {
+        val encodedClerkId = URLEncoder.encode(user.id, UTF_8.name())
+        val request =
+            Request.Builder()
+                .url("$apiUrl/User?clerkUserId=eq.$encodedClerkId")
+                .addHeader("Authorization", authorizationHeader)
+                .addHeader("Content-Type", "application/json")
+                .patch(payload.toString().toRequestBody(jsonMediaType))
+                .build()
+
+        client.newCall(request).execute().use { patchResponse ->
+            val bodyString = patchResponse.body?.string()
+            if (!patchResponse.isSuccessful) {
+                val errorMessage = bodyString ?: "Empty response body"
+                throw IOException(
+                    "Neon update failed (${patchResponse.code}) for ${user.id}: $errorMessage"
+                )
+            }
+            Log.d(TAG, "Updated existing Neon user ${user.id}.")
+        }
     }
 
 }

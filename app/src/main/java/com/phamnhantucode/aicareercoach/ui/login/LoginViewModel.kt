@@ -18,9 +18,12 @@ import com.clerk.api.user.User
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -34,7 +37,9 @@ class LoginViewModel : ViewModel() {
     val uiState = _uiState.asStateFlow()
 
     private var lastSyncedUserId: String? = null
-    private var syncInProgress = false
+    private var neonAuthToken: String? = null
+    private var neonTokenJob: Job? = null
+    private var neonUserSyncJob: Job? = null
 
     init {
         combine(
@@ -49,10 +54,13 @@ class LoginViewModel : ViewModel() {
                     isSignedIn = user != null
                 )
             }
-            if (user != null) {
-                syncUserIfNeeded(user)
-            } else {
+            if (user == null) {
                 lastSyncedUserId = null
+                neonAuthToken = null
+                neonTokenJob?.cancel()
+                neonTokenJob = null
+                neonUserSyncJob?.cancel()
+                neonUserSyncJob = null
             }
         }.launchIn(viewModelScope)
     }
@@ -82,6 +90,7 @@ class LoginViewModel : ViewModel() {
                 )
                 .onSuccess {
                     _uiState.update { state -> state.copy(isProcessing = false) }
+                    refreshNeonAuthTokenAsync()
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
@@ -125,6 +134,7 @@ class LoginViewModel : ViewModel() {
                                 verificationEmail = null
                             )
                         }
+                        syncNewClerkUserAsync()
                         return@onSuccess
                     }
 
@@ -199,6 +209,7 @@ class LoginViewModel : ViewModel() {
                             verificationEmail = null
                         )
                     }
+                    syncNewClerkUserAsync()
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
@@ -219,6 +230,8 @@ class LoginViewModel : ViewModel() {
     fun resetVerification() {
         _uiState.update { it.copy(verificationEmail = null) }
     }
+
+    fun currentNeonAuthToken(): String? = neonAuthToken
 
     fun signInWithGoogle() {
         if (!_uiState.value.isInitialized) {
@@ -248,6 +261,7 @@ class LoginViewModel : ViewModel() {
                     _uiState.update { state ->
                         state.copy(isProcessing = false)
                     }
+                    refreshNeonAuthTokenAsync()
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
@@ -261,33 +275,50 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    private fun syncUserIfNeeded(user: User) {
-        val userId = user.id
-        if (syncInProgress) return
-        if (userId == lastSyncedUserId) return
-
-        viewModelScope.launch {
-            syncInProgress = true
-            try {
-                fetchNeonAuthToken { authToken ->
-                    NeonUserService.upsertUser(user, authToken)
-                    lastSyncedUserId = userId
-                }
+    private fun refreshNeonAuthTokenAsync() {
+        neonTokenJob?.cancel()
+        neonTokenJob = viewModelScope.launch {
+            neonAuthToken = try {
+                fetchNeonAuthToken()
             } catch (cancellation: CancellationException) {
-                // Coroutine was cancelled (e.g., navigation or ViewModel cleared)
-                // This is expected behavior, so just propagate it without logging
                 throw cancellation
             } catch (error: Exception) {
-                Log.e(TAG, "Failed to sync user ${user.id} with Neon.", error)
-            } finally {
-                syncInProgress = false
+                Log.e(TAG, "Failed to refresh Neon auth token.", error)
+                null
             }
         }
     }
 
-    private suspend fun fetchNeonAuthToken(onSuccess: suspend (String) -> Unit) {
+    private fun syncNewClerkUserAsync(initialUser: User? = null) {
+        neonUserSyncJob?.cancel()
+        neonUserSyncJob = viewModelScope.launch {
+            try {
+                val user = initialUser ?: awaitClerkUser() ?: return@launch
+                val userId = user.id
+                if (userId == lastSyncedUserId) return@launch
+                val authToken = fetchNeonAuthToken() ?: return@launch
+                NeonUserService.upsertUser(user, authToken)
+                lastSyncedUserId = userId
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to sync new Clerk user with Neon.", error)
+            }
+        }
+    }
+
+    private suspend fun awaitClerkUser(): User? {
+        Clerk.user?.let { return it }
+        return try {
+            Clerk.userFlow.filterNotNull().first()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        }
+    }
+
+    private suspend fun fetchNeonAuthToken(): String? {
         // Check if coroutine is still active before proceeding
-        if (!coroutineContext.isActive) return
+        if (!coroutineContext.isActive) return null
 
         val fallbackToken = BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
         val basicAuthConfigured =
@@ -295,20 +326,12 @@ class LoginViewModel : ViewModel() {
         val session = Clerk.session
         if (session == null) {
             Log.w(TAG, "Clerk session unavailable; cannot fetch Neon auth token.")
-            if (fallbackToken != null) {
-                onSuccess(fallbackToken)
-            } else if (basicAuthConfigured) {
-                onSuccess("")
-            } else {
-                Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
-            }
-            return
+            return fallbackToken ?: if (basicAuthConfigured) "" else null
         }
 
         val cachedSessionToken = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
         if (cachedSessionToken != null) {
-            onSuccess(cachedSessionToken)
-            return
+            return cachedSessionToken
         }
 
         val clerkResult = try {
@@ -316,49 +339,39 @@ class LoginViewModel : ViewModel() {
         } catch (cancellation: CancellationException) {
             if (fallbackToken != null) {
                 Log.w(TAG, "Clerk session token fetch cancelled; using Neon API key fallback.")
-                onSuccess(fallbackToken)
+                return fallbackToken
             } else if (basicAuthConfigured) {
                 Log.w(TAG, "Clerk session token fetch cancelled; using Neon role/password fallback.")
-                onSuccess("")
+                return ""
             } else {
                 throw cancellation
             }
-            return
         } catch (error: Exception) {
             Log.e(TAG, "Failed to fetch Clerk session token for Neon.", error)
-            if (fallbackToken != null) {
-                onSuccess(fallbackToken)
-            } else if (basicAuthConfigured) {
-                onSuccess("")
-            } else {
-                Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
-            }
-            return
+            return fallbackToken ?: if (basicAuthConfigured) "" else null
         }
 
-        when (clerkResult) {
+        return when (clerkResult) {
             is ClerkResult.Success -> {
                 val jwt = clerkResult.value.jwt?.takeUnless { it.isBlank() }
                 when {
-                    jwt != null -> onSuccess(jwt)
-                    fallbackToken != null -> onSuccess(fallbackToken)
-                    basicAuthConfigured -> onSuccess("")
-                    else -> Log.w(TAG, "Clerk returned an empty Neon auth token; sync skipped.")
+                    jwt != null -> jwt
+                    fallbackToken != null -> fallbackToken
+                    basicAuthConfigured -> ""
+                    else -> {
+                        Log.w(TAG, "Clerk returned an empty Neon auth token; sync skipped.")
+                        null
+                    }
                 }
             }
+
             is ClerkResult.Failure -> {
                 Log.e(
                     TAG,
                     clerkResult.longErrorMessageOrNull
                         ?: "Failed to fetch Clerk session token for Neon."
                 )
-                if (fallbackToken != null) {
-                    onSuccess(fallbackToken)
-                } else if (basicAuthConfigured) {
-                    onSuccess("")
-                } else {
-                    Log.w(TAG, "Neon fallback API key missing or blank; sync skipped.")
-                }
+                fallbackToken ?: if (basicAuthConfigured) "" else null
             }
         }
     }
