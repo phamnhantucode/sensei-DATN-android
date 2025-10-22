@@ -31,6 +31,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 
+enum class LoginNavigationTarget {
+    Industry,
+    Onboarding,
+}
+
 class LoginViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -40,6 +45,7 @@ class LoginViewModel : ViewModel() {
     private var neonAuthToken: String? = null
     private var neonTokenJob: Job? = null
     private var neonUserSyncJob: Job? = null
+    private var hasIssuedPostSignInNavigation = false
 
     init {
         combine(
@@ -55,12 +61,20 @@ class LoginViewModel : ViewModel() {
                 )
             }
             if (user == null) {
+                _uiState.update { current -> current.copy(navigationTarget = null) }
                 lastSyncedUserId = null
                 neonAuthToken = null
                 neonTokenJob?.cancel()
                 neonTokenJob = null
                 neonUserSyncJob?.cancel()
                 neonUserSyncJob = null
+                hasIssuedPostSignInNavigation = false
+            } else if (!hasIssuedPostSignInNavigation) {
+                val state = _uiState.value
+                if (!state.requiresVerification && state.navigationTarget == null) {
+                    _uiState.update { it.copy(navigationTarget = LoginNavigationTarget.Industry) }
+                    hasIssuedPostSignInNavigation = true
+                }
             }
         }.launchIn(viewModelScope)
     }
@@ -78,8 +92,8 @@ class LoginViewModel : ViewModel() {
                 isProcessing = true,
                 errorMessage = null,
                 verificationEmail = null
-            )
-        }
+                )
+            }
         viewModelScope.launch {
             SignIn
                 .create(
@@ -89,7 +103,13 @@ class LoginViewModel : ViewModel() {
                     )
                 )
                 .onSuccess {
-                    _uiState.update { state -> state.copy(isProcessing = false) }
+                    _uiState.update { state ->
+                        state.copy(
+                            isProcessing = false,
+                            navigationTarget = LoginNavigationTarget.Industry
+                        )
+                    }
+                    hasIssuedPostSignInNavigation = true
                     refreshNeonAuthTokenAsync()
                 }
                 .onFailure { failure ->
@@ -116,8 +136,8 @@ class LoginViewModel : ViewModel() {
             it.copy(
                 isProcessing = true,
                 errorMessage = null
-            )
-        }
+                )
+            }
         viewModelScope.launch {
             SignUp
                 .create(
@@ -131,9 +151,11 @@ class LoginViewModel : ViewModel() {
                         _uiState.update { state ->
                             state.copy(
                                 isProcessing = false,
-                                verificationEmail = null
+                                verificationEmail = null,
+                                navigationTarget = LoginNavigationTarget.Onboarding
                             )
                         }
+                        hasIssuedPostSignInNavigation = true
                         syncNewClerkUserAsync()
                         return@onSuccess
                     }
@@ -206,9 +228,11 @@ class LoginViewModel : ViewModel() {
                     _uiState.update { state ->
                         state.copy(
                             isProcessing = false,
-                            verificationEmail = null
+                            verificationEmail = null,
+                            navigationTarget = LoginNavigationTarget.Onboarding
                         )
                     }
+                    hasIssuedPostSignInNavigation = true
                     syncNewClerkUserAsync()
                 }
                 .onFailure { failure ->
@@ -259,8 +283,12 @@ class LoginViewModel : ViewModel() {
                     // OAuth authentication successful
                     // The result contains either a SignIn or SignUp
                     _uiState.update { state ->
-                        state.copy(isProcessing = false)
+                        state.copy(
+                            isProcessing = false,
+                            navigationTarget = LoginNavigationTarget.Industry
+                        )
                     }
+                    hasIssuedPostSignInNavigation = true
                     refreshNeonAuthTokenAsync()
                 }
                 .onFailure { failure ->
@@ -376,6 +404,10 @@ class LoginViewModel : ViewModel() {
         }
     }
 
+    fun consumeNavigationTarget() {
+        _uiState.update { it.copy(navigationTarget = null) }
+    }
+
     companion object {
         private const val TAG = "LoginViewModel"
     }
@@ -386,7 +418,8 @@ data class LoginUiState(
     val isProcessing: Boolean = false,
     val isSignedIn: Boolean = false,
     val verificationEmail: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val navigationTarget: LoginNavigationTarget? = null,
 ) {
     val requiresVerification: Boolean
         get() = verificationEmail != null

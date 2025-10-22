@@ -61,15 +61,24 @@ private enum class AuthMode {
 fun LoginScreen(
     onBack: () -> Unit,
     onSignedIn: () -> Unit,
+    onNavigateToOnboarding: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LoginViewModel = viewModel()
 ) {
     var darkTheme by remember { mutableStateOf(true) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(uiState.isInitialized, uiState.isSignedIn) {
-        if (uiState.isInitialized && uiState.isSignedIn) {
-            onSignedIn()
+    LaunchedEffect(uiState.navigationTarget) {
+        when (uiState.navigationTarget) {
+            LoginNavigationTarget.Onboarding -> {
+                onNavigateToOnboarding()
+                viewModel.consumeNavigationTarget()
+            }
+            LoginNavigationTarget.Industry -> {
+                onSignedIn()
+                viewModel.consumeNavigationTarget()
+            }
+            null -> Unit
         }
     }
 
