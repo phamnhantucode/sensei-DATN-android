@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,8 +56,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clerk.api.Clerk
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 
 data class FormData(
     val industryId: String = "",
@@ -75,6 +79,9 @@ fun OnboardingScreen(
     var formData by remember { mutableStateOf(FormData()) }
     val industries = remember { IndustriesData.industries }
     val totalSteps = 3
+    val scope = rememberCoroutineScope()
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submitError by remember { mutableStateOf<String?>(null) }
 
     AppTheme(darkTheme = isDarkMode) {
         Surface(
@@ -169,7 +176,16 @@ fun OnboardingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            submitError?.let { errorMsg ->
+                                Text(
+                                    text = errorMsg,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
 
                             // Navigation Buttons
                             Row(
@@ -194,15 +210,55 @@ fun OnboardingScreen(
 
                                 Button(
                                     onClick = {
-                                        if (currentStep < totalSteps - 1) currentStep++
-                                        else {
-                                            onComplete()
+                                        if (currentStep < totalSteps - 1) {
+                                            currentStep++
+                                        } else if (!isSubmitting) {
+                                            submitError = null
+                                            isSubmitting = true
+                                            scope.launch {
+                                                try {
+                                                    val selectedIndustry = industries.find { it.id == formData.industryId }
+                                                    val user = com.clerk.api.Clerk.user
+                                                    if (selectedIndustry == null) {
+                                                        submitError = "Please select an industry."
+                                                    } else if (user == null) {
+                                                        submitError = "User session unavailable. Please sign in again."
+                                                    } else {
+                                                        // Ensure Neon user exists, then update profile
+                                                        try {
+                                                            NeonUserService.upsertUser(user)
+                                                        } catch (_: Exception) {
+                                                            // Best-effort; continue to profile update
+                                                        }
+                                                        val skills = formData.skills.split(',')
+                                                            .map { it.trim() }
+                                                            .filter { it.isNotEmpty() }
+                                                        val experienceYears = formData.experienceYears.trim().toIntOrNull()
+                                                        val profile = NeonUserService.UserProfileUpdate(
+                                                            industry = selectedIndustry.name,
+                                                            experienceYears = experienceYears,
+                                                            skills = skills,
+                                                            bio = formData.bio.takeIf { it.isNotBlank() },
+                                                        )
+                                                        NeonUserService.updateUserProfile(
+                                                            clerkUserId = user.id,
+                                                            profile = profile,
+                                                        )
+                                                        onComplete()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    submitError = e.localizedMessage ?: "Failed to save profile. Please try again."
+                                                } finally {
+                                                    isSubmitting = false
+                                                }
+                                            }
                                         }
                                     },
+                                    enabled = !isSubmitting,
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(if (currentStep == totalSteps - 1) "Complete Profile" else "Continue")
+                                    Text(if (isSubmitting) "Saving..." else if (currentStep == totalSteps - 1) "Complete Profile" else "Continue")
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
                                         imageVector = Icons.Default.ChevronRight,

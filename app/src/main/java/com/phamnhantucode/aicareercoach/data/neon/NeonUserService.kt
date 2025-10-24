@@ -27,24 +27,11 @@ object NeonUserService {
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     suspend fun upsertUser(user: User, authToken: String? = null) = withContext(Dispatchers.IO) {
-        val bearerToken = authToken?.takeUnless { it.isBlank() }
-            ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
-        val basicAuthHeader = BuildConfig.NEON_DB_ROLE.takeUnless { it.isBlank() }?.let { role ->
-            val password = BuildConfig.NEON_DB_PASSWORD.takeUnless { it.isBlank() } ?: return@let null
-            val credentials = "$role:$password"
-            val encodedCredentials =
-                Base64.encodeToString(credentials.toByteArray(UTF_8), Base64.NO_WRAP)
-            "Basic $encodedCredentials"
-        }
-
-        val authorizationHeader = when {
-            bearerToken != null -> "Bearer $bearerToken"
-            basicAuthHeader != null -> basicAuthHeader
-            else -> {
+        val authorizationHeader = resolveAuthorizationHeader(authToken)
+            ?: run {
                 Log.w(TAG, "No Neon auth credentials available; skipping Neon sync.")
                 return@withContext
             }
-        }
 
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
         val email = resolvePrimaryEmail(user)
@@ -79,12 +66,66 @@ object NeonUserService {
                 val errorMessage = bodyString ?: "Empty response body"
                 if (response.code == 409 && bodyString?.contains("duplicate key value") == true) {
                     Log.i(TAG, "Neon record exists for ${user.id}; attempting to update instead.")
-                    updateExistingUser(apiUrl, authorizationHeader, user, payload)
+                    patchUser(apiUrl, authorizationHeader, user.id, payload)
                     return@withContext
                 }
                 throw IOException("Neon query failed (${response.code}): $errorMessage")
             }
             Log.d(TAG, "Synced Clerk user ${user.id} with Neon.")
+        }
+    }
+
+    suspend fun updateUserProfile(
+        clerkUserId: String,
+        profile: UserProfileUpdate,
+        authToken: String? = null,
+    ) = withContext(Dispatchers.IO) {
+        val authorizationHeader = resolveAuthorizationHeader(authToken)
+            ?: run {
+                Log.w(TAG, "No Neon auth credentials available; skipping user profile update.")
+                return@withContext
+            }
+
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val payload = JSONObject().apply {
+            if (profile.industry != null) {
+                put("industry", profile.industry)
+            } else {
+                put("industry", JSONObject.NULL)
+            }
+            if (profile.experienceYears != null) {
+                put("experience", profile.experienceYears)
+            } else {
+                put("experience", JSONObject.NULL)
+            }
+            put("skills", JSONArray(profile.skills))
+            if (profile.bio != null) {
+                put("bio", profile.bio)
+            } else {
+                put("bio", JSONObject.NULL)
+            }
+        }
+
+        Log.d(TAG, "Updating Neon user $clerkUserId with onboarding profile: $payload")
+        patchUser(apiUrl, authorizationHeader, clerkUserId, payload)
+        Log.d(TAG, "Updated onboarding profile for Neon user $clerkUserId.")
+    }
+
+    private fun resolveAuthorizationHeader(authToken: String?): String? {
+        val bearerToken = authToken?.takeUnless { it.isBlank() }
+            ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+        val basicAuthHeader = BuildConfig.NEON_DB_ROLE.takeUnless { it.isBlank() }?.let { role ->
+            val password = BuildConfig.NEON_DB_PASSWORD.takeUnless { it.isBlank() } ?: return@let null
+            val credentials = "$role:$password"
+            val encodedCredentials =
+                Base64.encodeToString(credentials.toByteArray(UTF_8), Base64.NO_WRAP)
+            "Basic $encodedCredentials"
+        }
+
+        return when {
+            bearerToken != null -> "Bearer $bearerToken"
+            basicAuthHeader != null -> basicAuthHeader
+            else -> null
         }
     }
 
@@ -108,13 +149,13 @@ object NeonUserService {
             ?: resolvePrimaryEmail(user)
     }
 
-    private fun updateExistingUser(
+    private fun patchUser(
         apiUrl: String,
         authorizationHeader: String,
-        user: User,
+        clerkUserId: String,
         payload: JSONObject,
     ) {
-        val encodedClerkId = URLEncoder.encode(user.id, UTF_8.name())
+        val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
         val request =
             Request.Builder()
                 .url("$apiUrl/User?clerkUserId=eq.$encodedClerkId")
@@ -128,11 +169,18 @@ object NeonUserService {
             if (!patchResponse.isSuccessful) {
                 val errorMessage = bodyString ?: "Empty response body"
                 throw IOException(
-                    "Neon update failed (${patchResponse.code}) for ${user.id}: $errorMessage"
+                    "Neon update failed (${patchResponse.code}) for $clerkUserId: $errorMessage"
                 )
             }
-            Log.d(TAG, "Updated existing Neon user ${user.id}.")
+            Log.d(TAG, "Patched Neon user $clerkUserId.")
         }
     }
+
+    data class UserProfileUpdate(
+        val industry: String?,
+        val experienceYears: Int?,
+        val skills: List<String> = emptyList(),
+        val bio: String?,
+    )
 
 }
