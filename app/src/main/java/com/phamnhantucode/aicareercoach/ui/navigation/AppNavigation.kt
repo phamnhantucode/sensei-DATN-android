@@ -108,9 +108,11 @@ fun AppNavigation() {
                 onOpenEditor = { entry ->
                     navController.navigate(
                         Screen.CoverLetterEditor.buildRoute(
+                            id = entry.id,
                             jobTitle = entry.jobTitle,
                             company = entry.companyName,
-                            jobDescription = entry.jobDescription
+                            jobDescription = entry.jobDescription,
+                            content = entry.content
                         )
                     )
                 }
@@ -120,6 +122,10 @@ fun AppNavigation() {
         composable(
             route = Screen.CoverLetterEditor.routeWithArgs,
             arguments = listOf(
+                navArgument(Screen.CoverLetterEditor.idKey()) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
                 navArgument(Screen.CoverLetterEditor.jobTitleKey()) {
                     type = NavType.StringType
                     defaultValue = ""
@@ -131,17 +137,25 @@ fun AppNavigation() {
                 navArgument(Screen.CoverLetterEditor.jobDescriptionKey()) {
                     type = NavType.StringType
                     defaultValue = ""
+                },
+                navArgument(Screen.CoverLetterEditor.contentKey()) {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString(Screen.CoverLetterEditor.idKey()).orEmpty()
             val jobTitle = backStackEntry.arguments?.getString(Screen.CoverLetterEditor.jobTitleKey()).orEmpty()
             val companyName = backStackEntry.arguments?.getString(Screen.CoverLetterEditor.companyKey()).orEmpty()
             val jobDescription = backStackEntry.arguments?.getString(Screen.CoverLetterEditor.jobDescriptionKey()).orEmpty()
+            val content = backStackEntry.arguments?.getString(Screen.CoverLetterEditor.contentKey()).orEmpty()
 
             CoverLetterEditorScreen(
+                coverLetterId = id,
                 jobTitle = jobTitle,
                 companyName = companyName,
                 jobDescription = jobDescription,
+                initialGeneratedContent = content,
                 onBack = { navController.popBackStack() }
             )
         }

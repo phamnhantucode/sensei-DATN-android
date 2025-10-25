@@ -26,11 +26,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -42,8 +44,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,35 +55,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.UUID
 import kotlinx.coroutines.launch
-
-data class CoverLetterEntry(
-    val id: String,
-    val companyName: String,
-    val jobTitle: String,
-    val jobDescription: String,
-    val createdAt: Instant
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CoverLetterScreen(
     onBack: () -> Unit = {},
-    onOpenEditor: (CoverLetterEntry) -> Unit = {}
+    onOpenEditor: (CoverLetterEntry) -> Unit = {},
+    viewModel: CoverLetterViewModel = viewModel()
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val coverLetters = remember { mutableStateListOf(*sampleCoverLetters().toTypedArray()) }
+    val uiState by viewModel.uiState.collectAsState()
+    val generationState by viewModel.generationState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+
+    // Handle generation state
+    LaunchedEffect(generationState) {
+        when (generationState) {
+            is GenerationState.Error -> {
+                snackbarHostState.showSnackbar((generationState as GenerationState.Error).message)
+                viewModel.resetGenerationState()
+            }
+            else -> {}
+        }
+    }
 
     AppTheme {
         Surface(
@@ -133,48 +142,94 @@ fun CoverLetterScreen(
                 },
                 snackbarHost = { SnackbarHost(snackbarHostState) }
             ) { innerPadding ->
-                if (coverLetters.isEmpty()) {
-                    EmptyCoverLetterState(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        onCreateNew = { showCreateDialog = true }
-                    )
-                } else {
-                    CoverLetterList(
-                        items = coverLetters,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
-                        onOpen = { entry -> onOpenEditor(entry) },
-                        onDelete = { entry ->
-                            coverLetters.remove(entry)
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
+                Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                    when (val state = uiState) {
+                        is CoverLetterUiState.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
                             }
                         }
-                    )
+                        is CoverLetterUiState.Error -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = "Failed to load cover letters",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = state.message,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Button(onClick = { viewModel.loadCoverLetters() }) {
+                                        Text("Retry")
+                                    }
+                                }
+                            }
+                        }
+                        is CoverLetterUiState.Success -> {
+                            if (state.coverLetters.isEmpty()) {
+                                EmptyCoverLetterState(
+                                    modifier = Modifier.fillMaxSize(),
+                                    onCreateNew = { showCreateDialog = true }
+                                )
+                            } else {
+                                CoverLetterList(
+                                    items = state.coverLetters,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
+                                    onOpen = { entry -> onOpenEditor(entry) },
+                                    onDelete = { entry ->
+                                        viewModel.deleteCoverLetter(entry)
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Show loading indicator at top when generating
+                    if (generationState is GenerationState.Generating) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                        )
+                    }
                 }
             }
 
             if (showCreateDialog) {
                 CreateCoverLetterDialog(
+                    isGenerating = generationState is GenerationState.Generating,
                     onDismiss = { showCreateDialog = false },
                     onCreate = { companyName, jobTitle, jobDescription ->
-                        val entry = CoverLetterEntry(
-                            id = UUID.randomUUID().toString(),
+                        showCreateDialog = false
+                        viewModel.generateCoverLetter(
                             companyName = companyName,
                             jobTitle = jobTitle,
                             jobDescription = jobDescription,
-                            createdAt = Instant.now()
+                            onSuccess = { entry ->
+                                onOpenEditor(entry)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("Cover letter generated!")
+                                }
+                            }
                         )
-                        coverLetters.add(0, entry)
-                        showCreateDialog = false
-                        onOpenEditor(entry)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("New cover letter drafted")
-                        }
                     }
                 )
             }
@@ -349,39 +404,10 @@ private fun formatTimestamp(instant: Instant): String {
     return instant.atZone(ZoneId.systemDefault()).format(formatter)
 }
 
-private fun sampleCoverLetters(): List<CoverLetterEntry> = listOf(
-    CoverLetterEntry(
-        id = "1",
-        companyName = "Acme Corp",
-        jobTitle = "Senior Product Manager",
-        jobDescription = "Lead product strategy for AI-driven customer journey automation.",
-        createdAt = Instant.now().minusSeconds(3600 * 5)
-    ),
-    CoverLetterEntry(
-        id = "2",
-        companyName = "BrightPath Labs",
-        jobTitle = "Product Marketing Lead",
-        jobDescription = "Own GTM launches and storytelling for the data platform portfolio.",
-        createdAt = Instant.now().minusSeconds(3600 * 26)
-    ),
-    CoverLetterEntry(
-        id = "3",
-        companyName = "NeuralWorks",
-        jobTitle = "AI Solutions Architect",
-        jobDescription = "Architect end-to-end AI solutions for enterprise client delivery.",
-        createdAt = Instant.now().minusSeconds(3600 * 72)
-    )
-)
-
-@Preview(showBackground = true)
-@Composable
-private fun CoverLetterScreenPreview() {
-    CoverLetterScreen()
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateCoverLetterDialog(
+    isGenerating: Boolean = false,
     onDismiss: () -> Unit,
     onCreate: (companyName: String, jobTitle: String, jobDescription: String) -> Unit
 ) {
@@ -389,7 +415,7 @@ private fun CreateCoverLetterDialog(
     var jobTitle by rememberSaveable { mutableStateOf("") }
     var jobDescription by rememberSaveable { mutableStateOf("") }
 
-    val isCreateEnabled = companyName.isNotBlank() && jobTitle.isNotBlank() && jobDescription.isNotBlank()
+    val isCreateEnabled = !isGenerating && companyName.isNotBlank() && jobTitle.isNotBlank() && jobDescription.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -432,7 +458,20 @@ private fun CreateCoverLetterDialog(
                 },
                 enabled = isCreateEnabled
             ) {
-                Text("Create")
+                if (isGenerating) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text("Generating...")
+                    }
+                } else {
+                    Text("Generate")
+                }
             }
         },
         dismissButton = {

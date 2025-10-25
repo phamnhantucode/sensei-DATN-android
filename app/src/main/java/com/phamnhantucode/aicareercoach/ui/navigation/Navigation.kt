@@ -12,22 +12,28 @@ sealed class Screen(val route: String) {
     object CoverLetter : Screen("cover_letter")
     object AccountSettings : Screen("account_settings")
     object CoverLetterEditor : Screen("cover_letter_editor") {
+        private const val IdArg = "id"
         private const val JobTitleArg = "jobTitle"
         private const val CompanyArg = "company"
         private const val JobDescriptionArg = "jobDescription"
+        private const val ContentArg = "content"
 
         val routeWithArgs: String =
-            "$route?$JobTitleArg={$JobTitleArg}&$CompanyArg={$CompanyArg}&$JobDescriptionArg={$JobDescriptionArg}"
+            "$route?$IdArg={$IdArg}&$JobTitleArg={$JobTitleArg}&$CompanyArg={$CompanyArg}&$JobDescriptionArg={$JobDescriptionArg}&$ContentArg={$ContentArg}"
 
-        fun buildRoute(jobTitle: String, company: String, jobDescription: String): String {
+        fun buildRoute(id: String, jobTitle: String, company: String, jobDescription: String, content: String = ""): String {
+            val encodedId = Uri.encode(id)
             val encodedJobTitle = Uri.encode(jobTitle)
             val encodedCompany = Uri.encode(company)
             val encodedDescription = Uri.encode(jobDescription)
-            return "$route?$JobTitleArg=$encodedJobTitle&$CompanyArg=$encodedCompany&$JobDescriptionArg=$encodedDescription"
+            val encodedContent = Uri.encode(content)
+            return "$route?$IdArg=$encodedId&$JobTitleArg=$encodedJobTitle&$CompanyArg=$encodedCompany&$JobDescriptionArg=$encodedDescription&$ContentArg=$encodedContent"
         }
 
+        fun idKey(): String = IdArg
         fun jobTitleKey(): String = JobTitleArg
         fun companyKey(): String = CompanyArg
         fun jobDescriptionKey(): String = JobDescriptionArg
+        fun contentKey(): String = ContentArg
     }
 }

@@ -32,12 +32,11 @@ object NeonAuth {
             return fallbackToken ?: if (basicAuthConfigured) "" else null
         }
 
-        val cachedSessionToken = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
-        if (cachedSessionToken != null) return cachedSessionToken
-
+        // Always fetch a fresh token to avoid using expired cached tokens
         val clerkResult = try {
             session.fetchToken()
         } catch (cancelled: Exception) {
+            Log.w(TAG, "Failed to fetch token, using fallback", cancelled)
             // Cancellation or failure path handled similarly with fallbacks
             return fallbackToken ?: if (basicAuthConfigured) "" else null
         }
@@ -47,8 +46,14 @@ object NeonAuth {
                 val jwt = clerkResult.value.jwt?.takeUnless { it.isBlank() }
                 when {
                     jwt != null -> jwt
-                    fallbackToken != null -> fallbackToken
-                    basicAuthConfigured -> ""
+                    fallbackToken != null -> {
+                        Log.w(TAG, "Fresh token empty, using fallback API key")
+                        fallbackToken
+                    }
+                    basicAuthConfigured -> {
+                        Log.w(TAG, "Fresh token empty, using Basic auth")
+                        ""
+                    }
                     else -> {
                         Log.w(TAG, "Clerk returned an empty Neon auth token; sync skipped.")
                         null
@@ -56,8 +61,11 @@ object NeonAuth {
                 }
             }
             is ClerkResult.Failure -> {
-                Log.e(TAG, clerkResult.longErrorMessageOrNull ?: "Failed to fetch Clerk session token for Neon.")
-                fallbackToken ?: if (basicAuthConfigured) "" else null
+                val errorMsg = clerkResult.longErrorMessageOrNull ?: "Failed to fetch Clerk session token for Neon."
+                Log.e(TAG, errorMsg)
+                // Try cached token as last resort before falling back to other auth methods
+                val cachedToken = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
+                cachedToken ?: fallbackToken ?: if (basicAuthConfigured) "" else null
             }
         }
     }

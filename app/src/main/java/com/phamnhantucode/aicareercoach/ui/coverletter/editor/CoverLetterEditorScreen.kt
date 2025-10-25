@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,18 +66,24 @@ import kotlin.math.min
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CoverLetterEditorScreen(
+    coverLetterId: String = "",
     jobTitle: String,
     companyName: String,
     jobDescription: String,
+    initialGeneratedContent: String = "",
     onBack: () -> Unit = {}
 ) {
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val editorFocusRequester = remember { FocusRequester() }
+    val repository = remember { com.phamnhantucode.aicareercoach.data.coverletter.CoverLetterRepository() }
+    var isSaving by remember { mutableStateOf(false) }
 
-    val initialContent = remember(jobTitle, companyName, jobDescription) {
-        buildInitialEmail(jobTitle, companyName, jobDescription)
+    val initialContent = remember(initialGeneratedContent, jobTitle, companyName, jobDescription) {
+        initialGeneratedContent.ifBlank {
+            buildInitialEmail(jobTitle, companyName, jobDescription)
+        }
     }
 
     var editorState by rememberSaveable(stateSaver = TextFieldValue.Saver) {
@@ -113,6 +121,37 @@ fun CoverLetterEditorScreen(
                     }
                 },
                 actions = {
+                    if (coverLetterId.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                if (isSaving) return@TextButton
+                                isSaving = true
+                                coroutineScope.launch {
+                                    try {
+                                        repository.updateCoverLetter(
+                                            id = coverLetterId,
+                                            content = editorState.text
+                                        )
+                                        snackbarHostState.showSnackbar("Saved successfully")
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar("Failed to save: ${e.message}")
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                            enabled = !isSaving
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Save")
+                            }
+                        }
+                    }
                     IconButton(
                         onClick = {
                             clipboardManager.setText(AnnotatedString(editorState.text))

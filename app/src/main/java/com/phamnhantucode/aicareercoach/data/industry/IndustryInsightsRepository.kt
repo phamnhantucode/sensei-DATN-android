@@ -126,14 +126,14 @@ class IndustryInsightsRepository(
 
     private suspend fun fetchClerkSessionToken(): String? {
         val session = Clerk.session ?: return null
-        val cached = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
-        if (cached != null) return cached
 
+        // Always fetch a fresh token to avoid using expired cached tokens
         return when (val result = session.fetchToken()) {
             is ClerkResult.Success -> result.value.jwt.takeUnless { it.isBlank() }
             is ClerkResult.Failure -> {
-                Log.w(TAG, result.error.toString())
-                null
+                Log.w(TAG, "Failed to fetch fresh Clerk token: ${result.error}")
+                // As fallback, try cached token (might be expired but worth trying)
+                session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
             }
             else -> null
         }
@@ -145,17 +145,17 @@ class IndustryInsightsRepository(
     ): NeonUserRecord {
         val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-        val requestUrl =
-            "$apiUrl/User?select=*,industryInsight:IndustryInsight(*)&clerkUserId=eq.$encodedClerkId&limit=1"
+        val userRequestUrl =
+            "$apiUrl/User?select=*&clerkUserId=eq.$encodedClerkId&limit=1"
 
-        val request =
+        val userRequest =
             Request.Builder()
-                .url(requestUrl)
+                .url(userRequestUrl)
                 .addHeader("Authorization", authorizationHeader)
                 .get()
                 .build()
 
-        client.newCall(request).execute().use { response ->
+        val industry = client.newCall(userRequest).execute().use { response ->
             val bodyString = response.body?.string()
                 ?: throw IOException("Neon user fetch returned an empty body.")
             if (!response.isSuccessful) {
@@ -168,13 +168,40 @@ class IndustryInsightsRepository(
             }
 
             val userJson = results.getJSONObject(0)
-            val industry = userJson.optString("industry").takeIf { it.isNotBlank() }
-            val insightJson = userJson.optJSONObject("industryInsight")
-                ?: userJson.optJSONArray("industryInsight")?.optJSONObject(0)
-            val insight = insightJson?.let(::parseIndustryInsight)
-
-            return NeonUserRecord(industry = industry, industryInsight = insight)
+            userJson.optString("industry").takeIf { it.isNotBlank() }
         }
+
+        // Fetch IndustryInsight separately if user has an industry
+        val insight = if (industry != null) {
+            val encodedIndustry = URLEncoder.encode(industry, UTF_8.name())
+            val insightRequestUrl =
+                "$apiUrl/IndustryInsight?select=*&industry=eq.$encodedIndustry&limit=1"
+
+            val insightRequest =
+                Request.Builder()
+                    .url(insightRequestUrl)
+                    .addHeader("Authorization", authorizationHeader)
+                    .get()
+                    .build()
+
+            client.newCall(insightRequest).execute().use { response ->
+                val bodyString = response.body?.string()
+                if (response.isSuccessful && bodyString?.isNotBlank() == true) {
+                    val results = JSONArray(bodyString)
+                    if (results.length() > 0) {
+                        parseIndustryInsight(results.getJSONObject(0))
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
+        } else {
+            null
+        }
+
+        return NeonUserRecord(industry = industry, industryInsight = insight)
     }
 
     private suspend fun generateInsights(industry: String): GeneratedInsights {
