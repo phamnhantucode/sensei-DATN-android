@@ -1,0 +1,890 @@
+package com.phamnhantucode.aicareercoach.data.interview
+
+import android.content.Context
+import android.util.Base64
+import android.util.Log
+import com.clerk.api.Clerk
+import com.clerk.api.network.serialization.ClerkResult
+import com.clerk.api.session.fetchToken
+import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.local.AppDatabase
+import com.phamnhantucode.aicareercoach.data.local.QuestionPoolDao
+import com.phamnhantucode.aicareercoach.data.local.QuestionPoolEntity
+import java.io.IOException
+import java.net.URLEncoder
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+import kotlin.text.Charsets.UTF_8
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * Repository that orchestrates Interview Prep content:
+ * - Loads user profile data from Neon
+ * - Generates tailored practice material via Gemini
+ * - Stores and retrieves historical assessments in Neon
+ * - Caches questions locally using Room database
+ */
+class InterviewPrepRepository(
+    private val client: OkHttpClient = OkHttpClient(),
+    context: Context,
+) {
+    private val questionPoolDao: QuestionPoolDao = AppDatabase.getDatabase(context).questionPoolDao()
+
+    suspend fun loadInterviewPrepContent(
+        forceRefreshAuth: Boolean = false,
+    ): InterviewPrepContent = withContext(Dispatchers.IO) {
+        val user = Clerk.user
+            ?: throw IllegalStateException("User session unavailable. Please sign in again.")
+
+        if (BuildConfig.NEON_API_URL.isBlank()) {
+            throw IllegalStateException("Neon API URL is not configured.")
+        }
+        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+            throw IllegalStateException("Gemini API key is not configured.")
+        }
+
+        var authHeader = resolveAuthorizationHeader(forceRefresh = forceRefreshAuth)
+            ?: throw IllegalStateException("No Neon authentication method configured.")
+
+        val neonUser = try {
+            fetchNeonUserProfile(user.id, authHeader)
+        } catch (error: IOException) {
+            if (error.message?.contains("401") == true || error.message?.contains("Unauthorized") == true) {
+                authHeader = resolveAuthorizationHeader(forceRefresh = true)
+                    ?: throw IllegalStateException("Failed to refresh Neon authentication token.")
+                fetchNeonUserProfile(user.id, authHeader)
+            } else {
+                throw error
+            }
+        }
+
+        val assessments = fetchAssessmentsForUser(neonUser.id, authHeader)
+
+        // Check question pool availability (using local Room database)
+        val quizPoolCount = getUnusedQuestionsCount(neonUser.id, "quiz")
+        val interviewPoolCount = getUnusedQuestionsCount(neonUser.id, "interview")
+
+        // Generate new questions in batch if pool is low
+        if (quizPoolCount < MINIMUM_POOL_SIZE || interviewPoolCount < MINIMUM_POOL_SIZE) {
+            val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
+            val generated = callGemini(prompt)
+
+            // Store generated questions in the local pool
+            if (quizPoolCount < MINIMUM_POOL_SIZE) {
+                storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
+            }
+            if (interviewPoolCount < MINIMUM_POOL_SIZE) {
+                storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
+            }
+        }
+
+        // Load questions from local pool
+        val quizQuestions = fetchUnusedQuestionsFromPool(neonUser.id, "quiz", QUIZ_QUESTIONS_PER_SESSION)
+        val interviewQuestions = fetchUnusedQuestionsFromPool(neonUser.id, "interview", INTERVIEW_QUESTIONS_PER_SESSION)
+
+        // If pool is still empty (first time user), generate immediately
+        val (finalQuizQuestions, finalInterviewQuestions, practiceTips, coachingNotes) = if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
+            val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
+            val generated = callGemini(prompt)
+
+            storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
+            storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
+
+            val quiz = fetchUnusedQuestionsFromPool(neonUser.id, "quiz", QUIZ_QUESTIONS_PER_SESSION)
+            val interview = fetchUnusedQuestionsFromPool(neonUser.id, "interview", INTERVIEW_QUESTIONS_PER_SESSION)
+
+            QuestionBundle(quiz, interview, generated.practiceTips, generated.coachingNotes)
+        } else {
+            // Load tips and coaching notes separately (can be cached or generated less frequently)
+            val tipsAndNotes = loadTipsAndCoachingNotes(neonUser, assessments)
+            QuestionBundle(quizQuestions, interviewQuestions, tipsAndNotes.first, tipsAndNotes.second)
+        }
+
+        return@withContext InterviewPrepContent(
+            quizQuestions = finalQuizQuestions,
+            interviewQuestions = finalInterviewQuestions,
+            practiceTips = practiceTips,
+            coachingNotes = coachingNotes,
+            neonUser = neonUser,
+            assessments = assessments,
+        )
+    }
+
+    private data class QuestionBundle(
+        val quizQuestions: List<RepositoryQuestionSnapshot>,
+        val interviewQuestions: List<RepositoryQuestionSnapshot>,
+        val practiceTips: List<PracticeTipSpec>,
+        val coachingNotes: CoachingNotes?
+    )
+
+    suspend fun recordQuizAttempt(
+        quizScore: Int,
+        questions: List<RepositoryQuestionSnapshot>,
+        improvementTip: String?,
+    ) = withContext(Dispatchers.IO) {
+        val user = Clerk.user
+            ?: throw IllegalStateException("User session unavailable. Please sign in again.")
+        val authHeader = resolveAuthorizationHeader()
+            ?: throw IllegalStateException("No Neon authentication method configured.")
+        val neonUser = fetchNeonUserProfile(user.id, authHeader)
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+
+        val payload = JSONObject().apply {
+            put("userId", neonUser.id)
+            put("quizScore", quizScore)
+            put("category", "quiz")
+            put("improvementTip", improvementTip ?: JSONObject.NULL)
+            put(
+                "questions",
+                JSONArray().apply {
+                    questions.forEach { snapshot ->
+                        put(snapshot.toJson())
+                    }
+                }
+            )
+            put("createdat", Instant.now().toString())
+        }
+
+        val request =
+            Request.Builder()
+                .url("$apiUrl/Assessment")
+                .addHeader("Authorization", authHeader)
+                .addHeader("Content-Type", JSON_MEDIA_TYPE)
+                .addHeader("Prefer", "return=representation")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
+                .build()
+
+        client.newCall(request).execute().use { response ->
+            val bodyString = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("Failed to record quiz attempt (${response.code}): $bodyString")
+            }
+        }
+    }
+
+    suspend fun recordInterviewAttempt(
+        quizScore: Int,
+        questions: List<RepositoryQuestionSnapshot>,
+        improvementTip: String?,
+    ) = withContext(Dispatchers.IO) {
+        val user = Clerk.user
+            ?: throw IllegalStateException("User session unavailable. Please sign in again.")
+        val authHeader = resolveAuthorizationHeader()
+            ?: throw IllegalStateException("No Neon authentication method configured.")
+        val neonUser = fetchNeonUserProfile(user.id, authHeader)
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+
+        val payload = JSONObject().apply {
+            put("userId", neonUser.id)
+            put("quizScore", quizScore)
+            put("category", "interview")
+            put("improvementTip", improvementTip ?: JSONObject.NULL)
+            put(
+                "questions",
+                JSONArray().apply {
+                    questions.forEach { snapshot ->
+                        put(snapshot.toJson())
+                    }
+                }
+            )
+            put("createdat", Instant.now().toString())
+        }
+
+        val request =
+            Request.Builder()
+                .url("$apiUrl/Assessment")
+                .addHeader("Authorization", authHeader)
+                .addHeader("Content-Type", JSON_MEDIA_TYPE)
+                .addHeader("Prefer", "return=representation")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
+                .build()
+
+        client.newCall(request).execute().use { response ->
+            val bodyString = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("Failed to record interview attempt (${response.code}): $bodyString")
+            }
+        }
+    }
+
+    suspend fun getAuthorizationHeader(): String? {
+        return resolveAuthorizationHeader(forceRefresh = false)
+    }
+
+    private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
+        val bearer = if (forceRefresh) {
+            fetchClerkSessionToken()
+        } else {
+            fetchClerkSessionToken()
+                ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
+        }
+
+        val basicAuth = BuildConfig.NEON_DB_ROLE.takeUnless { it.isBlank() }?.let { role ->
+            val password = BuildConfig.NEON_DB_PASSWORD.takeUnless { it.isBlank() } ?: return@let null
+            val credentials = "$role:$password"
+            val encoded = Base64.encodeToString(credentials.toByteArray(UTF_8), Base64.NO_WRAP)
+            "Basic $encoded"
+        }
+
+        return when {
+            bearer != null -> "Bearer $bearer"
+            basicAuth != null -> basicAuth
+            else -> null
+        }
+    }
+
+    private suspend fun fetchClerkSessionToken(): String? {
+        val session = Clerk.session ?: return null
+        return when (val result = session.fetchToken()) {
+            is ClerkResult.Success -> result.value.jwt.takeUnless { it.isBlank() }
+            is ClerkResult.Failure -> {
+                Log.w(TAG, "Failed to fetch fresh Clerk token: ${result.error}")
+                session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
+            }
+            else -> null
+        }
+    }
+
+    private fun fetchNeonUserProfile(
+        clerkUserId: String,
+        authorizationHeader: String,
+    ): NeonUserProfile {
+        val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val userRequestUrl =
+            "$apiUrl/User?select=id,industry,skills,bio,experience&clerkUserId=eq.$encodedClerkId&limit=1"
+
+        val userRequest =
+            Request.Builder()
+                .url(userRequestUrl)
+                .addHeader("Authorization", authorizationHeader)
+                .get()
+                .build()
+
+        client.newCall(userRequest).execute().use { response ->
+            val bodyString = response.body?.string()
+                ?: throw IOException("Neon user fetch returned an empty body.")
+            if (!response.isSuccessful) {
+                throw IOException("Neon user fetch failed (${response.code}): $bodyString")
+            }
+
+            val results = JSONArray(bodyString)
+            if (results.length() == 0) {
+                throw IllegalStateException("No Neon user record found. Complete onboarding first.")
+            }
+            val json = results.getJSONObject(0)
+            val skillsJson = json.optJSONArray("skills") ?: JSONArray()
+            val skills = List(skillsJson.length()) { index ->
+                skillsJson.optString(index)
+            }.filter { it.isNotBlank() }
+            return NeonUserProfile(
+                id = json.optString("id").takeIf { it.isNotBlank() }
+                    ?: throw IOException("Neon user record missing id."),
+                industry = json.optString("industry").takeIf { it.isNotBlank() },
+                experienceYears = json.optInt("experience").takeUnless { json.isNull("experience") },
+                skills = skills,
+                bio = json.optString("bio").takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    private fun fetchAssessmentsForUser(
+        neonUserId: String,
+        authorizationHeader: String,
+    ): List<AssessmentRecord> {
+        val encodedUserId = URLEncoder.encode(neonUserId, UTF_8.name())
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val requestUrl =
+            "$apiUrl/Assessment?select=id,quizScore,questions,category,improvementTip,createdat&userId=eq.$encodedUserId&order=createdat.desc&limit=20"
+
+        val request =
+            Request.Builder()
+                .url(requestUrl)
+                .addHeader("Authorization", authorizationHeader)
+                .get()
+                .build()
+
+        return client.newCall(request).execute().use { response ->
+            val bodyString = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("Failed to load assessments (${response.code}): $bodyString")
+            }
+
+            if (bodyString.isBlank()) return@use emptyList()
+            val results = JSONArray(bodyString)
+            List(results.length()) { index ->
+                parseAssessment(results.getJSONObject(index))
+            }
+        }
+    }
+
+    private fun parseAssessment(json: JSONObject): AssessmentRecord {
+        val questionsArray = json.optJSONArray("questions") ?: JSONArray()
+        val questions = List(questionsArray.length()) { idx ->
+            val q = questionsArray.optJSONObject(idx) ?: JSONObject()
+            RepositoryQuestionSnapshot(
+                id = q.optString("id").takeUnless { it.isBlank() } ?: "question_$idx",
+                question = q.optString("question"),
+                category = q.optString("category").takeUnless { it.isBlank() },
+                type = q.optString("type").takeUnless { it.isBlank() },
+                options = q.optJSONArray("options").toStringList(),
+                correctAnswerIndex = q.optInt("correctAnswerIndex").takeUnless { q.isNull("correctAnswerIndex") },
+                selectedAnswerIndex = q.optInt("selectedAnswerIndex").takeUnless { q.isNull("selectedAnswerIndex") },
+                explanation = q.optString("explanation").takeUnless { it.isBlank() },
+                essayResponse = q.optString("essayResponse").takeUnless { it.isBlank() },
+            )
+        }
+
+        return AssessmentRecord(
+            id = json.optString("id"),
+            createdAt = json.optString("createdAt").toInstantOrEpoch(),
+            quizScore = json.optDouble("quizScore", 0.0),
+            category = json.optString("category").lowercase(Locale.US),
+            improvementTip = json.optString("improvementTip").takeUnless { it.isBlank() },
+            questions = questions,
+        )
+    }
+
+    private suspend fun getUnusedQuestionsCount(
+        userId: String,
+        category: String,
+    ): Int = withContext(Dispatchers.IO) {
+        return@withContext try {
+            questionPoolDao.getUnusedQuestionsCount(userId, category)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to count unused questions", e)
+            0
+        }
+    }
+
+    private suspend fun fetchUnusedQuestionsFromPool(
+        userId: String,
+        category: String,
+        limit: Int,
+    ): List<RepositoryQuestionSnapshot> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            questionPoolDao.getUnusedQuestions(userId, category, limit).map { entity ->
+                RepositoryQuestionSnapshot(
+                    id = entity.id,
+                    question = entity.question,
+                    category = entity.questionCategory,
+                    type = entity.questionType,
+                    options = entity.options ?: emptyList(),
+                    correctAnswerIndex = entity.correctAnswerIndex,
+                    explanation = entity.explanation,
+                    placeholder = entity.placeholder
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch questions from pool", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun storeQuestionsInPool(
+        userId: String,
+        questions: List<RepositoryQuestionSnapshot>,
+        category: String,
+    ) = withContext(Dispatchers.IO) {
+        if (questions.isEmpty()) return@withContext
+
+        try {
+            val entities = questions.map { question ->
+                QuestionPoolEntity(
+                    id = question.id.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
+                    userId = userId,
+                    category = category,
+                    questionType = question.type ?: "MULTIPLE_CHOICE",
+                    questionCategory = question.category,
+                    question = question.question,
+                    options = question.options,
+                    correctAnswerIndex = question.correctAnswerIndex,
+                    explanation = question.explanation,
+                    placeholder = question.placeholder,
+                    isUsed = false,
+                    createdAt = System.currentTimeMillis()
+                )
+            }
+            questionPoolDao.insertQuestions(entities)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to store questions in pool", e)
+        }
+    }
+
+    suspend fun markQuestionsAsUsed(
+        questionIds: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        if (questionIds.isEmpty()) return@withContext
+
+        try {
+            questionPoolDao.markQuestionsAsUsed(questionIds)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to mark questions as used", e)
+        }
+    }
+
+    private suspend fun loadTipsAndCoachingNotes(
+        profile: NeonUserProfile,
+        assessments: List<AssessmentRecord>,
+    ): Pair<List<PracticeTipSpec>, CoachingNotes?> = withContext(Dispatchers.IO) {
+        val prompt = buildTipsPrompt(profile, assessments)
+        val generated = callGeminiForTips(prompt)
+        Pair(generated.first, generated.second)
+    }
+
+    private fun buildGeminiPrompt(
+        profile: NeonUserProfile,
+        assessments: List<AssessmentRecord>,
+        generateBatchSize: Boolean = false,
+    ): String {
+        val experienceText = profile.experienceYears?.let { "$it years of experience" } ?: "experience not provided"
+        val skillsText = if (profile.skills.isEmpty()) "skills not provided" else profile.skills.joinToString()
+        val industryText = profile.industry ?: "unspecified industry"
+        val recentScores = if (assessments.isEmpty()) {
+            "no assessments recorded yet"
+        } else {
+            assessments.take(5).joinToString { score ->
+                "${score.quizScore.roundToInt()} (${score.category})"
+            }
+        }
+
+        val recurringGaps = assessments
+            .flatMap { record ->
+                record.improvementTip?.let { listOf(it) } ?: emptyList()
+            }
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString()
+            ?: "none observed"
+
+        val essayPracticeCount = assessments.sumOf { record ->
+            record.questions.count { snapshot ->
+                snapshot.type.equals("ESSAY", ignoreCase = true)
+            }
+        }
+
+        return """
+            You are an expert technical interview coach. Create targeted interview preparation for the following professional:
+            - Industry: $industryText
+            - Experience: $experienceText
+            - Skills: $skillsText
+            - Bio: ${profile.bio ?: "Not provided"}
+            - Recent scores: $recentScores
+            - Recurring improvement themes: $recurringGaps
+            - Essay responses completed so far: $essayPracticeCount
+
+            Produce STRICT JSON with the following structure and nothing else:
+            {
+              "quizQuestions": [
+                {
+                  "id": "unique string identifier",
+                  "type": "MULTIPLE_CHOICE",
+                  "category": "TECHNICAL" | "BEHAVIORAL" | "SITUATIONAL",
+                  "question": "question text",
+                  "options": ["A", "B", "C", "D"],
+                  "correctAnswerIndex": number,
+                  "explanation": "why this answer is correct"
+                }
+              ],
+              "interviewQuestions": [
+                {
+                  "id": "unique string identifier",
+                  "type": "MULTIPLE_CHOICE" | "ESSAY",
+                  "category": "TECHNICAL" | "BEHAVIORAL" | "SITUATIONAL",
+                  "question": "prompt text",
+                  "options": ["only include for multiple choice"],
+                  "correctAnswerIndex": number | null,
+                  "explanation": "short coaching note or sample approach",
+                  "placeholder": "short writing guidance for essay questions"
+                }
+              ],
+              "practiceTips": [
+                {
+                  "category": "short label",
+                  "icon": "one of: lightbulb, target, chat, rocket, tools, book, graph",
+                  "color": "#RRGGBB",
+                  "tips": ["bullet tip 1", "bullet tip 2", "bullet tip 3"]
+                }
+              ],
+              "coachingNotes": {
+                "summary": "2 sentence overview tailored to the user",
+                "improvementAreas": ["focus area 1", "focus area 2"],
+                "recommendedPracticeFrequency": "short recommendation like '3 sessions per week'"
+              }
+            }
+
+            Requirements:
+            - Provide at least ${if (generateBatchSize) BATCH_QUIZ_SIZE else 5} quizQuestions.
+            - Provide at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE else 4} interviewQuestions with at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE / 2 else 2} essay prompts.
+            - All JSON strings must escape quotes properly.
+            - Return ONLY the JSON object without Markdown or commentary.
+            ${if (generateBatchSize) "- Generate diverse questions covering different topics and difficulty levels." else ""}
+        """.trimIndent()
+    }
+
+    private fun buildTipsPrompt(
+        profile: NeonUserProfile,
+        assessments: List<AssessmentRecord>,
+    ): String {
+        val experienceText = profile.experienceYears?.let { "$it years of experience" } ?: "experience not provided"
+        val skillsText = if (profile.skills.isEmpty()) "skills not provided" else profile.skills.joinToString()
+        val industryText = profile.industry ?: "unspecified industry"
+        val recentScores = if (assessments.isEmpty()) {
+            "no assessments recorded yet"
+        } else {
+            assessments.take(5).joinToString { score ->
+                "${score.quizScore.roundToInt()} (${score.category})"
+            }
+        }
+
+        return """
+            You are an expert technical interview coach. Create practice tips and coaching notes for the following professional:
+            - Industry: $industryText
+            - Experience: $experienceText
+            - Skills: $skillsText
+            - Recent scores: $recentScores
+
+            Produce STRICT JSON with the following structure and nothing else:
+            {
+              "practiceTips": [
+                {
+                  "category": "short label",
+                  "icon": "one of: lightbulb, target, chat, rocket, tools, book, graph",
+                  "color": "#RRGGBB",
+                  "tips": ["bullet tip 1", "bullet tip 2", "bullet tip 3"]
+                }
+              ],
+              "coachingNotes": {
+                "summary": "2 sentence overview tailored to the user",
+                "improvementAreas": ["focus area 1", "focus area 2"],
+                "recommendedPracticeFrequency": "short recommendation like '3 sessions per week'"
+              }
+            }
+
+            Requirements:
+            - All JSON strings must escape quotes properly.
+            - Return ONLY the JSON object without Markdown or commentary.
+        """.trimIndent()
+    }
+
+    private fun callGeminiForTips(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
+        val requestUrl =
+            HttpUrl.Builder()
+                .scheme("https")
+                .host(GEMINI_API_HOST)
+                .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
+                .build()
+
+        val payload = JSONObject().apply {
+            put(
+                "contents",
+                JSONArray().apply {
+                    put(
+                        JSONObject().apply {
+                            put(
+                                "parts",
+                                JSONArray().apply {
+                                    put(JSONObject().apply { put("text", prompt) })
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+
+        val request =
+            Request.Builder()
+                .url(requestUrl)
+                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
+                .addHeader("Content-Type", JSON_MEDIA_TYPE)
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
+                .build()
+
+        val timeoutClient =
+            client.newBuilder()
+                .callTimeout(1, TimeUnit.MINUTES)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
+
+        val rawText =
+            timeoutClient.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string()
+                    ?: throw IOException("Gemini returned an empty response.")
+                if (!response.isSuccessful) {
+                    throw IOException("Gemini request failed (${response.code}): $bodyString")
+                }
+                extractGeminiText(JSONObject(bodyString))
+                    ?: throw IOException("Gemini response did not include text content.")
+            }
+
+        val cleaned = CODE_FENCE_REGEX.replace(rawText, "").trim()
+        val json = try {
+            JSONObject(cleaned)
+        } catch (error: Exception) {
+            throw IOException("Gemini returned invalid JSON: ${error.message}\n$cleaned", error)
+        }
+
+        val practiceTips = json.optJSONArray("practiceTips").toTipSpecs()
+        val coachingNotes =
+            json.optJSONObject("coachingNotes")?.let { notes ->
+                CoachingNotes(
+                    summary = notes.optString("summary").takeUnless { it.isBlank() },
+                    improvementAreas = notes.optJSONArray("improvementAreas").toStringList(),
+                    recommendedPracticeFrequency = notes.optString("recommendedPracticeFrequency")
+                        .takeUnless { it.isBlank() }
+                )
+            }
+
+        return Pair(practiceTips, coachingNotes)
+    }
+
+    private fun callGemini(prompt: String): GeminiInterviewBundle {
+        val requestUrl =
+            HttpUrl.Builder()
+                .scheme("https")
+                .host(GEMINI_API_HOST)
+                .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
+                .build()
+
+        val payload = JSONObject().apply {
+            put(
+                "contents",
+                JSONArray().apply {
+                    put(
+                        JSONObject().apply {
+                            put(
+                                "parts",
+                                JSONArray().apply {
+                                    put(JSONObject().apply { put("text", prompt) })
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+
+        val request =
+            Request.Builder()
+                .url(requestUrl)
+                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
+                .addHeader("Content-Type", JSON_MEDIA_TYPE)
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
+                .build()
+
+        val timeoutClient =
+            client.newBuilder()
+                .callTimeout(2, TimeUnit.MINUTES)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .build()
+
+        val rawText =
+            timeoutClient.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string()
+                    ?: throw IOException("Gemini returned an empty response.")
+                if (!response.isSuccessful) {
+                    throw IOException("Gemini request failed (${response.code}): $bodyString")
+                }
+                extractGeminiText(JSONObject(bodyString))
+                    ?: throw IOException("Gemini response did not include text content.")
+            }
+
+        val cleaned = CODE_FENCE_REGEX.replace(rawText, "").trim()
+        val json = try {
+            JSONObject(cleaned)
+        } catch (error: Exception) {
+            throw IOException("Gemini returned invalid JSON: ${error.message}\n$cleaned", error)
+        }
+
+        val quizQuestions = json.optJSONArray("quizQuestions").toQuestionSpecs()
+        val interviewQuestions = json.optJSONArray("interviewQuestions").toQuestionSpecs()
+        val practiceTips = json.optJSONArray("practiceTips").toTipSpecs()
+        val coachingNotes =
+            json.optJSONObject("coachingNotes")?.let { notes ->
+                CoachingNotes(
+                    summary = notes.optString("summary").takeUnless { it.isBlank() },
+                    improvementAreas = notes.optJSONArray("improvementAreas").toStringList(),
+                    recommendedPracticeFrequency = notes.optString("recommendedPracticeFrequency")
+                        .takeUnless { it.isBlank() }
+                )
+            }
+
+        return GeminiInterviewBundle(
+            quizQuestions = quizQuestions,
+            interviewQuestions = interviewQuestions,
+            practiceTips = practiceTips,
+            coachingNotes = coachingNotes,
+        )
+    }
+
+    private fun extractGeminiText(response: JSONObject): String? {
+        val candidates = response.optJSONArray("candidates") ?: return null
+        for (i in 0 until candidates.length()) {
+            val candidate = candidates.optJSONObject(i) ?: continue
+            val content = candidate.optJSONObject("content") ?: continue
+            val parts = content.optJSONArray("parts") ?: continue
+            val collected = buildString {
+                for (j in 0 until parts.length()) {
+                    val part = parts.optJSONObject(j) ?: continue
+                    val text = part.optString("text")
+                    if (!text.isNullOrBlank()) append(text)
+                }
+            }
+            if (collected.isNotBlank()) return collected
+        }
+        return null
+    }
+
+    private fun JSONArray?.toQuestionSpecs(): List<RepositoryQuestionSnapshot> {
+        if (this == null || length() == 0) return emptyList()
+        return List(length()) { index ->
+            val json = optJSONObject(index) ?: JSONObject()
+            val options = json.optJSONArray("options").toStringList()
+            RepositoryQuestionSnapshot(
+                id = json.optString("id").takeUnless { it.isBlank() } ?: "question_${index + 1}",
+                question = json.optString("question"),
+                category = json.optString("category").takeUnless { it.isBlank() },
+                type = json.optString("type").takeUnless { it.isBlank() },
+                options = options,
+                correctAnswerIndex = json.optInt("correctAnswerIndex").takeUnless { json.isNull("correctAnswerIndex") },
+                explanation = json.optString("explanation").takeUnless { it.isBlank() },
+                placeholder = json.optString("placeholder").takeUnless { it.isBlank() },
+            )
+        }
+    }
+
+    private fun JSONArray?.toTipSpecs(): List<PracticeTipSpec> {
+        if (this == null || length() == 0) return emptyList()
+        return List(length()) { index ->
+            val json = optJSONObject(index) ?: JSONObject()
+            PracticeTipSpec(
+                category = json.optString("category").takeUnless { it.isBlank() } ?: "Coaching Tip",
+                icon = json.optString("icon").takeUnless { it.isBlank() } ?: "lightbulb",
+                color = json.optString("color").takeUnless { it.isBlank() } ?: "#4F46E5",
+                tips = json.optJSONArray("tips").toStringList().ifEmpty {
+                    listOf(json.optString("summary").takeUnless { it.isBlank() } ?: "Stay consistent with practice.")
+                }
+            )
+        }
+    }
+
+    private fun JSONArray?.toStringList(): List<String> {
+        if (this == null || length() == 0) return emptyList()
+        val list = mutableListOf<String>()
+        for (i in 0 until length()) {
+            val value = optString(i)
+            if (!value.isNullOrBlank()) list.add(value)
+        }
+        return list
+    }
+
+    private fun RepositoryQuestionSnapshot.toJson(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("question", question)
+            put("category", category ?: JSONObject.NULL)
+            put("type", type ?: JSONObject.NULL)
+            put("options", JSONArray(options))
+            if (correctAnswerIndex != null) put("correctAnswerIndex", correctAnswerIndex) else put("correctAnswerIndex", JSONObject.NULL)
+            if (selectedAnswerIndex != null) put("selectedAnswerIndex", selectedAnswerIndex) else put("selectedAnswerIndex", JSONObject.NULL)
+            if (explanation != null) put("explanation", explanation) else put("explanation", JSONObject.NULL)
+            if (placeholder != null) put("placeholder", placeholder) else put("placeholder", JSONObject.NULL)
+            if (essayResponse != null) put("essayResponse", essayResponse) else put("essayResponse", JSONObject.NULL)
+        }
+    }
+
+    private fun String.toInstantOrEpoch(): Instant {
+        if (isBlank()) return Instant.EPOCH
+        return runCatching { Instant.parse(this) }
+            .recoverCatching { OffsetDateTime.parse(this).toInstant() }
+            .getOrElse { Instant.EPOCH }
+    }
+
+    data class InterviewPrepContent(
+        val quizQuestions: List<RepositoryQuestionSnapshot>,
+        val interviewQuestions: List<RepositoryQuestionSnapshot>,
+        val practiceTips: List<PracticeTipSpec>,
+        val coachingNotes: CoachingNotes?,
+        val neonUser: NeonUserProfile,
+        val assessments: List<AssessmentRecord>,
+    )
+
+    data class RepositoryQuestionSnapshot(
+        val id: String,
+        val question: String,
+        val category: String?,
+        val type: String?,
+        val options: List<String> = emptyList(),
+        val correctAnswerIndex: Int? = null,
+        val selectedAnswerIndex: Int? = null,
+        val explanation: String? = null,
+        val placeholder: String? = null,
+        val essayResponse: String? = null,
+    )
+
+    data class PracticeTipSpec(
+        val category: String,
+        val icon: String,
+        val color: String,
+        val tips: List<String>,
+    )
+
+    data class CoachingNotes(
+        val summary: String?,
+        val improvementAreas: List<String>,
+        val recommendedPracticeFrequency: String?,
+    )
+
+    data class NeonUserProfile(
+        val id: String,
+        val industry: String?,
+        val experienceYears: Int?,
+        val skills: List<String>,
+        val bio: String?,
+    )
+
+    data class AssessmentRecord(
+        val id: String,
+        val createdAt: Instant,
+        val quizScore: Double,
+        val category: String,
+        val improvementTip: String?,
+        val questions: List<RepositoryQuestionSnapshot>,
+    )
+
+    private data class GeminiInterviewBundle(
+        val quizQuestions: List<RepositoryQuestionSnapshot>,
+        val interviewQuestions: List<RepositoryQuestionSnapshot>,
+        val practiceTips: List<PracticeTipSpec>,
+        val coachingNotes: CoachingNotes?,
+    )
+
+    companion object {
+        private const val TAG = "InterviewPrepRepo"
+        private const val GEMINI_API_HOST = "generativelanguage.googleapis.com"
+        private const val GEMINI_MODEL_NAME = "gemini-2.5-flash"
+        private const val JSON_MEDIA_TYPE = "application/json; charset=utf-8"
+        private val CODE_FENCE_REGEX = Regex("```(?:json)?")
+
+        // Question pool configuration
+        private const val MINIMUM_POOL_SIZE = 10 // Trigger batch generation when below this
+        private const val BATCH_QUIZ_SIZE = 50 // Generate 50 quiz questions per batch
+        private const val BATCH_INTERVIEW_SIZE = 20 // Generate 20 interview questions per batch
+        private const val QUIZ_QUESTIONS_PER_SESSION = 5 // Show 5 questions per quiz
+        private const val INTERVIEW_QUESTIONS_PER_SESSION = 4 // Show 4 questions per interview
+    }
+}

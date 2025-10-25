@@ -72,3 +72,18 @@ data class InterviewTip(
     val tips: List<String>,
     val color: String
 )
+
+data class InterviewCoachingNotes(
+    val summary: String = "",
+    val improvementAreas: List<String> = emptyList(),
+    val recommendedPracticeFrequency: String = ""
+)
+
+/**
+ * Loading state with progress and description
+ */
+data class LoadingState(
+    val isLoading: Boolean = false,
+    val progress: Float = 0f,
+    val description: String = ""
+)

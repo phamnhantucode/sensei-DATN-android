@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 val localProperties = Properties().also { properties ->
@@ -99,4 +100,9 @@ dependencies {
     implementation(libs.clerk.android)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Room for local database
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 }

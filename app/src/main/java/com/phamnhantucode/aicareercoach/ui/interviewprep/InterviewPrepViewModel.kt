@@ -1,112 +1,32 @@
 package com.phamnhantucode.aicareercoach.ui.interviewprep
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository.AssessmentRecord
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository.CoachingNotes
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository.PracticeTipSpec
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository.RepositoryQuestionSnapshot
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Locale
+import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
-import kotlin.math.round
 
-class InterviewPrepViewModel : ViewModel() {
-
-    // Sample quiz questions
-    private val quizQuestions = listOf(
-        InterviewQuestion(
-            id = 1,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "What is the time complexity of binary search?",
-            options = listOf("O(n)", "O(log n)", "O(n²)", "O(1)"),
-            correctAnswer = 1,
-            explanation = "Binary search divides the search space in half with each iteration, resulting in O(log n) time complexity."
-        ),
-        InterviewQuestion(
-            id = 2,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "Which data structure uses LIFO principle?",
-            options = listOf("Queue", "Stack", "Array", "Tree"),
-            correctAnswer = 1,
-            explanation = "Stack follows Last-In-First-Out (LIFO) principle where the last element added is the first one to be removed."
-        ),
-        InterviewQuestion(
-            id = 3,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.BEHAVIORAL,
-            question = "What is the STAR method used for?",
-            options = listOf("Coding patterns", "Interview answers", "Data structures", "Testing"),
-            correctAnswer = 1,
-            explanation = "STAR (Situation, Task, Action, Result) is a technique for structuring behavioral interview answers."
-        ),
-        InterviewQuestion(
-            id = 4,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "What does REST stand for?",
-            options = listOf(
-                "Remote Event Service",
-                "Representational State Transfer",
-                "Resource Execution System",
-                "Real-time Event Stream"
-            ),
-            correctAnswer = 1,
-            explanation = "REST stands for Representational State Transfer, an architectural style for web services."
-        ),
-        InterviewQuestion(
-            id = 5,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "Which SQL command is used to retrieve data?",
-            options = listOf("INSERT", "UPDATE", "SELECT", "DELETE"),
-            correctAnswer = 2,
-            explanation = "SELECT is used to query and retrieve data from database tables."
-        )
-    )
-
-    // Sample interview questions (includes essay questions)
-    private val interviewQuestions = listOf(
-        InterviewQuestion(
-            id = 1,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "What is polymorphism in OOP?",
-            options = listOf(
-                "Multiple inheritance",
-                "Ability to take multiple forms",
-                "Data encapsulation",
-                "Code reusability"
-            ),
-            correctAnswer = 1,
-            explanation = "Polymorphism allows objects to take multiple forms and behave differently based on their data type or class."
-        ),
-        InterviewQuestion(
-            id = 2,
-            type = QuestionType.ESSAY,
-            category = QuestionCategory.BEHAVIORAL,
-            question = "Tell me about a challenging project you worked on and how you overcame obstacles.",
-            placeholder = "Describe the situation, your approach, and the outcome..."
-        ),
-        InterviewQuestion(
-            id = 3,
-            type = QuestionType.MULTIPLE_CHOICE,
-            category = QuestionCategory.TECHNICAL,
-            question = "Which HTTP method is idempotent?",
-            options = listOf("POST", "PUT", "PATCH", "All of the above"),
-            correctAnswer = 1,
-            explanation = "PUT is idempotent, meaning multiple identical requests have the same effect as a single request."
-        ),
-        InterviewQuestion(
-            id = 4,
-            type = QuestionType.ESSAY,
-            category = QuestionCategory.SITUATIONAL,
-            question = "How would you handle a disagreement with a team member about a technical decision?",
-            placeholder = "Explain your approach using specific examples..."
-        )
-    )
+class InterviewPrepViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
+    private val repository: InterviewPrepRepository = InterviewPrepRepository(context = application)
 
     private val _quizState = MutableStateFlow<QuizState?>(null)
     val quizState: StateFlow<QuizState?> = _quizState.asStateFlow()
@@ -114,25 +34,83 @@ class InterviewPrepViewModel : ViewModel() {
     private val _interviewState = MutableStateFlow<InterviewState?>(null)
     val interviewState: StateFlow<InterviewState?> = _interviewState.asStateFlow()
 
-    private val _userProgress = MutableStateFlow(UserProgress(
-        totalQuizzes = 3,
-        averageScore = 81.6,
-        questionsAnswered = 15,
-        streak = 5,
-        recentScores = listOf(75, 80, 90),
-        completedQuizStates = listOf(
-            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 2), true, LocalDateTime.now().minusDays(1), 80),
-            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 1), true, LocalDateTime.now().minusDays(2), 75),
-            QuizState(quizQuestions.take(5), 5, mapOf(0 to 1, 1 to 1, 2 to 1, 3 to 1, 4 to 1), true, LocalDateTime.now().minusDays(3), 90)
-        )
-    ))
+    private val _userProgress = MutableStateFlow(UserProgress())
     val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
 
+    private val _practiceTips = MutableStateFlow<List<InterviewTip>>(emptyList())
+    val practiceTips: StateFlow<List<InterviewTip>> = _practiceTips.asStateFlow()
+
+    private val _coachingNotes = MutableStateFlow<InterviewCoachingNotes?>(null)
+    val coachingNotes: StateFlow<InterviewCoachingNotes?> = _coachingNotes.asStateFlow()
+
+    private val _loadingState = MutableStateFlow(LoadingState(isLoading = true, progress = 0f, description = "Initializing..."))
+    val loadingState: StateFlow<LoadingState> = _loadingState.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private var quizBlueprint: List<RepositoryQuestionSnapshot> = emptyList()
+    private var interviewBlueprint: List<RepositoryQuestionSnapshot> = emptyList()
+    private var latestQuizQuestions: List<InterviewQuestion> = emptyList()
+    private var latestInterviewQuestions: List<InterviewQuestion> = emptyList()
+
     private var timerJob: Job? = null
+    private var loadJob: Job? = null
+
+    init {
+        refreshContent()
+    }
+
+    fun refreshContent(force: Boolean = false) {
+        if (loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
+            _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Connecting to server...")
+            _errorMessage.value = null
+            try {
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.3f, description = "Fetching interview questions...")
+                val content = repository.loadInterviewPrepContent(forceRefreshAuth = force)
+
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.5f, description = "Processing quiz questions...")
+                quizBlueprint = content.quizQuestions
+                interviewBlueprint = content.interviewQuestions
+                latestQuizQuestions = quizBlueprint.mapIndexed { index, snapshot ->
+                    snapshot.toInterviewQuestion(index)
+                }
+                latestInterviewQuestions = interviewBlueprint.mapIndexed { index, snapshot ->
+                    snapshot.toInterviewQuestion(index)
+                }
+
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.7f, description = "Loading practice tips...")
+                _practiceTips.value = content.practiceTips.map { it.toUiModel() }
+                _coachingNotes.value = content.coachingNotes?.toUiModel()
+
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.9f, description = "Calculating your progress...")
+                _userProgress.value = buildUserProgress(content.assessments)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to load interview prep content.", error)
+                _errorMessage.value = error.localizedMessage
+                if (latestQuizQuestions.isEmpty()) {
+                    _userProgress.value = UserProgress()
+                }
+            } finally {
+                _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Done!")
+            }
+        }
+    }
+
+    fun acknowledgeError() {
+        _errorMessage.value = null
+    }
 
     fun startQuiz() {
+        if (latestQuizQuestions.isEmpty()) {
+            refreshContent(force = true)
+            return
+        }
         _quizState.value = QuizState(
-            questions = quizQuestions,
+            questions = latestQuizQuestions,
             currentQuestionIndex = 0,
             answers = emptyMap(),
             isComplete = false,
@@ -141,11 +119,15 @@ class InterviewPrepViewModel : ViewModel() {
     }
 
     fun startInterview() {
+        if (latestInterviewQuestions.isEmpty()) {
+            refreshContent(force = true)
+            return
+        }
         _interviewState.value = InterviewState(
-            questions = interviewQuestions,
+            questions = latestInterviewQuestions,
             currentQuestionIndex = 0,
             answers = emptyMap(),
-            timeLeft = 1800,
+            timeLeft = INTERVIEW_DURATION_SECONDS,
             isComplete = false
         )
         startTimer()
@@ -195,14 +177,32 @@ class InterviewPrepViewModel : ViewModel() {
         _quizState.value?.let { state ->
             val score = calculateScore(state.questions, state.answers)
             val completedState = state.copy(isComplete = true, finalScore = score)
-
-            _userProgress.value = _userProgress.value.copy(
-                totalQuizzes = _userProgress.value.totalQuizzes + 1,
-                completedQuizStates = listOf(completedState) + _userProgress.value.completedQuizStates,
-                recentScores = (_userProgress.value.recentScores + score).takeLast(8)
-            )
-
             _quizState.value = completedState
+
+            val snapshots = mergeAnswers(quizBlueprint, state.answers)
+            viewModelScope.launch {
+                try {
+                    val improvementTip = _coachingNotes.value?.improvementAreas?.joinToString()
+                    repository.recordQuizAttempt(
+                        quizScore = score,
+                        questions = snapshots,
+                        improvementTip = improvementTip
+                    )
+
+                    // Mark questions as used in the local pool
+                    val questionIds = snapshots.map { it.id }
+                    try {
+                        repository.markQuestionsAsUsed(questionIds)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to mark questions as used", e)
+                    }
+
+                    refreshContent(force = false)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Failed to record quiz attempt.", error)
+                    _errorMessage.value = error.localizedMessage
+                }
+            }
         }
     }
 
@@ -210,27 +210,59 @@ class InterviewPrepViewModel : ViewModel() {
         timerJob?.cancel()
         _interviewState.value?.let { state ->
             val score = calculateScore(state.questions, state.answers)
-            _interviewState.value = state.copy(
+            val completedState = state.copy(
                 isComplete = true,
                 finalScore = score
             )
+            _interviewState.value = completedState
+
+            val snapshots = mergeAnswers(interviewBlueprint, state.answers)
+            viewModelScope.launch {
+                try {
+                    val improvementTip = _coachingNotes.value?.summary
+                    repository.recordInterviewAttempt(
+                        quizScore = score,
+                        questions = snapshots,
+                        improvementTip = improvementTip
+                    )
+
+                    // Mark questions as used in the local pool
+                    val questionIds = snapshots.map { it.id }
+                    try {
+                        repository.markQuestionsAsUsed(questionIds)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to mark questions as used", e)
+                    }
+
+                    refreshContent(force = false)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Failed to record interview attempt.", error)
+                    _errorMessage.value = error.localizedMessage
+                }
+            }
         }
     }
 
-    private fun calculateScore(questions: List<InterviewQuestion>, answers: Map<Int, Any>): Int {
+    private fun calculateScore(
+        questions: List<InterviewQuestion>,
+        answers: Map<Int, Any>,
+    ): Int {
         var correct = 0
         var total = 0
 
         questions.forEachIndexed { index, question ->
-            if (question.type == QuestionType.MULTIPLE_CHOICE) {
+            if (question.type == QuestionType.MULTIPLE_CHOICE && question.correctAnswer >= 0) {
                 total++
-                if (answers[index] == question.correctAnswer) {
+                val answerValue = answers[index]
+                if (answerValue is Int && answerValue == question.correctAnswer) {
                     correct++
                 }
             }
         }
 
-        return if (total > 0) round((correct.toDouble() / total) * 100).toInt() else 0
+        if (total == 0) return 0
+        val rawScore = (correct.toDouble() / total) * 100
+        return rawScore.roundToInt()
     }
 
     private fun startTimer() {
@@ -243,9 +275,9 @@ class InterviewPrepViewModel : ViewModel() {
                         _interviewState.value = state.copy(timeLeft = state.timeLeft - 1)
                     } else {
                         completeInterview()
-                        break
+                        return@launch
                     }
-                }
+                } ?: return@launch
             }
         }
     }
@@ -262,5 +294,135 @@ class InterviewPrepViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
+        loadJob?.cancel()
+    }
+
+    private fun RepositoryQuestionSnapshot.toInterviewQuestion(index: Int): InterviewQuestion {
+        val resolvedType = when (type?.uppercase(Locale.US)) {
+            QuestionType.ESSAY.name -> QuestionType.ESSAY
+            else -> QuestionType.MULTIPLE_CHOICE
+        }
+        val resolvedCategory = when (category?.uppercase(Locale.US)) {
+            QuestionCategory.BEHAVIORAL.name -> QuestionCategory.BEHAVIORAL
+            QuestionCategory.SITUATIONAL.name -> QuestionCategory.SITUATIONAL
+            else -> QuestionCategory.TECHNICAL
+        }
+        return InterviewQuestion(
+            id = index,
+            type = resolvedType,
+            category = resolvedCategory,
+            question = question,
+            options = if (resolvedType == QuestionType.MULTIPLE_CHOICE) options else emptyList(),
+            correctAnswer = correctAnswerIndex ?: -1,
+            explanation = explanation ?: "",
+            placeholder = placeholder ?: DEFAULT_ESSAY_PLACEHOLDER
+        )
+    }
+
+    private fun PracticeTipSpec.toUiModel(): InterviewTip {
+        return InterviewTip(
+            category = category,
+            icon = icon,
+            tips = tips,
+            color = color
+        )
+    }
+
+    private fun CoachingNotes.toUiModel(): InterviewCoachingNotes {
+        return InterviewCoachingNotes(
+            summary = summary ?: "",
+            improvementAreas = improvementAreas,
+            recommendedPracticeFrequency = recommendedPracticeFrequency ?: ""
+        )
+    }
+
+    private fun mergeAnswers(
+        blueprint: List<RepositoryQuestionSnapshot>,
+        answers: Map<Int, Any>,
+    ): List<RepositoryQuestionSnapshot> {
+        return blueprint.mapIndexed { index, snapshot ->
+            val answer = answers[index]
+            when (answer) {
+                is Int -> snapshot.copy(selectedAnswerIndex = answer)
+                is String -> snapshot.copy(essayResponse = answer)
+                else -> snapshot
+            }
+        }
+    }
+
+    private fun buildUserProgress(assessments: List<AssessmentRecord>): UserProgress {
+        if (assessments.isEmpty()) return UserProgress()
+
+        val totalQuizzes = assessments.size
+        val averageScore =
+            assessments.map { it.quizScore }.average().takeIf { !it.isNaN() } ?: 0.0
+        val questionsAnswered = assessments.sumOf { it.questions.size }
+        val recentScores = assessments.take(8).map { it.quizScore.roundToInt() }
+        val streak = computeStreak(assessments)
+        val quizStates = assessments.mapIndexed { index, record ->
+            record.toQuizState(index)
+        }
+
+        return UserProgress(
+            totalQuizzes = totalQuizzes,
+            averageScore = averageScore,
+            questionsAnswered = questionsAnswered,
+            streak = streak,
+            recentScores = recentScores,
+            completedQuizStates = quizStates
+        )
+    }
+
+    private fun computeStreak(assessments: List<AssessmentRecord>): Int {
+        val zone = ZoneId.systemDefault()
+        val uniqueDates = assessments
+            .map { it.createdAt.atZone(zone).toLocalDate() }
+            .distinct()
+            .sortedDescending()
+        if (uniqueDates.isEmpty()) return 0
+
+        var streak = 0
+        var cursor = LocalDate.now()
+        for (date in uniqueDates) {
+            if (streak == 0 && (date.isEqual(cursor) || date.isEqual(cursor.minusDays(1)))) {
+                streak++
+                cursor = date.minusDays(1)
+            } else if (date.isEqual(cursor)) {
+                streak++
+                cursor = cursor.minusDays(1)
+            } else {
+                break
+            }
+        }
+        return streak
+    }
+
+    private fun AssessmentRecord.toQuizState(index: Int): QuizState {
+        val zone = ZoneId.systemDefault()
+        val startedAt = createdAt.atZone(zone).toLocalDateTime()
+        val questionsUi = questions.mapIndexed { questionIndex, snapshot ->
+            snapshot.toInterviewQuestion(questionIndex)
+        }
+        val answers = buildMap<Int, Any> {
+            questions.forEachIndexed { idx, snapshot ->
+                snapshot.selectedAnswerIndex?.let { put(idx, it) }
+                snapshot.essayResponse?.takeIf { it.isNotBlank() }?.let { put(idx, it) }
+            }
+        }
+        return QuizState(
+            questions = questionsUi,
+            currentQuestionIndex = questionsUi.lastIndex.coerceAtLeast(0),
+            answers = answers,
+            isComplete = true,
+            timeStarted = startedAt,
+            finalScore = quizScore.roundToInt()
+        )
+    }
+
+    companion object {
+        private const val TAG = "InterviewPrepVM"
+        private const val INTERVIEW_DURATION_SECONDS = 30 * 60
+        private const val DEFAULT_ESSAY_PLACEHOLDER =
+            "Structure your response with STAR (Situation, Task, Action, Result)."
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -17,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,6 +295,8 @@ fun ProgressScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TipsScreen(
+    practiceTips: List<InterviewTip>,
+    coachingNotes: InterviewCoachingNotes?,
     onBack: () -> Unit
 ) {
     InsetAwareColumn(
@@ -323,78 +327,40 @@ fun TipsScreen(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Technical Preparation
-            TipCard(
-                icon = Icons.Default.Psychology,
-                title = "Technical Preparation",
-                tips = listOf(
-                    "Review data structures and algorithms daily",
-                    "Practice coding problems on platforms like LeetCode",
-                    "Understand time and space complexity",
-                    "Study system design patterns for senior roles"
-                )
-            )
+            coachingNotes?.let { notes ->
+                CoachingNotesCard(notes = notes)
+            }
 
-            // Behavioral Questions
-            TipCard(
-                icon = Icons.Default.People,
-                title = "Behavioral Questions",
-                tips = listOf(
-                    "Use the STAR method (Situation, Task, Action, Result)",
-                    "Prepare stories about challenges and successes",
-                    "Be specific and quantify results when possible",
-                    "Show growth mindset and learning from failures"
-                )
-            )
-
-            // General Tips
-            TipCard(
-                icon = Icons.Default.Lightbulb,
-                title = "General Tips",
-                tips = listOf(
-                    "Research the company and role thoroughly",
-                    "Prepare thoughtful questions for the interviewer",
-                    "Practice clear communication of complex ideas",
-                    "Get good sleep and arrive early"
-                )
-            )
-
-            // Pro Tip Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
+            if (practiceTips.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lightbulb,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(24.dp)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Pro Tip",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            text = "Start a quiz or interview to receive personalized tips.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Practice explaining your thought process out loud. Interviewers value clear communication as much as correct answers. Mock interviews with peers can significantly improve this skill.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                }
+            } else {
+                practiceTips.forEach { tip ->
+                    TipCard(tip = tip)
                 }
             }
 
@@ -404,11 +370,98 @@ fun TipsScreen(
 }
 
 @Composable
-private fun TipCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    tips: List<String>
-) {
+private fun CoachingNotesCard(notes: InterviewCoachingNotes) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Psychology,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "Personalized Coaching",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (notes.summary.isNotBlank()) {
+                Text(
+                    text = notes.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            if (notes.improvementAreas.isNotEmpty()) {
+                Text(
+                    text = "Focus Areas",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                notes.improvementAreas.forEach { area ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = area,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+            }
+            if (notes.recommendedPracticeFrequency.isNotBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = "Recommendation: ${notes.recommendedPracticeFrequency}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TipCard(tip: InterviewTip) {
+    val icon = remember(tip.icon) { resolveIconForKeyword(tip.icon) }
+    val parsedColor = remember(tip.color) { parseColorOrNull(tip.color) }
+    val accentColor = parsedColor ?: MaterialTheme.colorScheme.primary
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -426,7 +479,7 @@ private fun TipCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = accentColor.copy(alpha = 0.15f)
                 ) {
                     Box(
                         modifier = Modifier.padding(12.dp)
@@ -434,13 +487,13 @@ private fun TipCard(
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = accentColor,
                             modifier = Modifier.size(24.dp)
                         )
                     }
                 }
                 Text(
-                    text = title,
+                    text = tip.category,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -448,7 +501,7 @@ private fun TipCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            tips.forEach { tip ->
+            tip.tips.forEach { advice ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.Top
@@ -456,20 +509,36 @@ private fun TipCard(
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = accentColor,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = tip,
+                        text = advice,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (tip != tips.last()) {
+                if (advice != tip.tips.last()) {
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
     }
 }
+
+private fun resolveIconForKeyword(keyword: String): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (keyword.lowercase(Locale.US)) {
+        "target" -> Icons.Default.MyLocation
+        "chat" -> Icons.Default.Chat
+        "rocket" -> Icons.Default.RocketLaunch
+        "tools" -> Icons.Default.Build
+        "book" -> Icons.Default.MenuBook
+        "graph" -> Icons.Default.ShowChart
+        "people" -> Icons.Default.People
+        else -> Icons.Default.Lightbulb
+    }
+}
+
+private fun parseColorOrNull(value: String): Color? =
+    runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrNull()
