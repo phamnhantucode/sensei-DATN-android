@@ -225,8 +225,9 @@ fun OnboardingScreen(
                                                         submitError = "User session unavailable. Please sign in again."
                                                     } else {
                                                         // Ensure Neon user exists, then update profile
+                                                        val authToken = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
                                                         try {
-                                                            NeonUserService.upsertUser(user)
+                                                            NeonUserService.upsertUser(user, authToken)
                                                         } catch (_: Exception) {
                                                             // Best-effort; continue to profile update
                                                         }
@@ -240,9 +241,11 @@ fun OnboardingScreen(
                                                             skills = skills,
                                                             bio = formData.bio.takeIf { it.isNotBlank() },
                                                         )
+
                                                         NeonUserService.updateUserProfile(
                                                             clerkUserId = user.id,
                                                             profile = profile,
+                                                            authToken = authToken,
                                                         )
                                                         onComplete()
                                                     }

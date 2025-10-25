@@ -111,6 +111,39 @@ object NeonUserService {
         Log.d(TAG, "Updated onboarding profile for Neon user $clerkUserId.")
     }
 
+    suspend fun getUser(
+        clerkUserId: String,
+        authToken: String? = null,
+    ): NeonUser? = withContext(Dispatchers.IO) {
+        val authorizationHeader = resolveAuthorizationHeader(authToken) ?: return@withContext null
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
+        val request = Request.Builder()
+            .url("$apiUrl/User?clerkUserId=eq.$encodedClerkId&limit=1")
+            .addHeader("Authorization", authorizationHeader)
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val bodyString = response.body?.string() ?: return@withContext null
+            if (!response.isSuccessful) return@withContext null
+            val results = JSONArray(bodyString)
+            if (results.length() == 0) return@withContext null
+            val json = results.getJSONObject(0)
+            val industry = json.optString("industry").takeIf { it.isNotBlank() }
+            val experience = if (json.has("experience") && !json.isNull("experience")) json.optInt("experience") else null
+            val skillsArray = json.optJSONArray("skills") ?: JSONArray()
+            val skills = List(skillsArray.length()) { i -> skillsArray.optString(i) }.filter { it.isNotBlank() }
+            val bio = json.optString("bio").takeIf { it.isNotBlank() }
+            return@use NeonUser(
+                clerkUserId = clerkUserId,
+                industry = industry,
+                experienceYears = experience,
+                skills = skills,
+                bio = bio
+            )
+        }
+    }
+
     private fun resolveAuthorizationHeader(authToken: String?): String? {
         val bearerToken = authToken?.takeUnless { it.isBlank() }
             ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
@@ -180,6 +213,14 @@ object NeonUserService {
         val industry: String?,
         val experienceYears: Int?,
         val skills: List<String> = emptyList(),
+        val bio: String?,
+    )
+
+    data class NeonUser(
+        val clerkUserId: String,
+        val industry: String?,
+        val experienceYears: Int?,
+        val skills: List<String>,
         val bio: String?,
     )
 

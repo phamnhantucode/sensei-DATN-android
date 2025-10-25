@@ -16,6 +16,7 @@ import com.clerk.api.signup.prepareVerification
 import com.clerk.api.sso.OAuthProvider
 import com.clerk.api.user.User
 import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -45,6 +46,7 @@ class LoginViewModel : ViewModel() {
     private var neonAuthToken: String? = null
     private var neonTokenJob: Job? = null
     private var neonUserSyncJob: Job? = null
+    private var postSignInCheckJob: Job? = null
     private var hasIssuedPostSignInNavigation = false
 
     init {
@@ -72,8 +74,7 @@ class LoginViewModel : ViewModel() {
             } else if (!hasIssuedPostSignInNavigation) {
                 val state = _uiState.value
                 if (!state.requiresVerification && state.navigationTarget == null) {
-                    _uiState.update { it.copy(navigationTarget = LoginNavigationTarget.Industry) }
-                    hasIssuedPostSignInNavigation = true
+                    evaluatePostSignInNavigationAsync()
                 }
             }
         }.launchIn(viewModelScope)
@@ -105,12 +106,11 @@ class LoginViewModel : ViewModel() {
                 .onSuccess {
                     _uiState.update { state ->
                         state.copy(
-                            isProcessing = false,
-                            navigationTarget = LoginNavigationTarget.Industry
+                            isProcessing = false
                         )
                     }
-                    hasIssuedPostSignInNavigation = true
                     refreshNeonAuthTokenAsync()
+                    evaluatePostSignInNavigationAsync()
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
@@ -281,15 +281,13 @@ class LoginViewModel : ViewModel() {
                 )
                 .onSuccess { result ->
                     // OAuth authentication successful
-                    // The result contains either a SignIn or SignUp
                     _uiState.update { state ->
                         state.copy(
-                            isProcessing = false,
-                            navigationTarget = LoginNavigationTarget.Industry
+                            isProcessing = false
                         )
                     }
-                    hasIssuedPostSignInNavigation = true
                     refreshNeonAuthTokenAsync()
+                    evaluatePostSignInNavigationAsync()
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
@@ -307,7 +305,7 @@ class LoginViewModel : ViewModel() {
         neonTokenJob?.cancel()
         neonTokenJob = viewModelScope.launch {
             neonAuthToken = try {
-                fetchNeonAuthToken()
+                NeonAuth.fetchNeonAuthToken()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
@@ -324,7 +322,7 @@ class LoginViewModel : ViewModel() {
                 val user = initialUser ?: awaitClerkUser() ?: return@launch
                 val userId = user.id
                 if (userId == lastSyncedUserId) return@launch
-                val authToken = fetchNeonAuthToken() ?: return@launch
+                val authToken = NeonAuth.fetchNeonAuthToken() ?: return@launch
                 NeonUserService.upsertUser(user, authToken)
                 lastSyncedUserId = userId
             } catch (cancellation: CancellationException) {
@@ -344,68 +342,39 @@ class LoginViewModel : ViewModel() {
         }
     }
 
-    private suspend fun fetchNeonAuthToken(): String? {
-        // Check if coroutine is still active before proceeding
-        if (!coroutineContext.isActive) return null
-
-        val fallbackToken = BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }
-        val basicAuthConfigured =
-            BuildConfig.NEON_DB_ROLE.isNotBlank() && BuildConfig.NEON_DB_PASSWORD.isNotBlank()
-        val session = Clerk.session
-        if (session == null) {
-            Log.w(TAG, "Clerk session unavailable; cannot fetch Neon auth token.")
-            return fallbackToken ?: if (basicAuthConfigured) "" else null
-        }
-
-        val cachedSessionToken = session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
-        if (cachedSessionToken != null) {
-            return cachedSessionToken
-        }
-
-        val clerkResult = try {
-            session.fetchToken()
-        } catch (cancellation: CancellationException) {
-            if (fallbackToken != null) {
-                Log.w(TAG, "Clerk session token fetch cancelled; using Neon API key fallback.")
-                return fallbackToken
-            } else if (basicAuthConfigured) {
-                Log.w(TAG, "Clerk session token fetch cancelled; using Neon role/password fallback.")
-                return ""
-            } else {
-                throw cancellation
-            }
-        } catch (error: Exception) {
-            Log.e(TAG, "Failed to fetch Clerk session token for Neon.", error)
-            return fallbackToken ?: if (basicAuthConfigured) "" else null
-        }
-
-        return when (clerkResult) {
-            is ClerkResult.Success -> {
-                val jwt = clerkResult.value.jwt?.takeUnless { it.isBlank() }
-                when {
-                    jwt != null -> jwt
-                    fallbackToken != null -> fallbackToken
-                    basicAuthConfigured -> ""
-                    else -> {
-                        Log.w(TAG, "Clerk returned an empty Neon auth token; sync skipped.")
-                        null
-                    }
-                }
-            }
-
-            is ClerkResult.Failure -> {
-                Log.e(
-                    TAG,
-                    clerkResult.longErrorMessageOrNull
-                        ?: "Failed to fetch Clerk session token for Neon."
-                )
-                fallbackToken ?: if (basicAuthConfigured) "" else null
-            }
-        }
-    }
 
     fun consumeNavigationTarget() {
         _uiState.update { it.copy(navigationTarget = null) }
+    }
+
+    private fun evaluatePostSignInNavigationAsync() {
+        postSignInCheckJob?.cancel()
+        postSignInCheckJob = viewModelScope.launch {
+            try {
+                val user = Clerk.user
+                if (user == null) return@launch
+                val neonUser = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.getUser(
+                    clerkUserId = user.id,
+                    authToken = NeonAuth.fetchNeonAuthToken()
+                )
+                val industry = neonUser?.industry?.trim()
+                val needsOnboarding = industry.isNullOrBlank() || industry.equals("null", ignoreCase = true)
+                _uiState.update { state ->
+                    state.copy(
+                        navigationTarget = if (needsOnboarding) LoginNavigationTarget.Onboarding else LoginNavigationTarget.Industry
+                    )
+                }
+                hasIssuedPostSignInNavigation = true
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // If profile fetch fails, default to onboarding to be safe
+                _uiState.update { state ->
+                    state.copy(navigationTarget = LoginNavigationTarget.Onboarding)
+                }
+                hasIssuedPostSignInNavigation = true
+            }
+        }
     }
 
     companion object {
