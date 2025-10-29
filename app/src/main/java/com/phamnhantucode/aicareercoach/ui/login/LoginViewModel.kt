@@ -386,20 +386,25 @@ class LoginViewModel(
     }
 
     /**
-     * Preloads quiz and interview questions in the background after user login.
+     * Preloads quiz and interview questions and caches user data in the background after user login.
      * This runs independently and won't block navigation or show errors to the user.
      */
     private fun preloadInterviewQuestionsInBackground() {
         questionPreloadJob?.cancel()
         questionPreloadJob = viewModelScope.launch {
             try {
+                // Fetch and cache user profile, assessments, and tips for instant future loads
+                interviewPrepRepository?.fetchAndCacheUserData()
+                Log.d(TAG, "Successfully cached user data in background")
+
+                // Also preload question pools
                 interviewPrepRepository?.preloadQuestionPools()
                 Log.d(TAG, "Successfully preloaded interview question pools in background")
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 // Log but don't show error to user - this is a background optimization
-                Log.w(TAG, "Failed to preload interview questions in background", error)
+                Log.w(TAG, "Failed to preload interview data in background", error)
             }
         }
     }

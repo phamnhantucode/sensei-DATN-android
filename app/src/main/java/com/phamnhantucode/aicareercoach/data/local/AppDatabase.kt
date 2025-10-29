@@ -6,12 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [QuestionPoolEntity::class],
-    version = 1,
+    entities = [
+        QuestionPoolEntity::class,
+        UserProfileCacheEntity::class,
+        AssessmentCacheEntity::class,
+        TipsCacheEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun questionPoolDao(): QuestionPoolDao
+    abstract fun userProfileCacheDao(): UserProfileCacheDao
+    abstract fun assessmentCacheDao(): AssessmentCacheDao
+    abstract fun tipsCacheDao(): TipsCacheDao
 
     companion object {
         @Volatile

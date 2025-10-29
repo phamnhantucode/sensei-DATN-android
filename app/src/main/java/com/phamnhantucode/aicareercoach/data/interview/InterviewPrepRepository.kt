@@ -8,8 +8,11 @@ import com.clerk.api.network.serialization.ClerkResult
 import com.clerk.api.session.fetchToken
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
+import com.phamnhantucode.aicareercoach.data.local.AssessmentCacheEntity
 import com.phamnhantucode.aicareercoach.data.local.QuestionPoolDao
 import com.phamnhantucode.aicareercoach.data.local.QuestionPoolEntity
+import com.phamnhantucode.aicareercoach.data.local.TipsCacheEntity
+import com.phamnhantucode.aicareercoach.data.local.UserProfileCacheEntity
 import java.io.IOException
 import java.net.URLEncoder
 import java.time.Instant
@@ -44,7 +47,11 @@ class InterviewPrepRepository(
         .build(),
     context: Context,
 ) {
-    private val questionPoolDao: QuestionPoolDao = AppDatabase.getDatabase(context).questionPoolDao()
+    private val database = AppDatabase.getDatabase(context)
+    private val questionPoolDao: QuestionPoolDao = database.questionPoolDao()
+    private val userProfileCacheDao = database.userProfileCacheDao()
+    private val assessmentCacheDao = database.assessmentCacheDao()
+    private val tipsCacheDao = database.tipsCacheDao()
 
     suspend fun loadInterviewPrepContent(
         forceRefreshAuth: Boolean = false,
@@ -75,6 +82,10 @@ class InterviewPrepRepository(
         }
 
         val assessments = fetchAssessmentsForUser(neonUser.id, authHeader)
+
+        // Cache user profile and assessments
+        cacheUserProfile(neonUser, user.id)
+        cacheAssessments(neonUser.id, assessments)
 
         // Check question pool availability (using local Room database)
         val quizPoolCount = getUnusedQuestionsCount(neonUser.id, "quiz")
@@ -111,9 +122,18 @@ class InterviewPrepRepository(
 
             QuestionBundle(quiz, interview, generated.practiceTips, generated.coachingNotes)
         } else {
-            // Load tips and coaching notes separately (can be cached or generated less frequently)
-            val tipsAndNotes = loadTipsAndCoachingNotes(neonUser, assessments)
+            // Try to load cached tips first, otherwise generate new ones
+            val tipsAndNotes = getCachedTips(neonUser.id) ?: run {
+                val generated = loadTipsAndCoachingNotes(neonUser, assessments)
+                cacheTips(neonUser.id, generated.first, generated.second)
+                generated
+            }
             QuestionBundle(quizQuestions, interviewQuestions, tipsAndNotes.first, tipsAndNotes.second)
+        }
+
+        // Cache tips if they were generated for first-time users
+        if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
+            cacheTips(neonUser.id, practiceTips, coachingNotes)
         }
 
         return@withContext InterviewPrepContent(
@@ -436,6 +456,240 @@ class InterviewPrepRepository(
             questionPoolDao.markQuestionsAsUsed(questionIds)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to mark questions as used", e)
+        }
+    }
+
+    /**
+     * Loads cached interview prep content without making network calls.
+     * Returns null if no cached data is available.
+     */
+    suspend fun loadCachedContent(): InterviewPrepContent? = withContext(Dispatchers.IO) {
+        try {
+            val user = Clerk.user ?: return@withContext null
+
+            // Try to get cached user profile by clerk user ID
+            val userProfileCache = userProfileCacheDao.getUserProfileByClerkId(user.id) ?: return@withContext null
+            val cachedProfile = NeonUserProfile(
+                id = userProfileCache.userId,
+                industry = userProfileCache.industry,
+                experienceYears = userProfileCache.experienceYears,
+                skills = userProfileCache.skills,
+                bio = userProfileCache.bio
+            )
+
+            // Load cached assessments
+            val cachedAssessments = getCachedAssessments(cachedProfile.id) ?: emptyList()
+
+            // Load cached tips
+            val cachedTipsAndNotes = getCachedTips(cachedProfile.id)
+
+            // Load questions from pool
+            val quizQuestions = fetchUnusedQuestionsFromPool(cachedProfile.id, "quiz", QUIZ_QUESTIONS_PER_SESSION)
+            val interviewQuestions = fetchUnusedQuestionsFromPool(cachedProfile.id, "interview", INTERVIEW_QUESTIONS_PER_SESSION)
+
+            // If we have no questions cached, return null to force refresh
+            if (quizQuestions.isEmpty() && interviewQuestions.isEmpty()) {
+                return@withContext null
+            }
+
+            InterviewPrepContent(
+                quizQuestions = quizQuestions,
+                interviewQuestions = interviewQuestions,
+                practiceTips = cachedTipsAndNotes?.first ?: emptyList(),
+                coachingNotes = cachedTipsAndNotes?.second,
+                neonUser = cachedProfile,
+                assessments = cachedAssessments
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load cached content", e)
+            null
+        }
+    }
+
+    /**
+     * Fetches and caches user data silently in the background.
+     * Used after login or for background refreshes.
+     */
+    suspend fun fetchAndCacheUserData() = withContext(Dispatchers.IO) {
+        try {
+            val user = Clerk.user ?: return@withContext
+            if (BuildConfig.NEON_API_URL.isBlank() || BuildConfig.GEMINI_API_KEY.isBlank()) {
+                return@withContext
+            }
+
+            val authHeader = resolveAuthorizationHeader(forceRefresh = false) ?: return@withContext
+
+            // Fetch user profile
+            val neonUser = try {
+                fetchNeonUserProfile(user.id, authHeader)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to fetch user profile for caching", error)
+                return@withContext
+            }
+
+            // Cache user profile
+            cacheUserProfile(neonUser, user.id)
+
+            // Fetch and cache assessments
+            try {
+                val assessments = fetchAssessmentsForUser(neonUser.id, authHeader)
+                cacheAssessments(neonUser.id, assessments)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to fetch assessments for caching", error)
+            }
+
+            // Generate and cache tips if needed
+            try {
+                val assessments = getCachedAssessments(neonUser.id) ?: emptyList()
+                val (tips, notes) = loadTipsAndCoachingNotes(neonUser, assessments)
+                cacheTips(neonUser.id, tips, notes)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to generate and cache tips", error)
+            }
+
+            Log.d(TAG, "Successfully fetched and cached user data")
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to fetch and cache user data", error)
+        }
+    }
+
+    // Cache methods for user profile
+    private suspend fun getCachedUserProfile(userId: String): NeonUserProfile? = withContext(Dispatchers.IO) {
+        try {
+            val cached = userProfileCacheDao.getUserProfile(userId) ?: return@withContext null
+            NeonUserProfile(
+                id = cached.userId,
+                industry = cached.industry,
+                experienceYears = cached.experienceYears,
+                skills = cached.skills,
+                bio = cached.bio
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load cached user profile", e)
+            null
+        }
+    }
+
+    private suspend fun cacheUserProfile(profile: NeonUserProfile, clerkUserId: String) = withContext(Dispatchers.IO) {
+        try {
+            val entity = UserProfileCacheEntity(
+                userId = profile.id,
+                clerkUserId = clerkUserId,
+                industry = profile.industry,
+                experienceYears = profile.experienceYears,
+                skills = profile.skills,
+                bio = profile.bio,
+                cachedAt = System.currentTimeMillis()
+            )
+            userProfileCacheDao.insertUserProfile(entity)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cache user profile", e)
+        }
+    }
+
+    // Cache methods for assessments
+    private suspend fun getCachedAssessments(userId: String): List<AssessmentRecord>? = withContext(Dispatchers.IO) {
+        try {
+            val cached = assessmentCacheDao.getAssessmentsByUser(userId)
+            if (cached.isEmpty()) return@withContext null
+
+            cached.map { entity ->
+                AssessmentRecord(
+                    id = entity.id,
+                    createdAt = Instant.ofEpochMilli(entity.createdAt),
+                    quizScore = entity.quizScore,
+                    category = entity.category,
+                    improvementTip = entity.improvementTip,
+                    questions = emptyList() // We don't cache full question details for assessments
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load cached assessments", e)
+            null
+        }
+    }
+
+    private suspend fun cacheAssessments(userId: String, assessments: List<AssessmentRecord>) = withContext(Dispatchers.IO) {
+        try {
+            val entities = assessments.map { assessment ->
+                AssessmentCacheEntity(
+                    id = assessment.id,
+                    userId = userId,
+                    createdAt = assessment.createdAt.toEpochMilli(),
+                    quizScore = assessment.quizScore,
+                    category = assessment.category,
+                    improvementTip = assessment.improvementTip,
+                    cachedAt = System.currentTimeMillis()
+                )
+            }
+            assessmentCacheDao.insertAssessments(entities)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cache assessments", e)
+        }
+    }
+
+    // Cache methods for tips and coaching notes
+    private suspend fun getCachedTips(userId: String): Pair<List<PracticeTipSpec>, CoachingNotes?>? = withContext(Dispatchers.IO) {
+        try {
+            val cached = tipsCacheDao.getTips(userId) ?: return@withContext null
+
+            val tips = JSONArray(cached.practiceTipsJson).let { array ->
+                (0 until array.length()).map { i ->
+                    val obj = array.getJSONObject(i)
+                    PracticeTipSpec(
+                        category = obj.getString("category"),
+                        icon = obj.getString("icon"),
+                        tips = obj.getJSONArray("tips").let { tipsArr ->
+                            (0 until tipsArr.length()).map { j -> tipsArr.getString(j) }
+                        },
+                        color = obj.getString("color")
+                    )
+                }
+            }
+
+            val coaching = if (cached.coachingSummary != null || cached.improvementAreas.isNotEmpty()) {
+                CoachingNotes(
+                    summary = cached.coachingSummary,
+                    improvementAreas = cached.improvementAreas,
+                    recommendedPracticeFrequency = cached.recommendedPracticeFrequency
+                )
+            } else null
+
+            Pair(tips, coaching)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load cached tips", e)
+            null
+        }
+    }
+
+    private suspend fun cacheTips(
+        userId: String,
+        tips: List<PracticeTipSpec>,
+        coachingNotes: CoachingNotes?
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val tipsJson = JSONArray().apply {
+                tips.forEach { tip ->
+                    put(JSONObject().apply {
+                        put("category", tip.category)
+                        put("icon", tip.icon)
+                        put("tips", JSONArray(tip.tips))
+                        put("color", tip.color)
+                    })
+                }
+            }.toString()
+
+            val entity = TipsCacheEntity(
+                userId = userId,
+                practiceTipsJson = tipsJson,
+                coachingSummary = coachingNotes?.summary,
+                improvementAreas = coachingNotes?.improvementAreas ?: emptyList(),
+                recommendedPracticeFrequency = coachingNotes?.recommendedPracticeFrequency,
+                cachedAt = System.currentTimeMillis()
+            )
+            tipsCacheDao.insertTips(entity)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cache tips", e)
         }
     }
 
@@ -935,7 +1189,7 @@ class InterviewPrepRepository(
         private val CODE_FENCE_REGEX = Regex("```(?:json)?")
 
         // Question pool configuration
-        private const val MINIMUM_POOL_SIZE = 10 // Trigger batch generation when below this
+        private const val MINIMUM_POOL_SIZE = 6 // Trigger batch generation when below this (30% of 20 = ~70-80% used)
         private const val BATCH_QUIZ_SIZE = 20 // Generate 20 quiz questions per batch
         private const val BATCH_INTERVIEW_SIZE = 4 // Generate 4 interview questions per batch
         private const val QUIZ_QUESTIONS_PER_SESSION = 10 // Show 10 questions per quiz

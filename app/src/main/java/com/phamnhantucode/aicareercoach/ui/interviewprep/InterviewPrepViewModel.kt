@@ -58,7 +58,29 @@ class InterviewPrepViewModel(
     private var loadJob: Job? = null
 
     init {
-        refreshContent()
+        // Try to load cached data first for instant display
+        viewModelScope.launch {
+            try {
+                val cachedContent = repository.loadCachedContent()
+                if (cachedContent != null) {
+                    // Load cached content instantly without showing loading dialog
+                    _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Done!")
+                    loadContentIntoState(cachedContent)
+                    Log.d(TAG, "Loaded cached content instantly")
+
+                    // Silently refresh in background
+                    refreshInBackground()
+                } else {
+                    // No cached data, show loading and fetch fresh
+                    Log.d(TAG, "No cached content available, fetching fresh data")
+                    refreshContent()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load cached content, falling back to refresh", e)
+                refreshContent()
+            }
+        }
+
         // Preload question pools in the background for better UX
         viewModelScope.launch {
             try {
@@ -79,21 +101,7 @@ class InterviewPrepViewModel(
                 val content = repository.loadInterviewPrepContent(forceRefreshAuth = force)
 
                 _loadingState.value = LoadingState(isLoading = true, progress = 0.5f, description = "Processing quiz questions...")
-                quizBlueprint = content.quizQuestions
-                interviewBlueprint = content.interviewQuestions
-                latestQuizQuestions = quizBlueprint.mapIndexed { index, snapshot ->
-                    snapshot.toInterviewQuestion(index)
-                }
-                latestInterviewQuestions = interviewBlueprint.mapIndexed { index, snapshot ->
-                    snapshot.toInterviewQuestion(index)
-                }
-
-                _loadingState.value = LoadingState(isLoading = true, progress = 0.7f, description = "Loading practice tips...")
-                _practiceTips.value = content.practiceTips.map { it.toUiModel() }
-                _coachingNotes.value = content.coachingNotes?.toUiModel()
-
-                _loadingState.value = LoadingState(isLoading = true, progress = 0.9f, description = "Calculating your progress...")
-                _userProgress.value = buildUserProgress(content.assessments)
+                loadContentIntoState(content)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
@@ -106,6 +114,43 @@ class InterviewPrepViewModel(
                 _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Done!")
             }
         }
+    }
+
+    /**
+     * Silently refreshes content in the background without showing loading dialog.
+     * Used when we already have cached content displayed.
+     */
+    private fun refreshInBackground() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Refreshing content silently in background")
+                val content = repository.loadInterviewPrepContent(forceRefreshAuth = false)
+                loadContentIntoState(content)
+                Log.d(TAG, "Background refresh completed successfully")
+            } catch (e: Exception) {
+                Log.w(TAG, "Background refresh failed, keeping cached content", e)
+                // Silently fail - user still has cached content
+            }
+        }
+    }
+
+    /**
+     * Loads content data into the ViewModel state.
+     * Extracted as a common method used by both cache loading and network loading.
+     */
+    private fun loadContentIntoState(content: InterviewPrepRepository.InterviewPrepContent) {
+        quizBlueprint = content.quizQuestions
+        interviewBlueprint = content.interviewQuestions
+        latestQuizQuestions = quizBlueprint.mapIndexed { index, snapshot ->
+            snapshot.toInterviewQuestion(index)
+        }
+        latestInterviewQuestions = interviewBlueprint.mapIndexed { index, snapshot ->
+            snapshot.toInterviewQuestion(index)
+        }
+
+        _practiceTips.value = content.practiceTips.map { it.toUiModel() }
+        _coachingNotes.value = content.coachingNotes?.toUiModel()
+        _userProgress.value = buildUserProgress(content.assessments)
     }
 
     fun acknowledgeError() {
