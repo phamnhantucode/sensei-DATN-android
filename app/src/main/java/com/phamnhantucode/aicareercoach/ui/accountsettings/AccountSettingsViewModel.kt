@@ -12,7 +12,10 @@ import com.clerk.api.network.serialization.onSuccess
 import com.phamnhantucode.aicareercoach.data.preferences.PreferencesRepository
 import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
@@ -44,6 +47,9 @@ class AccountSettingsViewModel(application: Application) : AndroidViewModel(appl
 
     private val _uiState = MutableStateFlow(AccountSettingsUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val _signOutSuccess = MutableSharedFlow<Unit>()
+    val signOutSuccess: SharedFlow<Unit> = _signOutSuccess.asSharedFlow()
 
     init {
         // Combine Clerk auth state with theme preference
@@ -90,6 +96,7 @@ class AccountSettingsViewModel(application: Application) : AndroidViewModel(appl
                     _uiState.update { state ->
                         state.copy(isSigningOut = false, signOutError = null)
                     }
+                    _signOutSuccess.emit(Unit)
                 }
                 .onFailure { failure ->
                     _uiState.update { state ->
