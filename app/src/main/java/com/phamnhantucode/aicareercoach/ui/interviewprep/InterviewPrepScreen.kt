@@ -338,19 +338,20 @@ private fun HomeScreen(
         ) {
             ActionCard(
                 title = "Quick Quiz",
-                subtitle = "5 questions • 10 min",
+                subtitle = "10 questions • Multiple choice",
                 icon = Icons.Default.PlayArrow,
                 color = MaterialTheme.colorScheme.primary,
                 onClick = onStartQuiz
             )
 
-            ActionCard(
-                title = "Full Interview",
-                subtitle = "Mock interview • 30 min",
-                icon = Icons.Default.Psychology,
-                color = MaterialTheme.colorScheme.secondary,
-                onClick = onStartInterview
-            )
+            // Full Interview feature hidden as per requirements
+            // ActionCard(
+            //     title = "Full Interview",
+            //     subtitle = "Mock interview • 30 min",
+            //     icon = Icons.Default.Psychology,
+            //     color = MaterialTheme.colorScheme.secondary,
+            //     onClick = onStartInterview
+            // )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

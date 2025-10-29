@@ -37,7 +37,11 @@ import org.json.JSONObject
  * - Caches questions locally using Room database
  */
 class InterviewPrepRepository(
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(360, TimeUnit.SECONDS)
+        .readTimeout(360, TimeUnit.SECONDS)
+        .writeTimeout(360, TimeUnit.SECONDS)
+        .build(),
     context: Context,
 ) {
     private val questionPoolDao: QuestionPoolDao = AppDatabase.getDatabase(context).questionPoolDao()
@@ -525,7 +529,8 @@ class InterviewPrepRepository(
             }
 
             Requirements:
-            - Provide at least ${if (generateBatchSize) BATCH_QUIZ_SIZE else 5} quizQuestions.
+            - Provide at least ${if (generateBatchSize) BATCH_QUIZ_SIZE else 10} quizQuestions.
+            - ALL quizQuestions MUST be MULTIPLE_CHOICE type only (no ESSAY questions in quizQuestions).
             - Provide at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE else 4} interviewQuestions with at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE / 2 else 2} essay prompts.
             - All JSON strings must escape quotes properly.
             - Return ONLY the JSON object without Markdown or commentary.
@@ -687,9 +692,9 @@ class InterviewPrepRepository(
 
         val timeoutClient =
             client.newBuilder()
-                .callTimeout(2, TimeUnit.MINUTES)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(60, TimeUnit.SECONDS)
+                .callTimeout(6, TimeUnit.MINUTES)
+                .readTimeout(360, TimeUnit.SECONDS)
+                .writeTimeout(360, TimeUnit.SECONDS)
                 .build()
 
         val rawText =
@@ -873,6 +878,55 @@ class InterviewPrepRepository(
         val coachingNotes: CoachingNotes?,
     )
 
+    /**
+     * Pre-loads quiz and interview question pools in the background after user info is fetched.
+     * This helps improve UX by having questions ready when the user wants to start.
+     */
+    suspend fun preloadQuestionPools() = withContext(Dispatchers.IO) {
+        try {
+            val user = Clerk.user ?: return@withContext
+            if (BuildConfig.NEON_API_URL.isBlank() || BuildConfig.GEMINI_API_KEY.isBlank()) {
+                return@withContext
+            }
+
+            val authHeader = resolveAuthorizationHeader(forceRefresh = false) ?: return@withContext
+            val neonUser = try {
+                fetchNeonUserProfile(user.id, authHeader)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to fetch user profile for preloading", error)
+                return@withContext
+            }
+
+            // Check question pool availability
+            val quizPoolCount = getUnusedQuestionsCount(neonUser.id, "quiz")
+            val interviewPoolCount = getUnusedQuestionsCount(neonUser.id, "interview")
+
+            // Generate new questions in batch if pool is low
+            if (quizPoolCount < MINIMUM_POOL_SIZE || interviewPoolCount < MINIMUM_POOL_SIZE) {
+                val assessments = try {
+                    fetchAssessmentsForUser(neonUser.id, authHeader)
+                } catch (error: Exception) {
+                    Log.w(TAG, "Failed to fetch assessments for preloading", error)
+                    emptyList()
+                }
+
+                val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
+                val generated = callGemini(prompt)
+
+                // Store generated questions in the local pool
+                if (quizPoolCount < MINIMUM_POOL_SIZE) {
+                    storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
+                }
+                if (interviewPoolCount < MINIMUM_POOL_SIZE) {
+                    storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
+                }
+                Log.d(TAG, "Preloaded question pools successfully")
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to preload question pools", error)
+        }
+    }
+
     companion object {
         private const val TAG = "InterviewPrepRepo"
         private const val GEMINI_API_HOST = "generativelanguage.googleapis.com"
@@ -882,9 +936,9 @@ class InterviewPrepRepository(
 
         // Question pool configuration
         private const val MINIMUM_POOL_SIZE = 10 // Trigger batch generation when below this
-        private const val BATCH_QUIZ_SIZE = 50 // Generate 50 quiz questions per batch
-        private const val BATCH_INTERVIEW_SIZE = 20 // Generate 20 interview questions per batch
-        private const val QUIZ_QUESTIONS_PER_SESSION = 5 // Show 5 questions per quiz
+        private const val BATCH_QUIZ_SIZE = 20 // Generate 20 quiz questions per batch
+        private const val BATCH_INTERVIEW_SIZE = 4 // Generate 4 interview questions per batch
+        private const val QUIZ_QUESTIONS_PER_SESSION = 10 // Show 10 questions per quiz
         private const val INTERVIEW_QUESTIONS_PER_SESSION = 4 // Show 4 questions per interview
     }
 }

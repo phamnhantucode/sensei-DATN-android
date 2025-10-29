@@ -50,6 +50,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 private enum class AuthMode {
@@ -62,9 +64,19 @@ fun LoginScreen(
     onBack: () -> Unit,
     onSignedIn: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: LoginViewModel = viewModel()
+    modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val viewModel: LoginViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val interviewPrepRepository = InterviewPrepRepository(context = context.applicationContext)
+                return LoginViewModel(interviewPrepRepository = interviewPrepRepository) as T
+            }
+        }
+    )
+
     var darkTheme by remember { mutableStateOf(true) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 

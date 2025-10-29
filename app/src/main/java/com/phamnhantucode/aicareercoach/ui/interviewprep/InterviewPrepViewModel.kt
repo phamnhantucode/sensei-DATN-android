@@ -59,6 +59,14 @@ class InterviewPrepViewModel(
 
     init {
         refreshContent()
+        // Preload question pools in the background for better UX
+        viewModelScope.launch {
+            try {
+                repository.preloadQuestionPools()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to preload question pools in background", e)
+            }
+        }
     }
 
     fun refreshContent(force: Boolean = false) {

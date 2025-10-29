@@ -16,6 +16,7 @@ import com.clerk.api.signup.prepareVerification
 import com.clerk.api.sso.OAuthProvider
 import com.clerk.api.user.User
 import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository
 import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import kotlinx.coroutines.CancellationException
@@ -37,7 +38,9 @@ enum class LoginNavigationTarget {
     Onboarding,
 }
 
-class LoginViewModel : ViewModel() {
+class LoginViewModel(
+    private val interviewPrepRepository: InterviewPrepRepository? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState = _uiState.asStateFlow()
@@ -48,6 +51,7 @@ class LoginViewModel : ViewModel() {
     private var neonUserSyncJob: Job? = null
     private var postSignInCheckJob: Job? = null
     private var hasIssuedPostSignInNavigation = false
+    private var questionPreloadJob: Job? = null
 
     init {
         combine(
@@ -365,6 +369,10 @@ class LoginViewModel : ViewModel() {
                     )
                 }
                 hasIssuedPostSignInNavigation = true
+
+                // Preload interview questions in background after successful user info fetch
+                // This improves UX by having questions ready when user navigates to interview prep
+                preloadInterviewQuestionsInBackground()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
@@ -373,6 +381,25 @@ class LoginViewModel : ViewModel() {
                     state.copy(navigationTarget = LoginNavigationTarget.Onboarding)
                 }
                 hasIssuedPostSignInNavigation = true
+            }
+        }
+    }
+
+    /**
+     * Preloads quiz and interview questions in the background after user login.
+     * This runs independently and won't block navigation or show errors to the user.
+     */
+    private fun preloadInterviewQuestionsInBackground() {
+        questionPreloadJob?.cancel()
+        questionPreloadJob = viewModelScope.launch {
+            try {
+                interviewPrepRepository?.preloadQuestionPools()
+                Log.d(TAG, "Successfully preloaded interview question pools in background")
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                // Log but don't show error to user - this is a background optimization
+                Log.w(TAG, "Failed to preload interview questions in background", error)
             }
         }
     }
