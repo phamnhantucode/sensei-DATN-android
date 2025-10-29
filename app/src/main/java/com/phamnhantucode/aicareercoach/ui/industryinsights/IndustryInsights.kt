@@ -82,12 +82,9 @@ fun IndustryInsightsScreen(
     onNavigateToAccountSettings: () -> Unit = {},
     viewModel: IndustryInsightsViewModel = viewModel(),
 ) {
-    var darkTheme by remember { mutableStateOf(true) }
     val uiState by viewModel.uiState.collectAsState()
 
     IndustryInsightsLayout(
-        darkTheme = darkTheme,
-        onThemeToggle = { darkTheme = !darkTheme },
         uiState = uiState,
         onRefresh = { viewModel.refreshInsights(forceRefresh = true) },
         onDismissError = viewModel::clearError,
@@ -101,8 +98,6 @@ fun IndustryInsightsScreen(
 
 @Composable
 private fun IndustryInsightsLayout(
-    darkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     uiState: IndustryInsightsUiState,
     onRefresh: () -> Unit,
     onDismissError: () -> Unit,
@@ -114,8 +109,7 @@ private fun IndustryInsightsLayout(
 ) {
     val selectedInsight = uiState.selectedInsight
 
-    AppTheme(darkTheme = darkTheme) {
-        Surface(
+    Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
@@ -139,8 +133,6 @@ private fun IndustryInsightsLayout(
                             .padding(16.dp)
                     ) {
                         HeaderSection(
-                            darkTheme = darkTheme,
-                            onThemeToggle = onThemeToggle,
                             onNavigateToResumeBuilder = onNavigateToResumeBuilder,
                             onNavigateToInterviewPrep = onNavigateToInterviewPrep,
                             onNavigateToCoverLetter = onNavigateToCoverLetter,
@@ -191,13 +183,10 @@ private fun IndustryInsightsLayout(
                 }
             }
         }
-    }
 }
 
 @Composable
 private fun HeaderSection(
-    darkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     onNavigateToResumeBuilder: () -> Unit,
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
@@ -308,7 +297,7 @@ private fun HeaderSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Industry Insights",
                     style = MaterialTheme.typography.headlineMedium,
@@ -320,17 +309,6 @@ private fun HeaderSection(
                     text = "Stay on top of market outlooks, salary bands, and in-demand skills.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(
-                onClick = onThemeToggle,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            ) {
-                Icon(
-                    imageVector = if (darkTheme) Icons.Outlined.WbSunny else Icons.Outlined.Analytics,
-                    contentDescription = "Toggle theme"
                 )
             }
         }
@@ -1170,16 +1148,16 @@ private fun IndustryInsightsScreenPreview() {
         selectedIndustryId = sampleInsights.keys.first(),
         errorMessage = null
     )
-    IndustryInsightsLayout(
-        darkTheme = true,
-        onThemeToggle = {},
-        uiState = uiState,
-        onRefresh = {},
-        onDismissError = {},
-        onIndustrySelected = {},
-        onNavigateToResumeBuilder = {},
-        onNavigateToInterviewPrep = {},
-        onNavigateToCoverLetter = {},
-        onNavigateToAccountSettings = {}
-    )
+    AppTheme(darkTheme = true) {
+        IndustryInsightsLayout(
+            uiState = uiState,
+            onRefresh = {},
+            onDismissError = {},
+            onIndustrySelected = {},
+            onNavigateToResumeBuilder = {},
+            onNavigateToInterviewPrep = {},
+            onNavigateToCoverLetter = {},
+            onNavigateToAccountSettings = {}
+        )
+    }
 }

@@ -77,7 +77,6 @@ fun LoginScreen(
         }
     )
 
-    var darkTheme by remember { mutableStateOf(true) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiState.navigationTarget) {
@@ -94,26 +93,24 @@ fun LoginScreen(
         }
     }
 
-    AppTheme(darkTheme = darkTheme) {
-        Surface(
-            modifier = modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                LoginCard(
-                    onBack = onBack,
-                    uiState = uiState,
-                    onSignIn = viewModel::signIn,
-                    onSignUp = viewModel::signUp,
-                    onSignInWithGoogle = viewModel::signInWithGoogle,
-                    onVerify = viewModel::verifyCode,
-                    onClearError = viewModel::clearError,
-                    onResetVerification = viewModel::resetVerification
-                )
-            }
+            LoginCard(
+                onBack = onBack,
+                uiState = uiState,
+                onSignIn = viewModel::signIn,
+                onSignUp = viewModel::signUp,
+                onSignInWithGoogle = viewModel::signInWithGoogle,
+                onVerify = viewModel::verifyCode,
+                onClearError = viewModel::clearError,
+                onResetVerification = viewModel::resetVerification
+            )
         }
     }
 }

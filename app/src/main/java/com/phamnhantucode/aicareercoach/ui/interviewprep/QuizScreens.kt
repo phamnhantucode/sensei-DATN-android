@@ -336,9 +336,9 @@ fun QuizResultsScreen(
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (isCorrect)
-                                Color(0xFF22C55E).copy(alpha = 0.1f)
+                                MaterialTheme.colorScheme.tertiaryContainer
                             else
-                                Color(0xFFEF4444).copy(alpha = 0.1f)
+                                MaterialTheme.colorScheme.errorContainer
                         ) {
                             Box(
                                 modifier = Modifier.padding(12.dp)
@@ -349,7 +349,7 @@ fun QuizResultsScreen(
                                     else
                                         Icons.Default.Cancel,
                                     contentDescription = null,
-                                    tint = if (isCorrect) Color(0xFF22C55E) else Color(0xFFEF4444),
+                                    tint = if (isCorrect) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -376,7 +376,7 @@ fun QuizResultsScreen(
                                 Text(
                                     text = question.options[userAnswer],
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isCorrect) Color(0xFF22C55E) else Color(0xFFEF4444),
+                                    color = if (isCorrect) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -391,7 +391,7 @@ fun QuizResultsScreen(
                                 Text(
                                     text = question.options[question.correctAnswer],
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF22C55E),
+                                    color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Medium
                                 )
                             }

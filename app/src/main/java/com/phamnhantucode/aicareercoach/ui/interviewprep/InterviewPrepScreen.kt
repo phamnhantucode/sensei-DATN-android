@@ -93,151 +93,149 @@ fun InterviewPrepScreen(
     val loadingState by viewModel.loadingState.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    AppTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (currentScreen) {
-                    InterviewPrepScreen.HOME -> HomeScreen(
-                        userProgress = userProgress,
-                        onStartQuiz = {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (currentScreen) {
+                InterviewPrepScreen.HOME -> HomeScreen(
+                    userProgress = userProgress,
+                    onStartQuiz = {
+                        viewModel.startQuiz()
+                        currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
+                    },
+                    onStartInterview = {
+                        viewModel.startInterview()
+                        currentScreen = InterviewPrepScreen.INTERVIEW_ACTIVE
+                    },
+                    onNavigateToProgress = { currentScreen = InterviewPrepScreen.PROGRESS },
+                    onNavigateToTips = { currentScreen = InterviewPrepScreen.TIPS },
+                    onQuizClick = {
+                        selectedQuizState = it
+                        currentScreen = InterviewPrepScreen.QUIZ_HISTORY_RESULTS
+                    },
+                    onBack = onBack
+                )
+
+                InterviewPrepScreen.QUIZ_ACTIVE -> quizState?.let { state ->
+                    QuizActiveScreen(
+                        quizState = state,
+                        onAnswer = viewModel::answerQuizQuestion,
+                        onNext = viewModel::nextQuizQuestion,
+                        onBack = {
+                            viewModel.resetQuiz()
+                            currentScreen = InterviewPrepScreen.HOME
+                        }
+                    )
+                    if (state.isComplete) {
+                        currentScreen = InterviewPrepScreen.QUIZ_RESULTS
+                    }
+                }
+
+                InterviewPrepScreen.QUIZ_RESULTS -> quizState?.let { state ->
+                    QuizResultsScreen(
+                        quizState = state,
+                        onRetakeQuiz = {
                             viewModel.startQuiz()
                             currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
                         },
-                        onStartInterview = {
+                        onBackToHome = {
+                            viewModel.resetQuiz()
+                            currentScreen = InterviewPrepScreen.HOME
+                        }
+                    )
+                }
+
+                InterviewPrepScreen.QUIZ_HISTORY_RESULTS -> selectedQuizState?.let { state ->
+                    QuizResultsScreen(
+                        quizState = state,
+                        onRetakeQuiz = {
+                            viewModel.startQuiz()
+                            currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
+                        },
+                        onBackToHome = {
+                            currentScreen = InterviewPrepScreen.HOME
+                        }
+                    )
+                }
+
+                InterviewPrepScreen.INTERVIEW_ACTIVE -> interviewState?.let { state ->
+                    InterviewActiveScreen(
+                        interviewState = state,
+                        onAnswer = viewModel::answerInterviewQuestion,
+                        onNext = viewModel::nextInterviewQuestion,
+                        onBack = {
+                            viewModel.resetInterview()
+                            currentScreen = InterviewPrepScreen.HOME
+                        }
+                    )
+                    if (state.isComplete) {
+                        currentScreen = InterviewPrepScreen.INTERVIEW_RESULTS
+                    }
+                }
+
+                InterviewPrepScreen.INTERVIEW_RESULTS -> interviewState?.let { state ->
+                    InterviewResultsScreen(
+                        interviewState = state,
+                        onRetakeInterview = {
                             viewModel.startInterview()
                             currentScreen = InterviewPrepScreen.INTERVIEW_ACTIVE
                         },
-                        onNavigateToProgress = { currentScreen = InterviewPrepScreen.PROGRESS },
-                        onNavigateToTips = { currentScreen = InterviewPrepScreen.TIPS },
-                        onQuizClick = {
-                            selectedQuizState = it
-                            currentScreen = InterviewPrepScreen.QUIZ_HISTORY_RESULTS
-                        },
-                        onBack = onBack
-                    )
-
-                    InterviewPrepScreen.QUIZ_ACTIVE -> quizState?.let { state ->
-                        QuizActiveScreen(
-                            quizState = state,
-                            onAnswer = viewModel::answerQuizQuestion,
-                            onNext = viewModel::nextQuizQuestion,
-                            onBack = {
-                                viewModel.resetQuiz()
-                                currentScreen = InterviewPrepScreen.HOME
-                            }
-                        )
-                        if (state.isComplete) {
-                            currentScreen = InterviewPrepScreen.QUIZ_RESULTS
+                        onBackToHome = {
+                            viewModel.resetInterview()
+                            currentScreen = InterviewPrepScreen.HOME
                         }
-                    }
-
-                    InterviewPrepScreen.QUIZ_RESULTS -> quizState?.let { state ->
-                        QuizResultsScreen(
-                            quizState = state,
-                            onRetakeQuiz = {
-                                viewModel.startQuiz()
-                                currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
-                            },
-                            onBackToHome = {
-                                viewModel.resetQuiz()
-                                currentScreen = InterviewPrepScreen.HOME
-                            }
-                        )
-                    }
-
-                    InterviewPrepScreen.QUIZ_HISTORY_RESULTS -> selectedQuizState?.let { state ->
-                        QuizResultsScreen(
-                            quizState = state,
-                            onRetakeQuiz = {
-                                viewModel.startQuiz()
-                                currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
-                            },
-                            onBackToHome = {
-                                currentScreen = InterviewPrepScreen.HOME
-                            }
-                        )
-                    }
-
-                    InterviewPrepScreen.INTERVIEW_ACTIVE -> interviewState?.let { state ->
-                        InterviewActiveScreen(
-                            interviewState = state,
-                            onAnswer = viewModel::answerInterviewQuestion,
-                            onNext = viewModel::nextInterviewQuestion,
-                            onBack = {
-                                viewModel.resetInterview()
-                                currentScreen = InterviewPrepScreen.HOME
-                            }
-                        )
-                        if (state.isComplete) {
-                            currentScreen = InterviewPrepScreen.INTERVIEW_RESULTS
-                        }
-                    }
-
-                    InterviewPrepScreen.INTERVIEW_RESULTS -> interviewState?.let { state ->
-                        InterviewResultsScreen(
-                            interviewState = state,
-                            onRetakeInterview = {
-                                viewModel.startInterview()
-                                currentScreen = InterviewPrepScreen.INTERVIEW_ACTIVE
-                            },
-                            onBackToHome = {
-                                viewModel.resetInterview()
-                                currentScreen = InterviewPrepScreen.HOME
-                            }
-                        )
-                    }
-
-                    InterviewPrepScreen.PROGRESS -> ProgressScreen(
-                        userProgress = userProgress,
-                        onBack = { currentScreen = InterviewPrepScreen.HOME }
-                    )
-
-                    InterviewPrepScreen.TIPS -> TipsScreen(
-                        practiceTips = practiceTips,
-                        coachingNotes = coachingNotes,
-                        onBack = { currentScreen = InterviewPrepScreen.HOME }
                     )
                 }
 
-                if (loadingState.isLoading) {
-                    LoadingDialog(
-                        progress = loadingState.progress,
-                        description = loadingState.description
-                    )
-                }
+                InterviewPrepScreen.PROGRESS -> ProgressScreen(
+                    userProgress = userProgress,
+                    onBack = { currentScreen = InterviewPrepScreen.HOME }
+                )
 
-                errorMessage?.let { message ->
-                    Card(
+                InterviewPrepScreen.TIPS -> TipsScreen(
+                    practiceTips = practiceTips,
+                    coachingNotes = coachingNotes,
+                    onBack = { currentScreen = InterviewPrepScreen.HOME }
+                )
+            }
+
+            if (loadingState.isLoading) {
+                LoadingDialog(
+                    progress = loadingState.progress,
+                    description = loadingState.description
+                )
+            }
+
+            errorMessage?.let { message ->
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
                             .padding(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        )
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.weight(1f)
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = viewModel::acknowledgeError) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
                             )
-                            IconButton(onClick = viewModel::acknowledgeError) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss",
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
                         }
                     }
                 }

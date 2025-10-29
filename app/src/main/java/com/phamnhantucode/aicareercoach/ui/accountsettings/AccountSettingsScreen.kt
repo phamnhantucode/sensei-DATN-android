@@ -66,6 +66,7 @@ fun AccountSettingsScreen(
         uiState = uiState,
         onBack = onBack,
         onSignOut = viewModel::signOut,
+        onThemeModeChange = viewModel::setThemeMode,
         modifier = modifier
     )
 }
@@ -76,6 +77,7 @@ private fun AccountSettingsContent(
     uiState: AccountSettingsUiState,
     onBack: () -> Unit,
     onSignOut: () -> Unit,
+    onThemeModeChange: (com.phamnhantucode.aicareercoach.data.preferences.ThemeMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -126,7 +128,9 @@ private fun AccountSettingsContent(
                     AppSettingsSection(
                         isSigningOut = uiState.isSigningOut,
                         signOutError = uiState.signOutError,
-                        onSignOut = onSignOut
+                        themeMode = uiState.themeMode,
+                        onSignOut = onSignOut,
+                        onThemeModeChange = onThemeModeChange
                     )
                 }
             }
@@ -283,7 +287,9 @@ private fun ConnectedAccountsSection(connectedAccounts: List<ConnectedAccountUiS
 private fun AppSettingsSection(
     isSigningOut: Boolean,
     signOutError: String?,
-    onSignOut: () -> Unit
+    themeMode: com.phamnhantucode.aicareercoach.data.preferences.ThemeMode,
+    onSignOut: () -> Unit,
+    onThemeModeChange: (com.phamnhantucode.aicareercoach.data.preferences.ThemeMode) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -302,7 +308,10 @@ private fun AppSettingsSection(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ThemeModeSelector()
+            ThemeModeSelector(
+                selectedTheme = themeMode,
+                onThemeSelected = onThemeModeChange
+            )
             Spacer(modifier = Modifier.height(16.dp))
             LanguageSelector()
             Spacer(modifier = Modifier.height(16.dp))
@@ -341,9 +350,11 @@ private fun AppSettingsSection(
 }
 
 @Composable
-private fun ThemeModeSelector() {
+private fun ThemeModeSelector(
+    selectedTheme: com.phamnhantucode.aicareercoach.data.preferences.ThemeMode,
+    onThemeSelected: (com.phamnhantucode.aicareercoach.data.preferences.ThemeMode) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedTheme by remember { mutableStateOf("System") }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -353,7 +364,11 @@ private fun ThemeModeSelector() {
         Text("Theme Mode")
         Box {
             Text(
-                text = selectedTheme,
+                text = when (selectedTheme) {
+                    com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.LIGHT -> "Light"
+                    com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.DARK -> "Dark"
+                    com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.SYSTEM -> "System"
+                },
                 modifier = Modifier.clickable { expanded = true }
             )
             DropdownMenu(
@@ -363,21 +378,21 @@ private fun ThemeModeSelector() {
                 DropdownMenuItem(
                     text = { Text("Light") },
                     onClick = {
-                        selectedTheme = "Light"
+                        onThemeSelected(com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.LIGHT)
                         expanded = false
                     }
                 )
                 DropdownMenuItem(
                     text = { Text("Dark") },
                     onClick = {
-                        selectedTheme = "Dark"
+                        onThemeSelected(com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.DARK)
                         expanded = false
                     }
                 )
                 DropdownMenuItem(
                     text = { Text("System") },
                     onClick = {
-                        selectedTheme = "System"
+                        onThemeSelected(com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.SYSTEM)
                         expanded = false
                     }
                 )
@@ -485,10 +500,12 @@ private fun AccountSettingsScreenPreview() {
                         providerName = "GitHub",
                         emailAddress = "ada@github.com"
                     )
-                )
+                ),
+                themeMode = com.phamnhantucode.aicareercoach.data.preferences.ThemeMode.SYSTEM
             ),
             onBack = {},
-            onSignOut = {}
+            onSignOut = {},
+            onThemeModeChange = {}
         )
     }
 }

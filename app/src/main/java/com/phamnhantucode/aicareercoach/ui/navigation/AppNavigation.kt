@@ -1,11 +1,17 @@
 package com.phamnhantucode.aicareercoach.ui.navigation
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.phamnhantucode.aicareercoach.data.preferences.PreferencesRepository
+import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import com.phamnhantucode.aicareercoach.ui.accountsettings.AccountSettingsScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.editor.CoverLetterEditorScreen
@@ -15,15 +21,28 @@ import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeBuilderScreen
+import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 @Composable
 fun AppNavigation() {
+    val context = LocalContext.current
+    val preferencesRepository = PreferencesRepository.getInstance(context)
+    val themeMode by preferencesRepository.themeModeFlow.collectAsState(initial = ThemeMode.SYSTEM)
+    val isSystemInDarkTheme = isSystemInDarkTheme()
+
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme
+    }
+
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Login.route
-    ) {
+    AppTheme(darkTheme = darkTheme) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Login.route
+        ) {
         composable(Screen.Intro.route) {
             IntroPage(
                 onGetStarted = { navController.navigate(Screen.Onboarding.route) },
@@ -158,6 +177,7 @@ fun AppNavigation() {
                 initialGeneratedContent = content,
                 onBack = { navController.popBackStack() }
             )
+        }
         }
     }
 }

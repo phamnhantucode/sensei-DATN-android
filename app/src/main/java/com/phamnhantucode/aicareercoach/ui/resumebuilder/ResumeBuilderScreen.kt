@@ -108,14 +108,13 @@ fun ResumeBuilderScreen(
         }
     }
 
-    AppTheme(darkTheme = true) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
                 // Header with back button
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -313,11 +312,10 @@ fun ResumeBuilderScreen(
 
                     Spacer(modifier = Modifier.height(80.dp))
                 }
-                Spacer(
-                    modifier = Modifier
-                        .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
-                )
-            }
+            Spacer(
+                modifier = Modifier
+                    .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
+            )
         }
     }
 }

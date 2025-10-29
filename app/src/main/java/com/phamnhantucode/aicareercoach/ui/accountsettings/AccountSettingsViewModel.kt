@@ -1,6 +1,7 @@
 package com.phamnhantucode.aicareercoach.ui.accountsettings
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.clerk.api.Clerk
 import com.clerk.api.externalaccount.ExternalAccount
@@ -8,6 +9,8 @@ import com.clerk.api.user.User
 import com.clerk.api.network.serialization.longErrorMessageOrNull
 import com.clerk.api.network.serialization.onFailure
 import com.clerk.api.network.serialization.onSuccess
+import com.phamnhantucode.aicareercoach.data.preferences.PreferencesRepository
+import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +29,8 @@ data class AccountSettingsUiState(
     val primaryEmail: String? = null,
     val profileImageUrl: String? = null,
     val connectedAccounts: List<ConnectedAccountUiState> = emptyList(),
-    val signOutError: String? = null
+    val signOutError: String? = null,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 data class ConnectedAccountUiState(
@@ -34,18 +38,22 @@ data class ConnectedAccountUiState(
     val emailAddress: String?
 )
 
-class AccountSettingsViewModel : ViewModel() {
+class AccountSettingsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val preferencesRepository = PreferencesRepository.getInstance(application)
 
     private val _uiState = MutableStateFlow(AccountSettingsUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
+        // Combine Clerk auth state with theme preference
         combine(
             Clerk.isInitialized,
-            Clerk.userFlow
-        ) { isInitialized, user ->
-            isInitialized to user
-        }.onEach { (isInitialized, user) ->
+            Clerk.userFlow,
+            preferencesRepository.themeModeFlow
+        ) { isInitialized, user, themeMode ->
+            Triple(isInitialized, user, themeMode)
+        }.onEach { (isInitialized, user, themeMode) ->
             _uiState.update { current ->
                 current.copy(
                     isInitialized = isInitialized,
@@ -56,10 +64,17 @@ class AccountSettingsViewModel : ViewModel() {
                     profileImageUrl = user?.imageUrl,
                     connectedAccounts = user?.verifiedExternalAccounts
                         ?.map(::resolveConnectedAccount)
-                        .orEmpty()
+                        .orEmpty(),
+                    themeMode = themeMode
                 )
             }
         }.launchIn(viewModelScope)
+    }
+
+    fun setThemeMode(themeMode: ThemeMode) {
+        viewModelScope.launch {
+            preferencesRepository.setThemeMode(themeMode)
+        }
     }
 
     fun signOut() {
