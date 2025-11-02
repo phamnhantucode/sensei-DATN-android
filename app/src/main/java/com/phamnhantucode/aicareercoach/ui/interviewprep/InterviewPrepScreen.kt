@@ -255,15 +255,14 @@ private fun HomeScreen(
     onBack: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Header with back button
+        // Header with back button (Sticky)
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 4.dp
         ) {
             Row(
                 modifier = Modifier
@@ -306,7 +305,13 @@ private fun HomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Scrollable content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
 
         // Stats Grid
         Row(
@@ -498,11 +503,12 @@ private fun HomeScreen(
 //            )
         }
 
-        Spacer(
-            modifier = Modifier.height(
-                16.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+            Spacer(
+                modifier = Modifier.height(
+                    16.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+                )
             )
-        )
+        }
     }
 }
 

@@ -101,31 +101,16 @@ fun LoginScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            if (uiState.isCheckingAutoLogin) {
-                // Show loading indicator for auto-login
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CircularProgressIndicator()
-                    Text(
-                        text = "Signing you in...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            } else {
-                LoginCard(
-                    onBack = onBack,
-                    uiState = uiState,
-                    onSignIn = viewModel::signIn,
-                    onSignUp = viewModel::signUp,
-                    onSignInWithGoogle = viewModel::signInWithGoogle,
-                    onVerify = viewModel::verifyCode,
-                    onClearError = viewModel::clearError,
-                    onResetVerification = viewModel::resetVerification
-                )
-            }
+            LoginCard(
+                onBack = onBack,
+                uiState = uiState,
+                onSignIn = viewModel::signIn,
+                onSignUp = viewModel::signUp,
+                onSignInWithGoogle = viewModel::signInWithGoogle,
+                onVerify = viewModel::verifyCode,
+                onClearError = viewModel::clearError,
+                onResetVerification = viewModel::resetVerification
+            )
         }
     }
 }
@@ -234,7 +219,8 @@ private fun LoginCard(
                         authMode = AuthMode.SignUp
                     },
                     onBack = onBack,
-                    isProcessing = uiState.isProcessing
+                    isProcessing = uiState.isProcessing,
+                    isCheckingAutoLogin = uiState.isCheckingAutoLogin
                 )
             } else {
                 CredentialsSection(
@@ -249,17 +235,20 @@ private fun LoginCard(
                         if (uiState.errorMessage != null) onClearError()
                     },
                     onBack = onBack,
-                    isProcessing = uiState.isProcessing
+                    isProcessing = uiState.isProcessing,
+                    isCheckingAutoLogin = uiState.isCheckingAutoLogin
                 )
             }
 
             val primaryButtonLabel = when {
+                uiState.isCheckingAutoLogin -> "Signing you in..."
                 uiState.requiresVerification -> "Verify code"
                 authMode == AuthMode.SignUp -> "Create account"
                 else -> "Sign in"
             }
 
             val primaryEnabled = when {
+                uiState.isCheckingAutoLogin -> false
                 uiState.requiresVerification -> verificationCode.isNotBlank()
                 else -> email.isNotBlank() && password.isNotBlank()
             } && uiState.isInitialized && !uiState.isProcessing
@@ -275,7 +264,7 @@ private fun LoginCard(
                 },
                 enabled = primaryEnabled
             ) {
-                if (uiState.isProcessing) {
+                if (uiState.isProcessing || uiState.isCheckingAutoLogin) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
@@ -295,7 +284,8 @@ private fun LoginCard(
                             AuthMode.SignUp -> AuthMode.SignIn
                         }
                         onClearError()
-                    }
+                    },
+                    enabled = !uiState.isCheckingAutoLogin
                 ) {
                     Text(
                         text = when (authMode) {
@@ -310,7 +300,7 @@ private fun LoginCard(
                 OutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onSignInWithGoogle,
-                    enabled = uiState.isInitialized && !uiState.isProcessing,
+                    enabled = uiState.isInitialized && !uiState.isProcessing && !uiState.isCheckingAutoLogin,
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurface
@@ -351,7 +341,8 @@ private fun CredentialsSection(
     password: String,
     onPasswordChange: (String) -> Unit,
     onBack: () -> Unit,
-    isProcessing: Boolean
+    isProcessing: Boolean,
+    isCheckingAutoLogin: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         LabeledField(
@@ -360,7 +351,7 @@ private fun CredentialsSection(
             label = "Work email",
             placeholder = "you@company.com",
             icon = Icons.Outlined.AlternateEmail,
-            enabled = !isProcessing
+            enabled = !isProcessing && !isCheckingAutoLogin
         )
         LabeledField(
             value = password,
@@ -369,19 +360,19 @@ private fun CredentialsSection(
             placeholder = "••••••••",
             icon = Icons.Outlined.Lock,
             isPassword = true,
-            enabled = !isProcessing
+            enabled = !isProcessing && !isCheckingAutoLogin
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, enabled = !isProcessing) {
+            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
                 Text(text = "← Back")
             }
             TextButton(
                 onClick = { /* TODO: integrate forgot password */ },
-                enabled = !isProcessing
+                enabled = !isProcessing && !isCheckingAutoLogin
             ) {
                 Text(text = "Forgot password?")
             }
@@ -395,7 +386,8 @@ private fun VerificationSection(
     onVerificationCodeChange: (String) -> Unit,
     onUseDifferentEmail: () -> Unit,
     onBack: () -> Unit,
-    isProcessing: Boolean
+    isProcessing: Boolean,
+    isCheckingAutoLogin: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         OutlinedTextField(
@@ -405,17 +397,17 @@ private fun VerificationSection(
             label = { Text("Verification code") },
             placeholder = { Text("123456") },
             singleLine = true,
-            enabled = !isProcessing
+            enabled = !isProcessing && !isCheckingAutoLogin
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, enabled = !isProcessing) {
+            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
                 Text(text = "← Back")
             }
-            TextButton(onClick = onUseDifferentEmail, enabled = !isProcessing) {
+            TextButton(onClick = onUseDifferentEmail, enabled = !isProcessing && !isCheckingAutoLogin) {
                 Text(text = "Use a different email")
             }
         }

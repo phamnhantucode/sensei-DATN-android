@@ -119,6 +119,7 @@ fun ResumeBuilderScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(16.dp),
                     shadowElevation = 4.dp
                 ) {
                     Row(
