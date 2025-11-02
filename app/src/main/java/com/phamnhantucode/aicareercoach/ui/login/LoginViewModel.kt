@@ -354,9 +354,13 @@ class LoginViewModel(
     private fun evaluatePostSignInNavigationAsync() {
         postSignInCheckJob?.cancel()
         postSignInCheckJob = viewModelScope.launch {
+            _uiState.update { it.copy(isCheckingAutoLogin = true) }
             try {
                 val user = Clerk.user
-                if (user == null) return@launch
+                if (user == null) {
+                    _uiState.update { it.copy(isCheckingAutoLogin = false) }
+                    return@launch
+                }
                 val neonUser = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.getUser(
                     clerkUserId = user.id,
                     authToken = NeonAuth.fetchNeonAuthToken()
@@ -365,7 +369,8 @@ class LoginViewModel(
                 val needsOnboarding = industry.isNullOrBlank() || industry.equals("null", ignoreCase = true)
                 _uiState.update { state ->
                     state.copy(
-                        navigationTarget = if (needsOnboarding) LoginNavigationTarget.Onboarding else LoginNavigationTarget.Industry
+                        navigationTarget = if (needsOnboarding) LoginNavigationTarget.Onboarding else LoginNavigationTarget.Industry,
+                        isCheckingAutoLogin = false
                     )
                 }
                 hasIssuedPostSignInNavigation = true
@@ -374,11 +379,15 @@ class LoginViewModel(
                 // This improves UX by having questions ready when user navigates to interview prep
                 preloadInterviewQuestionsInBackground()
             } catch (cancellation: CancellationException) {
+                _uiState.update { it.copy(isCheckingAutoLogin = false) }
                 throw cancellation
             } catch (_: Exception) {
                 // If profile fetch fails, default to onboarding to be safe
                 _uiState.update { state ->
-                    state.copy(navigationTarget = LoginNavigationTarget.Onboarding)
+                    state.copy(
+                        navigationTarget = LoginNavigationTarget.Onboarding,
+                        isCheckingAutoLogin = false
+                    )
                 }
                 hasIssuedPostSignInNavigation = true
             }
@@ -418,6 +427,7 @@ data class LoginUiState(
     val isInitialized: Boolean = false,
     val isProcessing: Boolean = false,
     val isSignedIn: Boolean = false,
+    val isCheckingAutoLogin: Boolean = false,
     val verificationEmail: String? = null,
     val errorMessage: String? = null,
     val navigationTarget: LoginNavigationTarget? = null,

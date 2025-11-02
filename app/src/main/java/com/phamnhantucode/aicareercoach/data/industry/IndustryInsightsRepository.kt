@@ -92,6 +92,74 @@ class IndustryInsightsRepository(
         )
     }
 
+    /**
+     * Ensures an IndustryInsight record exists for the given industry.
+     * This method is designed to be called during onboarding before setting User.industry.
+     *
+     * @param industry The industry name to check/create
+     * @param authorizationHeader The authorization header for Neon API calls
+     * @return The IndustryInsightRecord (either existing or newly created)
+     */
+    suspend fun ensureIndustryInsightExists(
+        industry: String,
+        authorizationHeader: String,
+    ): IndustryInsightRecord = withContext(Dispatchers.IO) {
+        if (BuildConfig.NEON_API_URL.isBlank()) {
+            throw IllegalStateException("Neon API URL is not configured.")
+        }
+
+        // Check if an IndustryInsight already exists for this industry
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val encodedIndustry = URLEncoder.encode(industry, UTF_8.name())
+        val insightRequestUrl =
+            "$apiUrl/IndustryInsight?select=*&industry=eq.$encodedIndustry&limit=1"
+
+        val insightRequest =
+            Request.Builder()
+                .url(insightRequestUrl)
+                .addHeader("Authorization", authorizationHeader)
+                .get()
+                .build()
+
+        val existingInsight = client.newCall(insightRequest).execute().use { response ->
+            val bodyString = response.body?.string()
+            if (response.isSuccessful && bodyString?.isNotBlank() == true) {
+                val results = JSONArray(bodyString)
+                if (results.length() > 0) {
+                    parseIndustryInsight(results.getJSONObject(0))
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+
+        // If it exists, return it
+        if (existingInsight != null) {
+            return@withContext existingInsight
+        }
+
+        // Otherwise, create it
+        // Try to generate with Gemini first, fallback to default if it fails
+        return@withContext try {
+            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+                Log.w(TAG, "Gemini API key not configured, using default insights")
+                createDefaultIndustryInsight(industry, authorizationHeader)
+            } else {
+                val generated = generateInsights(industry)
+                saveIndustryInsight(
+                    industry = industry,
+                    generated = generated,
+                    authorizationHeader = authorizationHeader,
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to generate insights with Gemini, using defaults: ${e.message}")
+            createDefaultIndustryInsight(industry, authorizationHeader)
+        }
+    }
+
     private fun IndustryInsightRecord.requiresRefresh(referenceTime: Instant): Boolean {
         val dueByNextUpdate = !referenceTime.isBefore(nextUpdate)
         val dueByLastUpdated =
@@ -202,6 +270,56 @@ class IndustryInsightsRepository(
         }
 
         return NeonUserRecord(industry = industry, industryInsight = insight)
+    }
+
+    /**
+     * Creates a default IndustryInsight record with placeholder data.
+     * Used as a fallback when Gemini API is unavailable.
+     */
+    private fun createDefaultIndustryInsight(
+        industry: String,
+        authorizationHeader: String,
+    ): IndustryInsightRecord {
+        val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
+        val nextUpdate = now.plus(1, ChronoUnit.DAYS) // Retry sooner for defaults
+
+        val defaultInsights = GeneratedInsights(
+            salaryRanges = listOf(
+                SalaryRangeRecord(
+                    role = "Entry Level",
+                    location = "United States",
+                    min = 40000,
+                    median = 55000,
+                    max = 70000,
+                ),
+                SalaryRangeRecord(
+                    role = "Mid Level",
+                    location = "United States",
+                    min = 60000,
+                    median = 80000,
+                    max = 100000,
+                ),
+                SalaryRangeRecord(
+                    role = "Senior Level",
+                    location = "United States",
+                    min = 90000,
+                    median = 120000,
+                    max = 150000,
+                ),
+            ),
+            growthRate = 5.0f,
+            demandLevel = "Moderate",
+            topSkills = emptyList(),
+            marketOutlook = "Neutral",
+            keyTrends = emptyList(),
+            recommendedSkills = emptyList(),
+        )
+
+        return saveIndustryInsight(
+            industry = industry,
+            generated = defaultInsights,
+            authorizationHeader = authorizationHeader,
+        )
     }
 
     private suspend fun generateInsights(industry: String): GeneratedInsights {

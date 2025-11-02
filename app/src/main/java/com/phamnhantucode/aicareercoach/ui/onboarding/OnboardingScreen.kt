@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clerk.api.Clerk
+import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
@@ -82,6 +83,7 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     var isSubmitting by remember { mutableStateOf(false) }
     var submitError by remember { mutableStateOf<String?>(null) }
+    var loadingMessage by remember { mutableStateOf<String?>(null) }
 
     AppTheme(darkTheme = isDarkMode) {
         Surface(
@@ -214,6 +216,7 @@ fun OnboardingScreen(
                                             currentStep++
                                         } else if (!isSubmitting) {
                                             submitError = null
+                                            loadingMessage = null
                                             isSubmitting = true
                                             scope.launch {
                                                 try {
@@ -224,13 +227,28 @@ fun OnboardingScreen(
                                                     } else if (user == null) {
                                                         submitError = "User session unavailable. Please sign in again."
                                                     } else {
-                                                        // Ensure Neon user exists, then update profile
+                                                        // Step 1: Ensure Neon user exists
+                                                        loadingMessage = "Setting up your account..."
                                                         val authToken = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
+                                                            ?: throw IllegalStateException("Unable to fetch authentication token.")
                                                         try {
                                                             NeonUserService.upsertUser(user, authToken)
                                                         } catch (_: Exception) {
-                                                            // Best-effort; continue to profile update
+                                                            // Best-effort; continue to next step
                                                         }
+
+                                                        // Step 2: Ensure IndustryInsight exists BEFORE setting User.industry
+                                                        loadingMessage = "Generating industry insights..."
+                                                        // Format the token as "Bearer <token>" for the authorization header
+                                                        val authorizationHeader = "Bearer $authToken"
+                                                        val repository = IndustryInsightsRepository()
+                                                        repository.ensureIndustryInsightExists(
+                                                            industry = selectedIndustry.name,
+                                                            authorizationHeader = authorizationHeader,
+                                                        )
+
+                                                        // Step 3: Update user profile with industry foreign key
+                                                        loadingMessage = "Saving your profile..."
                                                         val skills = formData.skills.split(',')
                                                             .map { it.trim() }
                                                             .filter { it.isNotEmpty() }
@@ -253,6 +271,7 @@ fun OnboardingScreen(
                                                     submitError = e.localizedMessage ?: "Failed to save profile. Please try again."
                                                 } finally {
                                                     isSubmitting = false
+                                                    loadingMessage = null
                                                 }
                                             }
                                         }
@@ -261,7 +280,11 @@ fun OnboardingScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(if (isSubmitting) "Saving..." else if (currentStep == totalSteps - 1) "Complete Profile" else "Continue")
+                                    Text(
+                                        if (isSubmitting) loadingMessage ?: "Saving..."
+                                        else if (currentStep == totalSteps - 1) "Complete Profile"
+                                        else "Continue"
+                                    )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
                                         imageVector = Icons.Default.ChevronRight,

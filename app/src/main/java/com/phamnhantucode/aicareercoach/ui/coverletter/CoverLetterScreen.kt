@@ -91,12 +91,11 @@ fun CoverLetterScreen(
         }
     }
 
-    AppTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Scaffold(
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Scaffold(
                 topBar = {
                     TopAppBar(
                         title = {
@@ -235,7 +234,6 @@ fun CoverLetterScreen(
             }
         }
     }
-}
 
 @Composable
 private fun CoverLetterList(

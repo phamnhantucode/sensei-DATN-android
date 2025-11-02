@@ -101,16 +101,31 @@ fun LoginScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            LoginCard(
-                onBack = onBack,
-                uiState = uiState,
-                onSignIn = viewModel::signIn,
-                onSignUp = viewModel::signUp,
-                onSignInWithGoogle = viewModel::signInWithGoogle,
-                onVerify = viewModel::verifyCode,
-                onClearError = viewModel::clearError,
-                onResetVerification = viewModel::resetVerification
-            )
+            if (uiState.isCheckingAutoLogin) {
+                // Show loading indicator for auto-login
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = "Signing you in...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            } else {
+                LoginCard(
+                    onBack = onBack,
+                    uiState = uiState,
+                    onSignIn = viewModel::signIn,
+                    onSignUp = viewModel::signUp,
+                    onSignInWithGoogle = viewModel::signInWithGoogle,
+                    onVerify = viewModel::verifyCode,
+                    onClearError = viewModel::clearError,
+                    onResetVerification = viewModel::resetVerification
+                )
+            }
         }
     }
 }
