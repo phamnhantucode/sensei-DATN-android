@@ -10,9 +10,11 @@ import androidx.room.RoomDatabase
         QuestionPoolEntity::class,
         UserProfileCacheEntity::class,
         AssessmentCacheEntity::class,
-        TipsCacheEntity::class
+        TipsCacheEntity::class,
+        LiveInterviewCacheEntity::class,
+        LiveInterviewQuestionCacheEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun userProfileCacheDao(): UserProfileCacheDao
     abstract fun assessmentCacheDao(): AssessmentCacheDao
     abstract fun tipsCacheDao(): TipsCacheDao
+    abstract fun liveInterviewCacheDao(): LiveInterviewCacheDao
 
     companion object {
         @Volatile

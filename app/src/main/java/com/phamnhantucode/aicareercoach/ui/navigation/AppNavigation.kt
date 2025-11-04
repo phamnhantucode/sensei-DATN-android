@@ -17,6 +17,7 @@ import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.editor.CoverLetterEditorScreen
 import com.phamnhantucode.aicareercoach.ui.industryinsights.IndustryInsightsScreen
 import com.phamnhantucode.aicareercoach.ui.interviewprep.InterviewPrepScreen
+import com.phamnhantucode.aicareercoach.ui.liveinterview.LiveInterviewScreen
 import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
@@ -125,7 +126,10 @@ fun AppNavigation() {
 
         composable(Screen.InterviewPrep.route) {
             InterviewPrepScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToLiveInterview = {
+                    navController.navigate(Screen.LiveInterviewSetup.route)
+                }
             )
         }
 
@@ -183,6 +187,12 @@ fun AppNavigation() {
                 companyName = companyName,
                 jobDescription = jobDescription,
                 initialGeneratedContent = content,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.LiveInterviewSetup.route) {
+            LiveInterviewScreen(
                 onBack = { navController.popBackStack() }
             )
         }

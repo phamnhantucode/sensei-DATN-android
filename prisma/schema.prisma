@@ -17,15 +17,16 @@ model User {
   industry      String?
   industryInsight IndustryInsight? @relation(fields: [industry], references: [industry])
   createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  updatedAt     DateTime       @updatedAt @map("updatedat")
 
   bio           String?
   experience    Int?
 
-  skills        String[]
-  assessments   Assessment[]
-  resume        Resume?
-  coverLetter   CoverLetter[]
+  skills            String[]
+  assessments       Assessment[]
+  resume            Resume?
+  coverLetter       CoverLetter[]
+  liveMockInterviews LiveMockInterview[]
 }
 
 model Assessment {
@@ -89,4 +90,30 @@ model IndustryInsight {
   nextUpdate    DateTime
 
   @@index([industry])
+}
+
+model LiveMockInterview {
+  id          String                  @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
+  userId      String                  @db.Uuid
+  user        User                    @relation(fields: [userId], references: [id])
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  questions   LiveInterviewQuestion[]
+
+  @@index([userId])
+}
+
+model LiveInterviewQuestion {
+  id                  String            @id @default(dbgenerated("encode(gen_random_bytes(12), 'hex')"))
+  liveMockInterviewId String
+  liveMockInterview   LiveMockInterview @relation(fields: [liveMockInterviewId], references: [id])
+  question            String            @db.Text
+  correctAnswer       String            @db.Text
+  feedback            String?           @db.Text
+  rating              Int?
+  userAnswer          String?           @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([liveMockInterviewId])
 }
