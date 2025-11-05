@@ -1,13 +1,21 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
@@ -30,36 +38,50 @@ import kotlin.math.roundToInt
 fun DraggableElement(
     element: ResumeElement,
     gridConfig: GridConfig,
+    zoomLevel: Float = 1f,
     isSelected: Boolean = false,
     isDragging: Boolean = false,
     onDragStart: (ResumeElement) -> Unit = { _ -> },
     onDrag: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onDragEnd: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
+    onResize: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onSelect: (ResumeElement) -> Unit = { _ -> },
     onDeselect: () -> Unit = {},
+    onOpenProperties: (ResumeElement) -> Unit = { _ -> },
     content: @Composable BoxScope.() -> Unit
 ) {
     val density = LocalDensity.current.density
-    val cellSizePx = gridConfig.cellSizeDp * density
+    val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    var currentDragPosition by remember { mutableStateOf(element.position) }
+    // Offset states for drag tracking
+    var offsetX by remember(element.id) { mutableFloatStateOf(0f) }
+    var offsetY by remember(element.id) { mutableFloatStateOf(0f) }
+    var currentDragPosition by remember(element.id) { mutableStateOf(element.position) }
 
-    // Calculate base position in pixels
+    // Calculate base position in pixels (no animation - instant update)
     val baseX = element.position.col * cellSizePx
     val baseY = element.position.row * cellSizePx
+
+    // Track the last known position to detect when it changes
+    var lastPosition by remember(element.id) { mutableStateOf(element.position) }
+
+    // When element position changes, reset offsets synchronously
+    if (element.position != lastPosition) {
+        offsetX = 0f
+        offsetY = 0f
+        lastPosition = element.position
+    }
 
     // Calculate size in pixels
     // For ShapeElements with custom dimensions, use those instead of grid-based sizing
     val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
-        element.customWidthDp * density
+        element.customWidthDp * density * zoomLevel
     } else {
         element.position.colSpan * cellSizePx
     }
 
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
-        element.customHeightDp * density
+        element.customHeightDp * density * zoomLevel
     } else {
         element.position.rowSpan * cellSizePx
     }
@@ -85,21 +107,44 @@ fun DraggableElement(
                 // Add shadow/elevation effect
                 shadowElevation = if (isDragging) 8f else if (isSelected) 4f else 0f
             }
-            .pointerInput(element.id, gridConfig) {
-                detectDragGestures(
-                    onDragStart = { _ ->
-                        onDragStart(element)
-                    },
-                    onDrag = { change, dragAmount ->
+            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var hasDragged = false
+                    var dragStartCalled = false
+
+                    // Try to detect drag
+                    val dragResult = drag(down.id) { change ->
+                        if (!hasDragged) {
+                            hasDragged = true
+                            if (!dragStartCalled) {
+                                onDragStart(element)
+                                dragStartCalled = true
+                            }
+                        }
+
+                        val dragAmount = change.positionChange()
                         change.consume()
 
                         offsetX += dragAmount.x
                         offsetY += dragAmount.y
 
+                        // Calculate grid bounds in pixels
+                        val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
+                        val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
+
+                        // Clamp offsets to keep element within bounds
+                        val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
+                        val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
+
+                        // Update offsets to clamped values
+                        offsetX = clampedX - baseX
+                        offsetY = clampedY - baseY
+
                         // Calculate current grid position with snap
                         val (newRow, newCol) = GridUtils.offsetToGridPosition(
-                            offsetX = baseX + offsetX,
-                            offsetY = baseY + offsetY,
+                            offsetX = clampedX,
+                            offsetY = clampedY,
                             cellSizePx = cellSizePx,
                             snapEnabled = gridConfig.snapToGrid,
                             threshold = gridConfig.snapThreshold
@@ -113,9 +158,20 @@ fun DraggableElement(
                         )
 
                         onDrag(element, currentDragPosition)
-                    },
-                    onDragEnd = {
-                        // Snap to final grid position
+                    }
+
+                    // Handle end of gesture
+                    if (!hasDragged) {
+                        // This was a tap, not a drag
+                        if (isSelected) {
+                            // Already selected - open properties panel
+                            onOpenProperties(element)
+                        } else {
+                            // Not selected - select it
+                            onSelect(element)
+                        }
+                    } else {
+                        // This was a drag - handle position update
                         val finalPosition = if (gridConfig.snapToGrid) {
                             val snappedX = GridUtils.snapToGrid(baseX + offsetX, cellSizePx)
                             val snappedY = GridUtils.snapToGrid(baseY + offsetY, cellSizePx)
@@ -123,52 +179,46 @@ fun DraggableElement(
                             val row = GridUtils.pxToGrid(snappedY, cellSizePx)
                             val col = GridUtils.pxToGrid(snappedX, cellSizePx)
 
-                            GridPosition(
+                            val position = GridPosition(
                                 row = row,
                                 col = col,
                                 rowSpan = element.position.rowSpan,
                                 colSpan = element.position.colSpan
                             )
+
+                            // Clamp to ensure it's within bounds
+                            GridUtils.clampPosition(position, gridConfig)
                         } else {
-                            currentDragPosition
+                            // Clamp the current drag position to bounds
+                            GridUtils.clampPosition(currentDragPosition, gridConfig)
                         }
 
                         onDragEnd(element, finalPosition)
-
-                        // Reset offset
-                        offsetX = 0f
-                        offsetY = 0f
                     }
-                )
-            }
-            .pointerInput(element.id) {
-                detectTapGestures(
-                    onTap = {
-                        if (isSelected) {
-                            onDeselect()
-                        } else {
-                            onSelect(element)
-                        }
-                    }
-                )
+                }
             }
     ) {
         // Selection border
         if (isSelected) {
             SelectionBorder(
                 element = element,
-                onResize = { _, _, _ -> /* TODO: Implement resize */ }
+                gridConfig = gridConfig,
+                cellSizePx = cellSizePx,
+                zoomLevel = zoomLevel,
+                onResize = onResize
             )
-        }
-
-        // Drag handle (top-left corner)
-        if (isSelected && !element.locked) {
-            DragHandle()
         }
 
         // Lock indicator
         if (element.locked) {
             LockIndicator()
+        }
+
+        // Properties button (floating near selected element)
+        if (isSelected && !element.locked) {
+            PropertiesButton(
+                onOpenProperties = { onOpenProperties(element) }
+            )
         }
 
         // Content
@@ -182,7 +232,10 @@ fun DraggableElement(
 @Composable
 private fun BoxScope.SelectionBorder(
     element: ResumeElement,
-    onResize: (ResizeHandle, Float, Float) -> Unit = { _, _, _ -> }
+    gridConfig: GridConfig,
+    cellSizePx: Float,
+    zoomLevel: Float,
+    onResize: (ResumeElement, GridPosition) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -196,7 +249,12 @@ private fun BoxScope.SelectionBorder(
 
     // Resize handles (corners and edges)
     if (!element.locked) {
-        ResizeHandles(onResize)
+        ResizeHandles(
+            element = element,
+            cellSizePx = cellSizePx,
+            zoomLevel = zoomLevel,
+            onResize = onResize
+        )
     }
 }
 
@@ -205,10 +263,35 @@ private fun BoxScope.SelectionBorder(
  */
 @Composable
 private fun BoxScope.ResizeHandles(
-    onResize: (ResizeHandle, Float, Float) -> Unit
+    element: ResumeElement,
+    cellSizePx: Float,
+    zoomLevel: Float,
+    onResize: (ResumeElement, GridPosition) -> Unit
 ) {
     val handleSize = 8.dp
     val handleColor = Color(0xFF2196F3)
+
+    var accumulatedDeltaX by remember { mutableFloatStateOf(0f) }
+    var accumulatedDeltaY by remember { mutableFloatStateOf(0f) }
+
+    val handleResize: (ResizeHandle, Float, Float) -> Unit = { handle, deltaX, deltaY ->
+        accumulatedDeltaX += deltaX
+        accumulatedDeltaY += deltaY
+
+        val newPosition = calculateResizedPosition(
+            originalPosition = element.position,
+            handle = handle,
+            deltaX = accumulatedDeltaX,
+            deltaY = accumulatedDeltaY,
+            cellSizePx = cellSizePx
+        )
+        onResize(element, newPosition)
+    }
+
+    val resetAccumulated: () -> Unit = {
+        accumulatedDeltaX = 0f
+        accumulatedDeltaY = 0f
+    }
 
     // Top-left
     ResizeHandle(
@@ -216,7 +299,8 @@ private fun BoxScope.ResizeHandles(
         size = handleSize,
         color = handleColor,
         alignment = Alignment.TopStart,
-        onResize = onResize
+        onResize = handleResize,
+        onResizeEnd = resetAccumulated
     )
 
     // Top-right
@@ -225,7 +309,8 @@ private fun BoxScope.ResizeHandles(
         size = handleSize,
         color = handleColor,
         alignment = Alignment.TopEnd,
-        onResize = onResize
+        onResize = handleResize,
+        onResizeEnd = resetAccumulated
     )
 
     // Bottom-left
@@ -234,7 +319,8 @@ private fun BoxScope.ResizeHandles(
         size = handleSize,
         color = handleColor,
         alignment = Alignment.BottomStart,
-        onResize = onResize
+        onResize = handleResize,
+        onResizeEnd = resetAccumulated
     )
 
     // Bottom-right
@@ -243,7 +329,8 @@ private fun BoxScope.ResizeHandles(
         size = handleSize,
         color = handleColor,
         alignment = Alignment.BottomEnd,
-        onResize = onResize
+        onResize = handleResize,
+        onResizeEnd = resetAccumulated
     )
 
     // Edge handles (optional - can add later)
@@ -258,7 +345,8 @@ private fun BoxScope.ResizeHandle(
     size: androidx.compose.ui.unit.Dp,
     color: Color,
     alignment: Alignment,
-    onResize: (ResizeHandle, Float, Float) -> Unit
+    onResize: (ResizeHandle, Float, Float) -> Unit,
+    onResizeEnd: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -266,34 +354,17 @@ private fun BoxScope.ResizeHandle(
             .size(size)
             .background(color, RoundedCornerShape(size / 2))
             .pointerInput(handle) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onResize(handle, dragAmount.x, dragAmount.y)
-                }
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        onResize(handle, dragAmount.x, dragAmount.y)
+                    },
+                    onDragEnd = {
+                        onResizeEnd()
+                    }
+                )
             }
     )
-}
-
-/**
- * Drag handle indicator
- */
-@Composable
-private fun BoxScope.DragHandle() {
-    Surface(
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(4.dp)
-            .size(20.dp),
-        color = Color(0xFF2196F3).copy(alpha = 0.8f),
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.DragHandle,
-            contentDescription = "Drag",
-            tint = Color.White,
-            modifier = Modifier.padding(2.dp)
-        )
-    }
 }
 
 /**
@@ -320,6 +391,31 @@ private fun BoxScope.LockIndicator() {
 }
 
 /**
+ * Properties button for opening property panel
+ */
+@Composable
+private fun BoxScope.PropertiesButton(
+    onOpenProperties: () -> Unit
+) {
+    androidx.compose.material3.FloatingActionButton(
+        onClick = onOpenProperties,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = 28.dp, y = (-8).dp)
+            .size(28.dp),
+        containerColor = Color(0xFF2196F3),
+        contentColor = Color.White,
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Settings,
+            contentDescription = "Properties",
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+/**
  * Ghost preview of element being dragged
  */
 @Composable
@@ -327,11 +423,12 @@ fun DragGhost(
     element: ResumeElement,
     position: GridPosition,
     gridConfig: GridConfig,
+    zoomLevel: Float = 1f,
     isValid: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
     val density = LocalDensity.current.density
-    val cellSizePx = gridConfig.cellSizeDp * density
+    val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
     val x = position.col * cellSizePx
     val y = position.row * cellSizePx
@@ -399,27 +496,48 @@ fun calculateResizedPosition(
     val deltaCol = (deltaX / cellSizePx).roundToInt()
     val deltaRow = (deltaY / cellSizePx).roundToInt()
 
-    return when (handle) {
-        ResizeHandle.TOP_LEFT -> originalPosition.copy(
-            row = originalPosition.row + deltaRow,
-            col = originalPosition.col + deltaCol,
-            rowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1),
-            colSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
-        )
-        ResizeHandle.TOP_RIGHT -> originalPosition.copy(
-            row = originalPosition.row + deltaRow,
-            rowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1),
-            colSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
-        )
-        ResizeHandle.BOTTOM_LEFT -> originalPosition.copy(
-            col = originalPosition.col + deltaCol,
-            rowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1),
-            colSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
-        )
+    val newPosition = when (handle) {
+        ResizeHandle.TOP_LEFT -> {
+            val newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
+            val newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+            val newRow = originalPosition.row + (originalPosition.rowSpan - newRowSpan)
+            val newCol = originalPosition.col + (originalPosition.colSpan - newColSpan)
+
+            originalPosition.copy(
+                row = newRow.coerceAtLeast(0),
+                col = newCol.coerceAtLeast(0),
+                rowSpan = newRowSpan,
+                colSpan = newColSpan
+            )
+        }
+        ResizeHandle.TOP_RIGHT -> {
+            val newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
+            val newColSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
+            val newRow = originalPosition.row + (originalPosition.rowSpan - newRowSpan)
+
+            originalPosition.copy(
+                row = newRow.coerceAtLeast(0),
+                rowSpan = newRowSpan,
+                colSpan = newColSpan
+            )
+        }
+        ResizeHandle.BOTTOM_LEFT -> {
+            val newRowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1)
+            val newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+            val newCol = originalPosition.col + (originalPosition.colSpan - newColSpan)
+
+            originalPosition.copy(
+                col = newCol.coerceAtLeast(0),
+                rowSpan = newRowSpan,
+                colSpan = newColSpan
+            )
+        }
         ResizeHandle.BOTTOM_RIGHT -> originalPosition.copy(
             rowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1),
             colSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
         )
         else -> originalPosition // Edge handles not implemented yet
     }
+
+    return newPosition
 }

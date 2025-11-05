@@ -18,13 +18,14 @@ import androidx.compose.ui.unit.dp
 fun GridBackground(
     gridConfig: GridConfig,
     modifier: Modifier = Modifier,
+    zoomLevel: Float = 1f,
     gridLineColor: Color = Color.LightGray.copy(alpha = 0.3f),
     majorGridLineColor: Color = Color.LightGray.copy(alpha = 0.5f),
     showMajorLines: Boolean = true,
     majorLineInterval: Int = 4 // Draw thicker line every N cells
 ) {
     val density = LocalDensity.current.density
-    val cellSizePx = gridConfig.cellSizeDp * density
+    val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
     Canvas(modifier = modifier.fillMaxSize()) {
         if (!gridConfig.showGrid) return@Canvas

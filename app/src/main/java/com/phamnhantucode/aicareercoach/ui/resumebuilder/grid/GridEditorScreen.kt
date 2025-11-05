@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,14 +31,18 @@ fun GridEditorScreen(
     onSwitchToFormEditor: () -> Unit,
     viewModel: GridEditorViewModel = viewModel()
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val gridResume by viewModel.gridResume.collectAsState()
     val selectedElement by viewModel.selectedElement.collectAsState()
     val draggedElement by viewModel.draggedElement.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
+    val pdfExportState by viewModel.pdfExportState.collectAsState()
+    val zoomLevel by viewModel.zoomLevel.collectAsState()
 
     var showPropertyPanel by remember { mutableStateOf(false) }
     var showTemplateDialog by remember { mutableStateOf(false) }
     var showElementPicker by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -46,6 +51,7 @@ fun GridEditorScreen(
                 isSaving = isSaving,
                 onNavigateBack = onNavigateBack,
                 onSave = { viewModel.save() },
+                onExport = { showExportDialog = true },
                 onPreview = onNavigateToPreview,
                 onSwitchMode = onSwitchToFormEditor,
                 onShowTemplates = { showTemplateDialog = true }
@@ -54,10 +60,11 @@ fun GridEditorScreen(
         bottomBar = {
             GridEditorBottomBar(
                 gridConfig = gridResume.gridConfig,
+                zoomLevel = zoomLevel,
                 onToggleGrid = { viewModel.toggleGrid() },
                 onToggleSnap = { viewModel.toggleSnap() },
-                onZoomIn = { /* TODO */ },
-                onZoomOut = { /* TODO */ },
+                onZoomIn = { viewModel.zoomIn() },
+                onZoomOut = { viewModel.zoomOut() },
                 onUndo = { viewModel.undo() },
                 onRedo = { viewModel.redo() }
             )
@@ -78,6 +85,7 @@ fun GridEditorScreen(
                     gridResume = gridResume,
                     selectedElement = selectedElement,
                     draggedElement = draggedElement,
+                    zoomLevel = zoomLevel,
                     onElementSelect = { viewModel.selectElement(it) },
                     onElementDeselect = { viewModel.deselectElement() },
                     onDragStart = { viewModel.startDrag(it) },
@@ -86,7 +94,23 @@ fun GridEditorScreen(
                     },
                     onDragEnd = { element, position ->
                         viewModel.endDrag(position)
-                    }
+                    },
+                    onResize = { element, newPosition ->
+                        // Clamp position to ensure it stays within bounds
+                        val clampedPosition = GridUtils.clampPosition(newPosition, gridResume.gridConfig)
+
+                        // Update element with new position (size)
+                        val updatedElement = when (element) {
+                            is ResumeElement.TextElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ImageElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ShapeElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ChartElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ContainerElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.IconElement -> element.copy(position = clampedPosition)
+                        }
+                        viewModel.updateElement(updatedElement)
+                    },
+                    onOpenProperties = { showPropertyPanel = true }
                 )
 
                 // Floating action button to add elements
@@ -140,9 +164,34 @@ fun GridEditorScreen(
         )
     }
 
-    // Auto-show property panel when element is selected
+    // PDF Export dialog
+    if (showExportDialog) {
+        PdfExportDialog(
+            exportState = pdfExportState,
+            onDismiss = {
+                showExportDialog = false
+                viewModel.resetExportState()
+            },
+            onExport = {
+                viewModel.exportToPdf()
+            },
+            onShare = { uri ->
+                // Share the PDF using Android share sheet
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, "Share Resume PDF"))
+            }
+        )
+    }
+
+    // Close property panel when element is deselected
     LaunchedEffect(selectedElement) {
-        showPropertyPanel = selectedElement != null
+        if (selectedElement == null) {
+            showPropertyPanel = false
+        }
     }
 }
 
@@ -156,6 +205,7 @@ private fun GridEditorTopBar(
     isSaving: Boolean,
     onNavigateBack: () -> Unit,
     onSave: () -> Unit,
+    onExport: () -> Unit,
     onPreview: () -> Unit,
     onSwitchMode: () -> Unit,
     onShowTemplates: () -> Unit
@@ -196,6 +246,11 @@ private fun GridEditorTopBar(
                 Icon(Icons.Default.Visibility, contentDescription = "Preview")
             }
 
+            // Export PDF
+            IconButton(onClick = onExport) {
+                Icon(Icons.Default.FileDownload, contentDescription = "Export PDF")
+            }
+
             // Save
             IconButton(
                 onClick = onSave,
@@ -220,6 +275,7 @@ private fun GridEditorTopBar(
 @Composable
 private fun GridEditorBottomBar(
     gridConfig: GridConfig,
+    zoomLevel: Float,
     onToggleGrid: () -> Unit,
     onToggleSnap: () -> Unit,
     onZoomIn: () -> Unit,
@@ -280,7 +336,7 @@ private fun GridEditorBottomBar(
                 IconButton(onClick = onZoomOut) {
                     Icon(IconAliases.ZoomOut, contentDescription = "Zoom Out")
                 }
-                Text("100%", fontSize = 14.sp)
+                Text("${(zoomLevel * 100).toInt()}%", fontSize = 14.sp)
                 IconButton(onClick = onZoomIn) {
                     Icon(IconAliases.ZoomIn, contentDescription = "Zoom In")
                 }
@@ -309,11 +365,14 @@ private fun GridCanvas(
     gridResume: GridResume,
     selectedElement: ResumeElement?,
     draggedElement: DragState?,
+    zoomLevel: Float,
     onElementSelect: (ResumeElement) -> Unit,
     onElementDeselect: () -> Unit,
     onDragStart: (ResumeElement) -> Unit,
     onDrag: (ResumeElement, GridPosition) -> Unit,
-    onDragEnd: (ResumeElement, GridPosition) -> Unit
+    onDragEnd: (ResumeElement, GridPosition) -> Unit,
+    onResize: (ResumeElement, GridPosition) -> Unit,
+    onOpenProperties: () -> Unit
 ) {
     val density = LocalDensity.current.density
     val cellSizePx = gridResume.gridConfig.cellSizeDp * density
@@ -330,41 +389,46 @@ private fun GridCanvas(
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
             .verticalScroll(scrollStateVertical)
-            .horizontalScroll(scrollStateHorizontal)
-            .padding(32.dp)
+            .horizontalScroll(scrollStateHorizontal),
+        contentAlignment = Alignment.Center
     ) {
         // Resume page (A4-like container)
         Box(
             modifier = Modifier
                 .size(
-                    width = GridUtils.pxToDp(gridWidthPx, density),
-                    height = GridUtils.pxToDp(gridHeightPx, density)
+                    width = GridUtils.pxToDp(gridWidthPx, density) * zoomLevel,
+                    height = GridUtils.pxToDp(gridHeightPx, density) * zoomLevel
                 )
                 .background(Color.White)
                 .padding(0.dp)
         ) {
             // Grid background
             GridBackground(
-                gridConfig = gridResume.gridConfig
+                gridConfig = gridResume.gridConfig,
+                zoomLevel = zoomLevel
             )
 
             // Render all elements from first page
             gridResume.pages.firstOrNull()?.let { page ->
                 page.elementsByZIndex().forEach { element ->
-                    val isSelected = selectedElement?.id == element.id
-                    val isDragging = draggedElement?.element?.id == element.id
+                    key(element.id) {
+                        val isSelected = selectedElement?.id == element.id
+                        val isDragging = draggedElement?.element?.id == element.id
 
-                    DraggableElement(
-                        element = element,
-                        gridConfig = gridResume.gridConfig,
-                        isSelected = isSelected,
-                        isDragging = isDragging,
-                        onDragStart = onDragStart,
-                        onDrag = onDrag,
-                        onDragEnd = onDragEnd,
-                        onSelect = onElementSelect,
-                        onDeselect = onElementDeselect
-                    ) {
+                        DraggableElement(
+                            element = element,
+                            gridConfig = gridResume.gridConfig,
+                            zoomLevel = zoomLevel,
+                            isSelected = isSelected,
+                            isDragging = isDragging,
+                            onDragStart = onDragStart,
+                            onDrag = onDrag,
+                            onDragEnd = onDragEnd,
+                            onResize = onResize,
+                            onSelect = onElementSelect,
+                            onDeselect = onElementDeselect,
+                            onOpenProperties = { _ -> onOpenProperties() }
+                        ) {
                         // Render element content based on type
                         when (element) {
                             is ResumeElement.TextElement -> {
@@ -399,6 +463,7 @@ private fun GridCanvas(
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -408,6 +473,7 @@ private fun GridCanvas(
                     element = drag.element,
                     position = drag.currentPosition,
                     gridConfig = gridResume.gridConfig,
+                    zoomLevel = zoomLevel,
                     isValid = drag.isValidPosition
                 ) {
                     // Ghost content (simplified)
@@ -492,6 +558,135 @@ private fun ElementTypeButton(
             Text(label, fontSize = 16.sp)
         }
     }
+}
+
+/**
+ * PDF Export Dialog
+ */
+@Composable
+private fun PdfExportDialog(
+    exportState: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState,
+    onDismiss: () -> Unit,
+    onExport: () -> Unit,
+    onShare: (android.net.Uri) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Export PDF")
+        },
+        text = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Idle -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Export your resume as a PDF file.")
+                        Text(
+                            "The PDF will be saved to Downloads/AI Career Coach",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.PreparingImages -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Preparing images...")
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.RenderingPage -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Rendering page ${exportState.page} of ${exportState.total}...")
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.SavingFile -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Saving PDF...")
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Success -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("✓ PDF exported successfully!")
+                        Text(
+                            "Size: ${exportState.fileSizeBytes / 1024} KB",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Location: Downloads/AI Career Coach",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Error -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("❌ Export failed")
+                        Text(
+                            exportState.message,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Idle -> {
+                    Button(onClick = onExport) {
+                        Text("Export")
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Success -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onShare(exportState.uri) }) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Share")
+                        }
+                        Button(onClick = onDismiss) {
+                            Text("Close")
+                        }
+                    }
+                }
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Error -> {
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                }
+                else -> {
+                    // Hide button during export
+                }
+            }
+        },
+        dismissButton = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Idle -> {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                }
+                else -> { /* No dismiss button during/after export */ }
+            }
+        }
+    )
 }
 
 /**

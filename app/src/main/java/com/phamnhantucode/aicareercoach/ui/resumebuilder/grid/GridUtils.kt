@@ -126,10 +126,18 @@ object GridUtils {
      * @return Clamped position
      */
     fun clampPosition(position: GridPosition, gridConfig: GridConfig): GridPosition {
-        val row = position.row.coerceIn(0, gridConfig.rows - position.rowSpan)
-        val col = position.col.coerceIn(0, gridConfig.columns - position.colSpan)
+        // Ensure rowSpan and colSpan don't exceed grid size
+        val safeRowSpan = position.rowSpan.coerceIn(1, gridConfig.rows)
+        val safeColSpan = position.colSpan.coerceIn(1, gridConfig.columns)
 
-        return position.copy(row = row, col = col)
+        // Calculate maximum valid positions
+        val maxRow = (gridConfig.rows - safeRowSpan).coerceAtLeast(0)
+        val maxCol = (gridConfig.columns - safeColSpan).coerceAtLeast(0)
+
+        val row = position.row.coerceIn(0, maxRow)
+        val col = position.col.coerceIn(0, maxCol)
+
+        return position.copy(row = row, col = col, rowSpan = safeRowSpan, colSpan = safeColSpan)
     }
 
     /**

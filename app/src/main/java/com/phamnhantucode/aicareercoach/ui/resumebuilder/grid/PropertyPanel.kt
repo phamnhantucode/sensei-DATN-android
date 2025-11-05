@@ -2,11 +2,13 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -301,9 +303,15 @@ private fun TextElementProperties(
             color = Color(element.textStyle.color),
             onColorChange = { newColor ->
                 newColor?.let {
+                    val colorLong = android.graphics.Color.argb(
+                        (it.alpha * 255).toInt(),
+                        (it.red * 255).toInt(),
+                        (it.green * 255).toInt(),
+                        (it.blue * 255).toInt()
+                    ).toLong()
                     onUpdateElement(
                         element.copy(
-                            textStyle = element.textStyle.copy(color = it.value.toLong())
+                            textStyle = element.textStyle.copy(color = colorLong)
                         )
                     )
                 }
@@ -446,10 +454,18 @@ private fun StylePropertiesSection(
             label = "Background",
             color = element.style.backgroundColor?.let { Color(it) },
             onColorChange = { newColor ->
+                val colorLong = newColor?.let {
+                    android.graphics.Color.argb(
+                        (it.alpha * 255).toInt(),
+                        (it.red * 255).toInt(),
+                        (it.green * 255).toInt(),
+                        (it.blue * 255).toInt()
+                    ).toLong()
+                }
                 onUpdateElement(
                     updateElementStyle(
                         element,
-                        element.style.copy(backgroundColor = newColor?.value?.toLong())
+                        element.style.copy(backgroundColor = colorLong)
                     )
                 )
             },
@@ -461,10 +477,18 @@ private fun StylePropertiesSection(
             label = "Border Color",
             color = element.style.borderColor?.let { Color(it) },
             onColorChange = { newColor ->
+                val colorLong = newColor?.let {
+                    android.graphics.Color.argb(
+                        (it.alpha * 255).toInt(),
+                        (it.red * 255).toInt(),
+                        (it.green * 255).toInt(),
+                        (it.blue * 255).toInt()
+                    ).toLong()
+                }
                 onUpdateElement(
                     updateElementStyle(
                         element,
-                        element.style.copy(borderColor = newColor?.value?.toLong())
+                        element.style.copy(borderColor = colorLong)
                     )
                 )
             },
@@ -554,6 +578,8 @@ private fun ColorPicker(
     onColorChange: (Color?) -> Unit,
     nullable: Boolean = false
 ) {
+    var showColorPickerDialog by remember { mutableStateOf(false) }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -568,12 +594,15 @@ private fun ColorPicker(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Color preview box
+                // Color preview box - click to open dialog
                 Box(
                     modifier = Modifier
                         .size(32.dp)
                         .background(color ?: Color.Transparent, MaterialTheme.shapes.small)
                         .border(1.dp, Color.Gray, MaterialTheme.shapes.small)
+                        .clickable {
+                            showColorPickerDialog = true
+                        }
                 )
 
                 if (nullable && color != null) {
@@ -614,12 +643,31 @@ private fun ColorPicker(
                             color = if (color == presetColor) MaterialTheme.colorScheme.primary else Color.Gray,
                             shape = MaterialTheme.shapes.small
                         )
-                        .then(
-                            Modifier.padding(0.dp)
-                        )
-                ) {}
+                        .clickable { onColorChange(presetColor) }
+                )
             }
         }
+
+        // Button to open advanced color picker
+        OutlinedButton(
+            onClick = { showColorPickerDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Palette, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Advanced Picker")
+        }
+    }
+
+    // Show color picker dialog
+    if (showColorPickerDialog) {
+        ColorPickerDialog(
+            initialColor = color ?: Color.Black,
+            onDismiss = { showColorPickerDialog = false },
+            onColorSelected = { newColor ->
+                onColorChange(newColor)
+            }
+        )
     }
 }
 

@@ -1,11 +1,14 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidPdfGenerator
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,6 +22,7 @@ import java.util.*
 class GridEditorViewModel(context: Context) : ViewModel() {
 
     private val repository = ResumeRepository.getInstance(context)
+    private val pdfExporter = AndroidPdfGenerator(context)
 
     // Main state
     private val _gridResume = MutableStateFlow(GridResume())
@@ -38,6 +42,14 @@ class GridEditorViewModel(context: Context) : ViewModel() {
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    // PDF Export state
+    private val _pdfExportState = MutableStateFlow<PdfExportState>(PdfExportState.Idle)
+    val pdfExportState: StateFlow<PdfExportState> = _pdfExportState.asStateFlow()
+
+    // Zoom state
+    private val _zoomLevel = MutableStateFlow(1f)
+    val zoomLevel: StateFlow<Float> = _zoomLevel.asStateFlow()
 
     // Undo/Redo stacks
     private val undoStack = mutableListOf<GridResume>()
@@ -274,11 +286,14 @@ class GridEditorViewModel(context: Context) : ViewModel() {
     fun endDrag(finalPosition: GridPosition) {
         val dragState = _draggedElement.value ?: return
 
-        if (dragState.isValidPosition && finalPosition != dragState.originalPosition) {
+        // Clamp position to ensure it's within bounds
+        val clampedPosition = GridUtils.clampPosition(finalPosition, _gridResume.value.gridConfig)
+
+        if (clampedPosition != dragState.originalPosition) {
             saveToUndoStack()
 
             // Update element position
-            val updatedElement = updateElementPositionValue(dragState.element, finalPosition)
+            val updatedElement = updateElementPositionValue(dragState.element, clampedPosition)
             val currentPage = _gridResume.value.pages.firstOrNull() ?: return
 
             val updatedPage = currentPage.updateElement(updatedElement.id) { updatedElement }
@@ -293,6 +308,33 @@ class GridEditorViewModel(context: Context) : ViewModel() {
         }
 
         _draggedElement.value = null
+    }
+
+    // ============================================================================
+    // Zoom
+    // ============================================================================
+
+    /**
+     * Zoom in (increases zoom level by 10%)
+     */
+    fun zoomIn() {
+        val newZoom = (_zoomLevel.value * 1.1f).coerceAtMost(2f)
+        _zoomLevel.value = newZoom
+    }
+
+    /**
+     * Zoom out (decreases zoom level by 10%)
+     */
+    fun zoomOut() {
+        val newZoom = (_zoomLevel.value / 1.1f).coerceAtLeast(0.25f)
+        _zoomLevel.value = newZoom
+    }
+
+    /**
+     * Reset zoom to 100%
+     */
+    fun resetZoom() {
+        _zoomLevel.value = 1f
     }
 
     // ============================================================================
@@ -422,19 +464,7 @@ class GridEditorViewModel(context: Context) : ViewModel() {
             name = "New Resume",
             pages = listOf(
                 ResumePage(
-                    elements = listOf(
-                        // Add a default title text element
-                        ResumeElement.TextElement(
-                            position = GridPosition(0, 0, 2, 12),
-                            content = "Your Name",
-                            textStyle = TextStyle(
-                                fontSize = 32f,
-                                fontWeight = FontWeight.Bold,
-                                color = 0xFF000000
-                            ),
-                            alignment = TextAlignment.CENTER
-                        )
-                    )
+                    elements = emptyList()
                 )
             )
         )
@@ -533,6 +563,39 @@ class GridEditorViewModel(context: Context) : ViewModel() {
             is ResumeElement.IconElement -> element.copy(position = position)
         }
     }
+
+    // ============================================================================
+    // PDF Export
+    // ============================================================================
+
+    /**
+     * Export resume to PDF
+     */
+    fun exportToPdf() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = pdfExporter.exportToDownloads(_gridResume.value)
+
+                result.onSuccess { exportResult ->
+                    _pdfExportState.value = PdfExportState.Success(exportResult.uri, exportResult.fileSizeBytes)
+                    _events.emit(GridEditorEvent.PdfExportSuccess(exportResult.uri, exportResult.fileSizeBytes))
+                }.onFailure { throwable ->
+                    _pdfExportState.value = PdfExportState.Error(throwable, throwable.message ?: "Unknown error")
+                    _events.emit(GridEditorEvent.PdfExportError(throwable.message ?: "Export failed"))
+                }
+            } catch (e: Exception) {
+                _pdfExportState.value = PdfExportState.Error(e, e.message ?: "Unknown error")
+                _events.emit(GridEditorEvent.PdfExportError(e.message ?: "Export failed"))
+            }
+        }
+    }
+
+    /**
+     * Reset export state
+     */
+    fun resetExportState() {
+        _pdfExportState.value = PdfExportState.Idle
+    }
 }
 
 /**
@@ -553,4 +616,6 @@ sealed class GridEditorEvent {
     data class SaveSuccess(val message: String) : GridEditorEvent()
     data class SaveError(val message: String) : GridEditorEvent()
     data class TemplateApplied(val template: GridTemplateType) : GridEditorEvent()
+    data class PdfExportSuccess(val uri: Uri, val fileSizeBytes: Long) : GridEditorEvent()
+    data class PdfExportError(val message: String) : GridEditorEvent()
 }
