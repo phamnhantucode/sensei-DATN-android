@@ -450,30 +450,40 @@ class IndustryInsightsRepository(
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
         val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
         val nextUpdate = now.plus(7, ChronoUnit.DAYS)
-        val namingStrategies = listOf(ColumnNaming.LOWER)
+        val namingStrategies = listOf(ColumnNaming.CAMEL)
 
         var missingColumnError: MissingColumnException? = null
         for (strategy in namingStrategies) {
-            val payload = buildIndustryInsightPayload(
+            val postPayload = buildIndustryInsightPayload(
                 naming = strategy,
                 industry = industry,
                 generated = generated,
                 now = now,
                 nextUpdate = nextUpdate,
+                includeId = true,
             )
 
             try {
                 return postIndustryInsightPayload(
                     apiUrl = apiUrl,
                     authorizationHeader = authorizationHeader,
-                    payload = payload,
+                    payload = postPayload,
                 )
             } catch (duplicate: DuplicateIndustryException) {
+                // For update, don't include the id field
+                val patchPayload = buildIndustryInsightPayload(
+                    naming = strategy,
+                    industry = industry,
+                    generated = generated,
+                    now = now,
+                    nextUpdate = nextUpdate,
+                    includeId = false,
+                )
                 return updateIndustryInsightPayload(
                     apiUrl = apiUrl,
                     authorizationHeader = authorizationHeader,
                     industry = industry,
-                    payload = payload,
+                    payload = patchPayload,
                 )
             } catch (missing: MissingColumnException) {
                 missingColumnError = missing
@@ -494,8 +504,17 @@ class IndustryInsightsRepository(
         generated: GeneratedInsights,
         now: Instant,
         nextUpdate: Instant,
+        includeId: Boolean = false,
     ): JSONObject {
         return JSONObject().apply {
+            // Include ID only for POST requests, not for PATCH
+            if (includeId) {
+                // Generate a random hex ID similar to what the database would generate
+                val randomBytes = ByteArray(12)
+                java.security.SecureRandom().nextBytes(randomBytes)
+                val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+                put(naming.format("id"), hexId)
+            }
             put(naming.format("industry"), industry)
             put(
                 naming.format("salaryRanges"),

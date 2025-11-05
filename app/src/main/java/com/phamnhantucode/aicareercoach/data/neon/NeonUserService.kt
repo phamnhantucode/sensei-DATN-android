@@ -26,6 +26,104 @@ object NeonUserService {
     private val client = OkHttpClient()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    /**
+     * Generates a random ID matching Prisma's default: encode(gen_random_bytes(12), 'hex')
+     * This creates a 24-character hex string from 12 random bytes.
+     */
+    private fun generateRandomId(): String {
+        val randomBytes = ByteArray(12)
+        java.security.SecureRandom().nextBytes(randomBytes)
+        return randomBytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Creates or updates a user with the industry field.
+     * This should be used during onboarding after ensuring the IndustryInsight exists.
+     *
+     * @param user The Clerk user to sync
+     * @param industry The industry name (required for new users)
+     * @param authToken Optional authentication token
+     */
+    suspend fun upsertUserWithIndustry(
+        user: User,
+        industry: String,
+        authToken: String? = null
+    ) = withContext(Dispatchers.IO) {
+        val authorizationHeader = resolveAuthorizationHeader(authToken)
+            ?: run {
+                Log.w(TAG, "No Neon auth credentials available; skipping Neon sync.")
+                return@withContext
+            }
+
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val email = resolvePrimaryEmail(user)
+            ?: run {
+                Log.w(TAG, "Clerk user ${user.id} missing email; skipping Neon sync.")
+                return@withContext
+            }
+
+        // First, check if user already exists
+        val existingUser = getUser(user.id, authToken)
+
+        if (existingUser != null) {
+            // User exists, just update the industry
+            Log.d(TAG, "User ${user.id} already exists in Neon, updating industry to $industry")
+            val updatePayload = JSONObject().apply {
+                put("industry", industry)
+            }
+            patchUser(apiUrl, authorizationHeader, user.id, updatePayload)
+        } else {
+            // User doesn't exist, create with industry
+            // Generate ID using the same expression as in Prisma schema
+            val randomId = generateRandomId()
+            val now = java.time.Instant.now().toString()
+            val payload = JSONObject().apply {
+                put("id", randomId)
+                put("clerkUserId", user.id)
+                put("email", email)
+                put("name", resolveDisplayName(user) ?: JSONObject.NULL)
+                put("imageUrl", user.imageUrl ?: JSONObject.NULL)
+                put("industry", industry)
+                put("createdAt", now)
+                put("updatedAt", now)
+                put("skills", JSONArray())
+            }
+
+            Log.d(TAG, "Creating new Neon user with industry: $payload")
+
+            val request = Request.Builder()
+                .url("$apiUrl/User?on_conflict=clerkUserId")
+                .addHeader("Authorization", authorizationHeader)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Prefer", "resolution=merge-duplicates")
+                .addHeader("Prefer", "return=minimal")
+                .post(payload.toString().toRequestBody(jsonMediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val bodyString = response.body?.string()
+                if (!response.isSuccessful) {
+                    val errorMessage = bodyString ?: "Empty response body"
+                    if (response.code == 409 && bodyString?.contains("duplicate key value") == true) {
+                        Log.i(TAG, "Neon record exists for ${user.id}; attempting to update instead.")
+                        val updatePayload = JSONObject().apply {
+                            put("industry", industry)
+                        }
+                        patchUser(apiUrl, authorizationHeader, user.id, updatePayload)
+                        return@withContext
+                    }
+                    throw IOException("Neon query failed (${response.code}): $errorMessage")
+                }
+                Log.d(TAG, "Created Neon user ${user.id} with industry $industry.")
+            }
+        }
+    }
+
+    /**
+     * Legacy method that creates/updates user without industry.
+     * WARNING: This will fail if the database requires industry to be non-null.
+     * Use upsertUserWithIndustry() instead for onboarding flow.
+     */
     suspend fun upsertUser(user: User, authToken: String? = null) = withContext(Dispatchers.IO) {
         val authorizationHeader = resolveAuthorizationHeader(authToken)
             ?: run {
@@ -40,12 +138,18 @@ object NeonUserService {
                 return@withContext
             }
 
+        // Generate ID using the same expression as in Prisma schema
+        val randomId = generateRandomId()
+        val now = java.time.Instant.now().toString()
         val payload = JSONObject().apply {
+            put("id", randomId)
             put("clerkUserId", user.id)
             put("email", email)
             put("name", resolveDisplayName(user) ?: JSONObject.NULL)
             put("imageUrl", user.imageUrl ?: JSONObject.NULL)
             put("industry", JSONObject.NULL)
+            put("createdAt", now)
+            put("updatedAt", now)
             put("skills", JSONArray())
         }
 
@@ -188,6 +292,10 @@ object NeonUserService {
         clerkUserId: String,
         payload: JSONObject,
     ) {
+        // Always update the updatedAt timestamp when patching
+        val now = java.time.Instant.now().toString()
+        payload.put("updatedAt", now)
+
         val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
         val request =
             Request.Builder()

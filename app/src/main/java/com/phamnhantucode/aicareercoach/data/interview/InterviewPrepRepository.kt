@@ -166,6 +166,11 @@ class InterviewPrepRepository(
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
 
         val payload = JSONObject().apply {
+            // Generate a random hex ID similar to what the database would generate
+            val randomBytes = ByteArray(12)
+            java.security.SecureRandom().nextBytes(randomBytes)
+            val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+            put("id", hexId)
             put("userId", neonUser.id)
             put("quizScore", quizScore)
             put("category", "quiz")
@@ -178,7 +183,9 @@ class InterviewPrepRepository(
                     }
                 }
             )
-            put("createdat", Instant.now().toString())
+            val now = Instant.now().toString()
+            put("createdAt", now)
+            put("updatedAt", now)
         }
 
         val request =
@@ -211,6 +218,11 @@ class InterviewPrepRepository(
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
 
         val payload = JSONObject().apply {
+            // Generate a random hex ID similar to what the database would generate
+            val randomBytes = ByteArray(12)
+            java.security.SecureRandom().nextBytes(randomBytes)
+            val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+            put("id", hexId)
             put("userId", neonUser.id)
             put("quizScore", quizScore)
             put("category", "interview")
@@ -223,7 +235,9 @@ class InterviewPrepRepository(
                     }
                 }
             )
-            put("createdat", Instant.now().toString())
+            val now = Instant.now().toString()
+            put("createdAt", now)
+            put("updatedAt", now)
         }
 
         val request =
@@ -331,7 +345,7 @@ class InterviewPrepRepository(
         val encodedUserId = URLEncoder.encode(neonUserId, UTF_8.name())
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
         val requestUrl =
-            "$apiUrl/Assessment?select=id,quizScore,questions,category,improvementTip,createdat&userId=eq.$encodedUserId&order=createdat.desc&limit=20"
+            "$apiUrl/Assessment?select=id,quizScore,questions,category,improvementTip,createdAt&userId=eq.$encodedUserId&order=createdAt.desc&limit=20"
 
         val request =
             Request.Builder()

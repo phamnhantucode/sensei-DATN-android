@@ -227,19 +227,13 @@ fun OnboardingScreen(
                                                     } else if (user == null) {
                                                         submitError = "User session unavailable. Please sign in again."
                                                     } else {
-                                                        // Step 1: Ensure Neon user exists
+                                                        // Step 1: Get auth token
                                                         loadingMessage = "Setting up your account..."
                                                         val authToken = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
                                                             ?: throw IllegalStateException("Unable to fetch authentication token.")
-                                                        try {
-                                                            NeonUserService.upsertUser(user, authToken)
-                                                        } catch (_: Exception) {
-                                                            // Best-effort; continue to next step
-                                                        }
 
-                                                        // Step 2: Ensure IndustryInsight exists BEFORE setting User.industry
+                                                        // Step 2: Ensure IndustryInsight exists BEFORE creating user
                                                         loadingMessage = "Generating industry insights..."
-                                                        // Format the token as "Bearer <token>" for the authorization header
                                                         val authorizationHeader = "Bearer $authToken"
                                                         val repository = IndustryInsightsRepository()
                                                         repository.ensureIndustryInsightExists(
@@ -247,8 +241,16 @@ fun OnboardingScreen(
                                                             authorizationHeader = authorizationHeader,
                                                         )
 
-                                                        // Step 3: Update user profile with industry foreign key
-                                                        loadingMessage = "Saving your profile..."
+                                                        // Step 3: Create/update user with industry field
+                                                        loadingMessage = "Creating your profile..."
+                                                        NeonUserService.upsertUserWithIndustry(
+                                                            user = user,
+                                                            industry = selectedIndustry.name,
+                                                            authToken = authToken
+                                                        )
+
+                                                        // Step 4: Update additional user profile fields
+                                                        loadingMessage = "Saving your details..."
                                                         val skills = formData.skills.split(',')
                                                             .map { it.trim() }
                                                             .filter { it.isNotEmpty() }

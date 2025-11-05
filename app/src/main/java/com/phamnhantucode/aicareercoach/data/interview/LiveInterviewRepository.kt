@@ -341,8 +341,16 @@ class LiveInterviewRepository(
 
     private suspend fun createInterviewSession(userId: String, authHeader: String): String? {
         return try {
+            val randomBytes = ByteArray(12)
+            java.security.SecureRandom().nextBytes(randomBytes)
+            val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+            val now = java.time.Instant.now().toString()
+
             val payload = JSONObject().apply {
+                put("id", hexId)
                 put("userId", userId)
+                put("createdAt", now)
+                put("updatedAt", now)
             }
 
             val request = Request.Builder()
@@ -378,13 +386,21 @@ class LiveInterviewRepository(
 
     private suspend fun saveQuestionToDatabase(question: LiveQuestion, authHeader: String) {
         try {
+            val randomBytes = ByteArray(12)
+            java.security.SecureRandom().nextBytes(randomBytes)
+            val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+            val now = java.time.Instant.now().toString()
+
             val payload = JSONObject().apply {
+                put("id", hexId)
                 put("liveMockInterviewId", question.liveMockInterviewId)
                 put("question", question.questionText)
                 put("correctAnswer", question.correctAnswer)
                 put("userAnswer", question.userAnswer)
                 put("feedback", question.feedback)
                 put("rating", question.rating)
+                put("createdAt", now)
+                put("updatedAt", now)
             }
 
             val request = Request.Builder()

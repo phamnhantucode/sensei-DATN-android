@@ -76,14 +76,19 @@ class CoverLetterRepository(
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val payload = JSONObject().apply {
-                put("userid", userId)
-                put("companyname", companyName)
-                put("jobtitle", jobTitle)
-                put("jobdescription", jobDescription)
+                // Generate a random hex ID similar to what the database would generate
+                val randomBytes = ByteArray(12)
+                java.security.SecureRandom().nextBytes(randomBytes)
+                val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+                put("id", hexId)
+                put("userId", userId)
+                put("companyName", companyName)
+                put("jobTitle", jobTitle)
+                put("jobDescription", jobDescription)
                 put("content", content)
                 put("status", status)
-                put("createdat", Instant.now().toString())
-                put("updatedat", Instant.now().toString())
+                put("createdAt", Instant.now().toString())
+                put("updatedAt", Instant.now().toString())
             }
 
             val request = Request.Builder()
@@ -122,7 +127,7 @@ class CoverLetterRepository(
 
             val payload = JSONObject().apply {
                 put("content", content)
-                put("updatedat", Instant.now().toString())
+                put("updatedAt", Instant.now().toString())
             }
 
             val request = Request.Builder()
@@ -410,7 +415,7 @@ class CoverLetterRepository(
     private fun fetchCoverLettersForUser(userId: String, authorizationHeader: String): List<CoverLetterRecord> {
         val encodedUserId = URLEncoder.encode(userId, UTF_8.name())
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-        val requestUrl = "$apiUrl/CoverLetter?select=*&userid=eq.$encodedUserId&order=createdat.desc"
+        val requestUrl = "$apiUrl/CoverLetter?select=*&userId=eq.$encodedUserId&order=createdAt.desc"
 
         val request = Request.Builder()
             .url(requestUrl)
@@ -435,14 +440,14 @@ class CoverLetterRepository(
     private fun parseCoverLetter(json: JSONObject): CoverLetterRecord {
         return CoverLetterRecord(
             id = json.optString("id", ""),
-            userId = json.optString("userid", ""),
-            companyName = json.optString("companyname", ""),
-            jobTitle = json.optString("jobtitle", ""),
-            jobDescription = json.optString("jobdescription", ""),
+            userId = json.optString("userId", ""),
+            companyName = json.optString("companyName", ""),
+            jobTitle = json.optString("jobTitle", ""),
+            jobDescription = json.optString("jobDescription", ""),
             content = json.optString("content", ""),
             status = json.optString("status", "draft"),
-            createdAt = parseInstant(json.optString("createdat")),
-            updatedAt = parseInstant(json.optString("updatedat"))
+            createdAt = parseInstant(json.optString("createdAt")),
+            updatedAt = parseInstant(json.optString("updatedAt"))
         )
     }
 
