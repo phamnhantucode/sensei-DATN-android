@@ -392,6 +392,30 @@ private fun ShapeElementProperties(
                 onUpdateElement(element.copy(cornerRadius = newRadius))
             }
         )
+
+        // Custom height (particularly useful for dividers)
+        if (element.shapeType == ShapeType.DIVIDER || element.customHeightDp != null) {
+            SliderField(
+                label = "Custom Height: ${element.customHeightDp?.toInt() ?: 2}dp",
+                value = element.customHeightDp ?: 2f,
+                valueRange = 1f..24f,
+                onValueChange = { newHeight ->
+                    onUpdateElement(element.copy(customHeightDp = newHeight))
+                }
+            )
+        }
+
+        // Custom width (optional, for vertical dividers)
+        if (element.shapeType == ShapeType.LINE || element.customWidthDp != null) {
+            SliderField(
+                label = "Custom Width: ${element.customWidthDp?.toInt() ?: 2}dp",
+                value = element.customWidthDp ?: 2f,
+                valueRange = 1f..24f,
+                onValueChange = { newWidth ->
+                    onUpdateElement(element.copy(customWidthDp = newWidth))
+                }
+            )
+        }
     }
 }
 

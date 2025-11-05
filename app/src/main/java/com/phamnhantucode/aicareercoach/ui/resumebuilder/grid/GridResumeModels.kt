@@ -147,7 +147,9 @@ sealed class ResumeElement {
         override val zIndex: Int = -1, // Behind by default
         override val locked: Boolean = false,
         val shapeType: ShapeType = ShapeType.RECTANGLE,
-        val cornerRadius: Float = 0f
+        val cornerRadius: Float = 0f,
+        val customHeightDp: Float? = null, // Custom height for dividers (overrides rowSpan)
+        val customWidthDp: Float? = null  // Custom width if needed
     ) : ResumeElement()
 
     /**
@@ -377,7 +379,8 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
         ResumeElement.ShapeElement(
             position = GridPosition(currentRow, 0, 1, 12),
             shapeType = ShapeType.DIVIDER,
-            style = ElementStyle(backgroundColor = 0xFF000000)
+            style = ElementStyle(backgroundColor = 0xFF000000),
+            customHeightDp = 2f // Thin divider line
         )
     )
     currentRow += 1

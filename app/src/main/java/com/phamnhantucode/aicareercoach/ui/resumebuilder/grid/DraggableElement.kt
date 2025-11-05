@@ -51,8 +51,18 @@ fun DraggableElement(
     val baseY = element.position.row * cellSizePx
 
     // Calculate size in pixels
-    val width = element.position.colSpan * cellSizePx
-    val height = element.position.rowSpan * cellSizePx
+    // For ShapeElements with custom dimensions, use those instead of grid-based sizing
+    val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
+        element.customWidthDp * density
+    } else {
+        element.position.colSpan * cellSizePx
+    }
+
+    val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
+        element.customHeightDp * density
+    } else {
+        element.position.rowSpan * cellSizePx
+    }
 
     Box(
         modifier = Modifier

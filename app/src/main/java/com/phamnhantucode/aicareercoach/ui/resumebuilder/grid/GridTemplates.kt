@@ -459,7 +459,8 @@ private fun createProfessionalTemplate(): List<ResumeElement> {
         ResumeElement.ShapeElement(
             position = GridPosition(3, 0, 1, 12),
             shapeType = ShapeType.DIVIDER,
-            style = ElementStyle(backgroundColor = 0xFF2196F3, borderWidth = 2f)
+            style = ElementStyle(backgroundColor = 0xFF2196F3, borderWidth = 2f),
+            customHeightDp = 3f // Slightly thicker colored divider
         )
     )
 }

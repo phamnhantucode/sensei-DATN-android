@@ -479,6 +479,16 @@ class GridEditorViewModel(context: Context) : ViewModel() {
                     )
                 )
             }
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.DIVIDER -> {
+                ResumeElement.ShapeElement(
+                    position = position,
+                    shapeType = ShapeType.DIVIDER,
+                    style = ElementStyle(
+                        backgroundColor = 0xFF000000
+                    ),
+                    customHeightDp = 2f // Thin divider line (2dp)
+                )
+            }
             com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CHART -> {
                 ResumeElement.ChartElement(
                     position = position,
@@ -503,12 +513,13 @@ class GridEditorViewModel(context: Context) : ViewModel() {
 
     private fun getDefaultElementSize(type: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType): Pair<Int, Int> {
         return when (type) {
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.TEXT -> Pair(2, 6) // 2 rows, 6 cols
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.IMAGE -> Pair(4, 4) // Square
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.SHAPE -> Pair(1, 12) // Full width line
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CHART -> Pair(3, 6) // Rectangular
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CONTAINER -> Pair(4, 6)
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.ICON -> Pair(1, 1) // Single cell
+            ElementType.TEXT -> Pair(2, 6) // 2 rows, 6 cols
+            ElementType.IMAGE -> Pair(4, 4) // Square
+            ElementType.SHAPE -> Pair(1, 12) // Full width line
+            ElementType.CHART -> Pair(3, 6) // Rectangular
+            ElementType.CONTAINER -> Pair(4, 6)
+            ElementType.ICON -> Pair(1, 1) // Single cell
+            ElementType.DIVIDER -> Pair(1, 12) // Full width thin line
         }
     }
 

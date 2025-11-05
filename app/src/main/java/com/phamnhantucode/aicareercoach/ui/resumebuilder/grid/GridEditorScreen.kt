@@ -448,6 +448,11 @@ private fun ElementPickerDialog(
                     onClick = { onElementTypeSelected(ElementType.SHAPE) }
                 )
                 ElementTypeButton(
+                    icon = Icons.Default.HorizontalRule,
+                    label = "Divider",
+                    onClick = { onElementTypeSelected(ElementType.DIVIDER) }
+                )
+                ElementTypeButton(
                     icon = IconAliases.BarChart,
                     label = "Chart",
                     onClick = { onElementTypeSelected(ElementType.CHART) }
@@ -496,6 +501,7 @@ enum class ElementType {
     TEXT,
     IMAGE,
     SHAPE,
+    DIVIDER,
     CHART,
     CONTAINER,
     ICON
