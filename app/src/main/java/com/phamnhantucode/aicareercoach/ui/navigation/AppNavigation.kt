@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +23,8 @@ import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeBuilderScreen
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorScreen
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorViewModel
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 @Composable
@@ -120,7 +123,22 @@ fun AppNavigation() {
 
         composable(Screen.ResumeBuilder.route) {
             ResumeBuilderScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToGridEditor = {
+                    navController.navigate(Screen.GridEditor.route)
+                }
+            )
+        }
+
+        composable(Screen.GridEditor.route) {
+            val viewModel: GridEditorViewModel = remember { GridEditorViewModel(context) }
+            GridEditorScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPreview = { /* TODO: Navigate to preview if needed */ },
+                onSwitchToFormEditor = {
+                    navController.popBackStack()
+                },
+                viewModel = viewModel
             )
         }
 

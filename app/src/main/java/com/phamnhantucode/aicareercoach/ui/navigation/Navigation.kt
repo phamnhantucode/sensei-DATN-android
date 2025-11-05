@@ -8,6 +8,7 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object IndustryInsights : Screen("industry_insights")
     object ResumeBuilder : Screen("resume_builder")
+    object GridEditor : Screen("grid_editor")
     object InterviewPrep : Screen("interview_prep")
     object CoverLetter : Screen("cover_letter")
     object AccountSettings : Screen("account_settings")
