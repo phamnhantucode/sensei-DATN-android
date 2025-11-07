@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -107,9 +108,22 @@ fun DraggableElement(
                 // Add shadow/elevation effect
                 shadowElevation = if (isDragging) 8f else if (isSelected) 4f else 0f
             }
-            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected) {
+            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, height) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+
+                    // Check if touch is on a resize handle (only for selected, unlocked elements)
+                    if (isSelected && !element.locked) {
+                        val handleHitSize = 16.dp.toPx() // Hit area for handles (2x the 8dp visual size)
+                        val touchX = down.position.x
+                        val touchY = down.position.y
+
+                        if (isTouchOnResizeHandle(touchX, touchY, width, height, handleHitSize)) {
+                            // Touch is on a resize handle - don't consume, let resize handle process it
+                            return@awaitEachGesture
+                        }
+                    }
+
                     var hasDragged = false
                     var dragStartCalled = false
 
@@ -271,15 +285,32 @@ private fun BoxScope.ResizeHandles(
     val handleSize = 8.dp
     val handleColor = Color(0xFF2196F3)
 
-    var accumulatedDeltaX by remember { mutableFloatStateOf(0f) }
-    var accumulatedDeltaY by remember { mutableFloatStateOf(0f) }
+    // Key by element.id to reset state when element changes
+    var accumulatedDeltaX by remember(element.id) { mutableFloatStateOf(0f) }
+    var accumulatedDeltaY by remember(element.id) { mutableFloatStateOf(0f) }
+
+    // Use rememberUpdatedState to always get the latest position without recomposition
+    val currentPosition = rememberUpdatedState(element.position)
+
+    // Capture the position at the START of resize gesture (nullable, only set during gesture)
+    var gestureStartPosition by remember(element.id) { mutableStateOf<GridPosition?>(null) }
+
+    val onResizeStart: () -> Unit = {
+        // Capture the CURRENT position when resize starts
+        gestureStartPosition = currentPosition.value
+        accumulatedDeltaX = 0f
+        accumulatedDeltaY = 0f
+    }
 
     val handleResize: (ResizeHandle, Float, Float) -> Unit = { handle, deltaX, deltaY ->
         accumulatedDeltaX += deltaX
         accumulatedDeltaY += deltaY
 
+        // Use captured gesture start position, fallback to current if not set
+        val basePosition = gestureStartPosition ?: currentPosition.value
+
         val newPosition = calculateResizedPosition(
-            originalPosition = element.position,
+            originalPosition = basePosition,
             handle = handle,
             deltaX = accumulatedDeltaX,
             deltaY = accumulatedDeltaY,
@@ -291,6 +322,7 @@ private fun BoxScope.ResizeHandles(
     val resetAccumulated: () -> Unit = {
         accumulatedDeltaX = 0f
         accumulatedDeltaY = 0f
+        gestureStartPosition = null  // Clear gesture state so next resize captures fresh position
     }
 
     // Top-left
@@ -300,6 +332,7 @@ private fun BoxScope.ResizeHandles(
         color = handleColor,
         alignment = Alignment.TopStart,
         onResize = handleResize,
+        onResizeStart = onResizeStart,
         onResizeEnd = resetAccumulated
     )
 
@@ -310,6 +343,7 @@ private fun BoxScope.ResizeHandles(
         color = handleColor,
         alignment = Alignment.TopEnd,
         onResize = handleResize,
+        onResizeStart = onResizeStart,
         onResizeEnd = resetAccumulated
     )
 
@@ -320,6 +354,7 @@ private fun BoxScope.ResizeHandles(
         color = handleColor,
         alignment = Alignment.BottomStart,
         onResize = handleResize,
+        onResizeStart = onResizeStart,
         onResizeEnd = resetAccumulated
     )
 
@@ -330,6 +365,7 @@ private fun BoxScope.ResizeHandles(
         color = handleColor,
         alignment = Alignment.BottomEnd,
         onResize = handleResize,
+        onResizeStart = onResizeStart,
         onResizeEnd = resetAccumulated
     )
 
@@ -346,15 +382,19 @@ private fun BoxScope.ResizeHandle(
     color: Color,
     alignment: Alignment,
     onResize: (ResizeHandle, Float, Float) -> Unit,
+    onResizeStart: () -> Unit = {},
     onResizeEnd: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
             .align(alignment)
-            .size(size)
-            .background(color, RoundedCornerShape(size / 2))
+            .size(size * 2) // Increase hit area for easier dragging
+            .zIndex(10f) // Ensure handles are on top and receive events first
             .pointerInput(handle) {
                 detectDragGestures(
+                    onDragStart = {
+                        onResizeStart()
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         onResize(handle, dragAmount.x, dragAmount.y)
@@ -364,7 +404,15 @@ private fun BoxScope.ResizeHandle(
                     }
                 )
             }
-    )
+    ) {
+        // Visual handle (smaller than the hit area)
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(size)
+                .background(color, RoundedCornerShape(size / 2))
+        )
+    }
 }
 
 /**
@@ -481,6 +529,45 @@ enum class ResizeHandle {
     BOTTOM,
     LEFT,
     RIGHT
+}
+
+/**
+ * Check if a touch position is on any resize handle
+ * @param touchX Touch position X relative to element
+ * @param touchY Touch position Y relative to element
+ * @param elementWidth Element width in pixels
+ * @param elementHeight Element height in pixels
+ * @param handleSizePx Hit area size in pixels (typically 16dp converted to px)
+ * @return true if touch is on a resize handle
+ */
+fun isTouchOnResizeHandle(
+    touchX: Float,
+    touchY: Float,
+    elementWidth: Float,
+    elementHeight: Float,
+    handleSizePx: Float
+): Boolean {
+    // Top-left corner
+    if (touchX <= handleSizePx && touchY <= handleSizePx) {
+        return true
+    }
+
+    // Top-right corner
+    if (touchX >= elementWidth - handleSizePx && touchY <= handleSizePx) {
+        return true
+    }
+
+    // Bottom-left corner
+    if (touchX <= handleSizePx && touchY >= elementHeight - handleSizePx) {
+        return true
+    }
+
+    // Bottom-right corner
+    if (touchX >= elementWidth - handleSizePx && touchY >= elementHeight - handleSizePx) {
+        return true
+    }
+
+    return false
 }
 
 /**

@@ -4,7 +4,8 @@
       "Bash(gradlew.bat:*)",
       "Bash(./gradlew.bat assembleDebug:*)",
       "Bash(cat:*)",
-      "Bash(./gradlew assembleDebug:*)"
+      "Bash(./gradlew assembleDebug:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
