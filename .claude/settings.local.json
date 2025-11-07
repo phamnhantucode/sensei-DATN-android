@@ -5,7 +5,10 @@
       "Bash(./gradlew.bat assembleDebug:*)",
       "Bash(cat:*)",
       "Bash(./gradlew assembleDebug:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(find \"D:\\Workspace\\Android\\AICareerCoach\" -type f ( -name \"*resume*\" -o -name \"*grid*\" -o -name \"*editor*\" ) 2)",
+      "Bash(nul)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

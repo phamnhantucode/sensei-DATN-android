@@ -11,7 +11,7 @@ import java.util.UUID
  * Grid-based Resume Data Models
  *
  * This file contains the data structures for the grid-based resume editor.
- * The grid uses a 12x16 cell system for precise layout control.
+ * The grid uses a 48x64 cell system for precise layout control.
  */
 
 // ============================================================================
@@ -60,9 +60,9 @@ data class ResumePage(
  * @param snapThreshold Snap threshold as fraction of cell size (0.0-1.0)
  */
 data class GridConfig(
-    val columns: Int = 12,
-    val rows: Int = 16,
-    val cellSizeDp: Float = 24f,
+    val columns: Int = 48,
+    val rows: Int = 64,
+    val cellSizeDp: Float = 12f,
     val showGrid: Boolean = true,
     val snapToGrid: Boolean = true,
     val snapThreshold: Float = 0.3f // 30% of cell size
@@ -361,7 +361,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
         content = personalInfo.fullName,
         row = currentRow,
         col = 0,
-        colSpan = 12,
+        colSpan = 48,
         fontSize = 24f,
         fontWeight = FontWeight.Bold
     )
@@ -370,20 +370,20 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
         content = "${personalInfo.email} | ${personalInfo.phone} | ${personalInfo.location}",
         row = currentRow,
         col = 0,
-        colSpan = 12,
+        colSpan = 48,
         fontSize = 12f
     )
 
     // Add divider
     elements.add(
         ResumeElement.ShapeElement(
-            position = GridPosition(currentRow, 0, 1, 12),
+            position = GridPosition(currentRow, 0, 4, 48),
             shapeType = ShapeType.DIVIDER,
             style = ElementStyle(backgroundColor = 0xFF000000),
             customHeightDp = 2f // Thin divider line
         )
     )
-    currentRow += 1
+    currentRow += 4
 
     // Helper to check if section is visible
     fun isSectionVisible(sectionType: ResumeSectionType): Boolean {
@@ -403,7 +403,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = "SUMMARY",
             row = currentRow,
             col = 0,
-            colSpan = 12,
+            colSpan = 48,
             fontSize = 16f,
             fontWeight = FontWeight.Bold
         )
@@ -411,8 +411,8 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = professionalSummary,
             row = currentRow,
             col = 0,
-            colSpan = 12,
-            rowSpan = 2
+            colSpan = 48,
+            rowSpan = 8
         )
     }
 
@@ -422,7 +422,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = "EXPERIENCE",
             row = currentRow,
             col = 0,
-            colSpan = 12,
+            colSpan = 48,
             fontSize = 16f,
             fontWeight = FontWeight.Bold
         )
@@ -432,15 +432,15 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
                 content = "${work.jobTitle} at ${work.company}",
                 row = currentRow,
                 col = 0,
-                colSpan = 9,
+                colSpan = 36,
                 fontSize = 14f,
                 fontWeight = FontWeight.SemiBold
             )
             currentRow = addTextElement(
                 content = formatDates(work.startDate, work.endDate, work.isCurrentRole),
                 row = currentRow - 1,
-                col = 9,
-                colSpan = 3,
+                col = 36,
+                colSpan = 12,
                 fontSize = 12f
             )
             work.responsibilities.forEach { resp ->
@@ -448,7 +448,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
                     content = "• $resp",
                     row = currentRow,
                     col = 0,
-                    colSpan = 12
+                    colSpan = 48
                 )
             }
         }
@@ -460,7 +460,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = "SKILLS",
             row = currentRow,
             col = 0,
-            colSpan = 12,
+            colSpan = 48,
             fontSize = 16f,
             fontWeight = FontWeight.Bold
         )
@@ -469,8 +469,8 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = skills.joinToString(" • "),
             row = currentRow,
             col = 0,
-            colSpan = 12,
-            rowSpan = 2
+            colSpan = 48,
+            rowSpan = 8
         )
     }
 
@@ -480,7 +480,7 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
             content = "EDUCATION",
             row = currentRow,
             col = 0,
-            colSpan = 12,
+            colSpan = 48,
             fontSize = 16f,
             fontWeight = FontWeight.Bold
         )
@@ -490,15 +490,15 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
                 content = "${edu.degree} - ${edu.institution}",
                 row = currentRow,
                 col = 0,
-                colSpan = 9,
+                colSpan = 36,
                 fontSize = 14f,
                 fontWeight = FontWeight.SemiBold
             )
             currentRow = addTextElement(
                 content = formatDates(edu.startDate, edu.endDate),
                 row = currentRow - 1,
-                col = 9,
-                colSpan = 3,
+                col = 36,
+                colSpan = 12,
                 fontSize = 12f
             )
         }

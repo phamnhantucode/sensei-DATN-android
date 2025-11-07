@@ -543,13 +543,13 @@ class GridEditorViewModel(context: Context) : ViewModel() {
 
     private fun getDefaultElementSize(type: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType): Pair<Int, Int> {
         return when (type) {
-            ElementType.TEXT -> Pair(2, 6) // 2 rows, 6 cols
-            ElementType.IMAGE -> Pair(4, 4) // Square
-            ElementType.SHAPE -> Pair(1, 12) // Full width line
-            ElementType.CHART -> Pair(3, 6) // Rectangular
-            ElementType.CONTAINER -> Pair(4, 6)
-            ElementType.ICON -> Pair(1, 1) // Single cell
-            ElementType.DIVIDER -> Pair(1, 12) // Full width thin line
+            ElementType.TEXT -> Pair(8, 24) // 8 rows, 24 cols
+            ElementType.IMAGE -> Pair(16, 16) // Square
+            ElementType.SHAPE -> Pair(4, 48) // Full width line
+            ElementType.CHART -> Pair(12, 24) // Rectangular
+            ElementType.CONTAINER -> Pair(16, 24)
+            ElementType.ICON -> Pair(4, 4) // Single cell
+            ElementType.DIVIDER -> Pair(4, 48) // Full width thin line
         }
     }
 
