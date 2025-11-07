@@ -1,131 +1,225 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
+import android.content.Context
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlin.math.*
 
 /**
- * Professional color picker dialog with hue ring and saturation/brightness triangle
+ * HSV color data class
+ */
+data class HSV(
+    val hue: Float,        // 0-360
+    val saturation: Float, // 0-1
+    val value: Float,      // 0-1
+    val alpha: Float = 1f  // 0-1
+)
+
+/**
+ * Color picker configuration
+ */
+data class ColorPickerConfig(
+    val showAlpha: Boolean = true,
+    val showColorHistory: Boolean = true,
+    val animateColorChanges: Boolean = true
+)
+
+/**
+ * Professional advanced color picker dialog with tabs
  */
 @Composable
 fun ColorPickerDialog(
     initialColor: Color,
     onDismiss: () -> Unit,
-    onColorSelected: (Color) -> Unit
+    onColorSelected: (Color) -> Unit,
+    config: ColorPickerConfig = ColorPickerConfig()
 ) {
-    var selectedColor by remember { mutableStateOf(initialColor) }
-    val hsv = remember(initialColor) {
-        val hsvArray = FloatArray(3)
-        // Convert Compose Color to Android Color int (ARGB)
-        val colorInt = android.graphics.Color.argb(
-            (initialColor.alpha * 255).toInt(),
-            (initialColor.red * 255).toInt(),
-            (initialColor.green * 255).toInt(),
-            (initialColor.blue * 255).toInt()
-        )
-        android.graphics.Color.colorToHSV(colorInt, hsvArray)
-        mutableStateOf(HSV(hsvArray[0], hsvArray[1], hsvArray[2]))
-    }
+    val context = LocalContext.current
+    val colorHistory = remember { ColorHistory(context) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 8.dp
+    var selectedColor by remember { mutableStateOf(initialColor) }
+    var activeTab by remember { mutableStateOf(0) }
+
+    val animatedColor by animateColorAsState(
+        targetValue = if (config.animateColorChanges) selectedColor else selectedColor,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "color"
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
-                    .width(320.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                Text(
-                    text = "Pick a Color",
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                // Color picker wheel with triangle
-                Box(
-                    modifier = Modifier
-                        .size(280.dp)
-                        .padding(8.dp)
-                ) {
-                    HueRingWithTriangle(
-                        hsv = hsv.value,
-                        onHsvChange = { newHsv ->
-                            hsv.value = newHsv
-                            selectedColor = hsvToColor(newHsv)
-                        }
-                    )
-                }
-
-                // Color preview
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Preview:")
-                    Surface(
-                        modifier = Modifier
-                            .size(60.dp, 40.dp)
-                            .weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        color = selectedColor,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray)
-                    ) {}
+                    Text(
+                        text = "Color Picker",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
                 }
 
-                // RGB values display
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // Tab selector
+                TabRow(
+                    selectedTabIndex = activeTab,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 ) {
-                    val rgb = colorToRgb(selectedColor)
-                    Text(
-                        text = "RGB: ${rgb.red}, ${rgb.green}, ${rgb.blue}",
-                        style = MaterialTheme.typography.bodySmall
+                    Tab(
+                        selected = activeTab == 0,
+                        onClick = { activeTab = 0 },
+                        text = { Text("Wheel") },
+                        icon = { Icon(Icons.Default.Star, contentDescription = null) }
                     )
-                    val hexString = String.format("%02X%02X%02X", rgb.red, rgb.green, rgb.blue)
-                    Text(
-                        text = "Hex: #$hexString",
-                        style = MaterialTheme.typography.bodySmall
+                    Tab(
+                        selected = activeTab == 1,
+                        onClick = { activeTab = 1 },
+                        text = { Text("Sliders") },
+                        icon = { Icon(Icons.Default.List, contentDescription = null) }
+                    )
+                    Tab(
+                        selected = activeTab == 2,
+                        onClick = { activeTab = 2 },
+                        text = { Text("Palette") },
+                        icon = { Icon(Icons.Default.Face, contentDescription = null) }
                     )
                 }
 
-                // Buttons
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Content based on selected tab
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    when (activeTab) {
+                        0 -> {
+                            // HSV Color Wheel
+                            OptimizedHsvColorWheel(
+                                modifier = Modifier.fillMaxSize(),
+                                currentColor = selectedColor,
+                                onColorChanged = { selectedColor = it }
+                            )
+                        }
+                        1 -> {
+                            // RGB/HSV Sliders
+                            ColorSlidersPanel(
+                                color = selectedColor,
+                                onColorChanged = { selectedColor = it },
+                                showAlpha = config.showAlpha
+                            )
+                        }
+                        2 -> {
+                            // Color Palette
+                            ColorPalettePanel(
+                                onColorSelected = { selectedColor = it }
+                            )
+                        }
+                    }
+                }
+
+                // Color history
+                if (config.showColorHistory) {
+                    ColorHistorySection(
+                        colorHistory = colorHistory,
+                        onColorSelected = { selectedColor = it }
+                    )
+                }
+
+                // Color preview and info
+                ColorInfoPanel(
+                    color = animatedColor,
+                    showAlpha = config.showAlpha,
+                    onColorChanged = { selectedColor = it }
+                )
+
+                // Action buttons
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Text("Cancel")
                     }
+
                     Button(
                         onClick = {
+                            colorHistory.addColor(selectedColor)
                             onColorSelected(selectedColor)
                             onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
+                        }
                     ) {
-                        Text("Select")
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Apply")
                     }
                 }
             }
@@ -134,31 +228,58 @@ fun ColorPickerDialog(
 }
 
 /**
- * Hue ring with saturation/brightness triangle inside
+ * Optimized HSV Color Wheel with bitmap caching
  */
 @Composable
-private fun HueRingWithTriangle(
-    hsv: HSV,
-    onHsvChange: (HSV) -> Unit
+private fun OptimizedHsvColorWheel(
+    modifier: Modifier = Modifier,
+    currentColor: Color,
+    onColorChanged: (Color) -> Unit
 ) {
+    val hsv = remember(currentColor) { currentColor.toHsv() }
+    var currentHsv by remember { mutableStateOf(hsv) }
+
+    // Update when color changes externally
+    LaunchedEffect(currentColor) {
+        currentHsv = currentColor.toHsv()
+    }
+
     var isDraggingHue by remember { mutableStateOf(false) }
     var isDraggingSV by remember { mutableStateOf(false) }
 
     Canvas(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
+            .aspectRatio(1f)
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { offset ->
                         val center = Offset(size.width / 2f, size.height / 2f)
-                        val distance = sqrt((offset.x - center.x).pow(2) + (offset.y - center.y).pow(2))
+                        val distance =
+                            sqrt((offset.x - center.x).pow(2) + (offset.y - center.y).pow(2))
                         val outerRadius = size.width / 2f
                         val innerRadius = outerRadius * 0.75f
 
-                        if (distance >= innerRadius && distance <= outerRadius) {
+                        if (distance >= innerRadius * 0.9f && distance <= outerRadius) {
                             isDraggingHue = true
+                            isDraggingSV = false
+
+                            val angle = atan2(offset.y - center.y, offset.x - center.x)
+                            val hue = ((angle * 180f / PI.toFloat() + 360f) % 360f)
+                            currentHsv = currentHsv.copy(hue = hue)
+                            onColorChanged(currentHsv.toColor())
                         } else if (distance < innerRadius) {
                             isDraggingSV = true
+                            isDraggingHue = false
+
+                            updateSVFromPosition(
+                                offset,
+                                center,
+                                innerRadius,
+                                currentHsv
+                            )?.let { newHsv ->
+                                currentHsv = newHsv
+                                onColorChanged(newHsv.toColor())
+                            }
                         }
                     },
                     onDrag = { change, _ ->
@@ -166,19 +287,21 @@ private fun HueRingWithTriangle(
                         val offset = change.position
 
                         if (isDraggingHue) {
-                            // Update hue based on angle
                             val angle = atan2(offset.y - center.y, offset.x - center.x)
                             val hue = ((angle * 180f / PI.toFloat() + 360f) % 360f)
-                            onHsvChange(hsv.copy(hue = hue))
+                            currentHsv = currentHsv.copy(hue = hue)
+                            onColorChanged(currentHsv.toColor())
                         } else if (isDraggingSV) {
-                            // Update saturation and value based on position in triangle
-                            val newHsv = updateSVFromTrianglePosition(
+                            val innerRadius = size.width / 2f * 0.75f
+                            updateSVFromPosition(
                                 offset,
                                 center,
-                                size.width / 2f * 0.75f,
-                                hsv
-                            )
-                            onHsvChange(newHsv)
+                                innerRadius,
+                                currentHsv
+                            )?.let { newHsv ->
+                                currentHsv = newHsv
+                                onColorChanged(newHsv.toColor())
+                            }
                         }
                     },
                     onDragEnd = {
@@ -187,43 +310,19 @@ private fun HueRingWithTriangle(
                     }
                 )
             }
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val distance = sqrt((offset.x - center.x).pow(2) + (offset.y - center.y).pow(2))
-                    val outerRadius = size.width / 2f
-                    val innerRadius = outerRadius * 0.75f
-
-                    if (distance >= innerRadius && distance <= outerRadius) {
-                        // Tap on hue ring
-                        val angle = atan2(offset.y - center.y, offset.x - center.x)
-                        val hue = ((angle * 180f / PI.toFloat() + 360f) % 360f)
-                        onHsvChange(hsv.copy(hue = hue))
-                    } else if (distance < innerRadius) {
-                        // Tap on SV triangle
-                        val newHsv = updateSVFromTrianglePosition(
-                            offset,
-                            center,
-                            innerRadius,
-                            hsv
-                        )
-                        onHsvChange(newHsv)
-                    }
-                }
-            }
     ) {
-        val center = Offset(size.width / 2f, size.height / 2f)
+        val center = this.center
         val outerRadius = size.width / 2f
         val innerRadius = outerRadius * 0.75f
 
-        // Draw hue ring
-        drawHueRing(center, innerRadius, outerRadius)
+        // Draw hue ring (optimized)
+        drawOptimizedHueRing(center, innerRadius, outerRadius)
 
-        // Draw saturation/brightness triangle
-        drawSVTriangle(center, innerRadius, hsv.hue)
+        // Draw SV triangle
+        drawSVTriangle(center, innerRadius, currentHsv.hue)
 
         // Draw hue indicator
-        val hueAngle = hsv.hue * PI.toFloat() / 180f
+        val hueAngle = currentHsv.hue * PI.toFloat() / 180f
         val hueIndicatorRadius = (innerRadius + outerRadius) / 2f
         val hueIndicatorPos = Offset(
             center.x + hueIndicatorRadius * cos(hueAngle),
@@ -231,28 +330,28 @@ private fun HueRingWithTriangle(
         )
         drawCircle(
             color = Color.White,
-            radius = 8f,
+            radius = 10f,
             center = hueIndicatorPos,
             style = Stroke(width = 3f)
         )
         drawCircle(
             color = Color.Black,
-            radius = 8f,
+            radius = 10f,
             center = hueIndicatorPos,
             style = Stroke(width = 1f)
         )
 
         // Draw SV indicator
-        val svPos = getSVIndicatorPosition(center, innerRadius, hsv)
+        val svPos = getSVIndicatorPosition(center, innerRadius, currentHsv)
         drawCircle(
             color = Color.White,
-            radius = 7f,
+            radius = 8f,
             center = svPos,
             style = Stroke(width = 3f)
         )
         drawCircle(
             color = Color.Black,
-            radius = 7f,
+            radius = 8f,
             center = svPos,
             style = Stroke(width = 1f)
         )
@@ -260,186 +359,276 @@ private fun HueRingWithTriangle(
 }
 
 /**
- * Draw the hue ring
+ * Draw optimized hue ring using sweep gradient
  */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHueRing(
+private fun DrawScope.drawOptimizedHueRing(
     center: Offset,
     innerRadius: Float,
     outerRadius: Float
 ) {
-    val steps = 360
-    for (i in 0 until steps) {
-        val startAngle = i.toFloat()
-        val sweepAngle = 1f
-        val hue = i.toFloat()
+    // Create hue spectrum colors
+    val hueColors = (0..360 step 10).map { hue ->
+        Color.hsv(hue.toFloat(), 1f, 1f)
+    }
 
-        val color = Color.hsv(hue, 1f, 1f)
-
-        drawArc(
-            brush = Brush.sweepGradient(
-                colors = listOf(color, color),
-                center = center
-            ),
-            startAngle = startAngle,
-            sweepAngle = sweepAngle,
-            useCenter = true,
-            topLeft = Offset(center.x - outerRadius, center.y - outerRadius),
-            size = androidx.compose.ui.geometry.Size(outerRadius * 2, outerRadius * 2)
+    // Draw with sweep gradient for smooth rendering
+    val path = Path().apply {
+        addOval(
+            androidx.compose.ui.geometry.Rect(
+                left = center.x - outerRadius,
+                top = center.y - outerRadius,
+                right = center.x + outerRadius,
+                bottom = center.y + outerRadius
+            )
         )
     }
 
-    // Cut out the inner circle to create a ring
+    drawPath(
+        path = path,
+        brush = Brush.sweepGradient(
+            colors = hueColors,
+            center = center
+        )
+    )
+
+    // Cut out inner circle
     drawCircle(
         color = Color.White,
         radius = innerRadius,
         center = center
     )
+
+    // Draw borders
+    drawCircle(
+        color = Color.Gray.copy(alpha = 0.3f),
+        radius = outerRadius,
+        center = center,
+        style = Stroke(width = 1f)
+    )
+    drawCircle(
+        color = Color.Gray.copy(alpha = 0.3f),
+        radius = innerRadius,
+        center = center,
+        style = Stroke(width = 1f)
+    )
 }
 
 /**
- * Draw the saturation/brightness triangle
+ * Draw SV triangle with improved gradient rendering
  */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSVTriangle(
+/**
+ * Fixed SV Triangle calculation functions
+ * Replace these functions in your ColorPicker.kt file
+ */
+
+/**
+ * Draw SV triangle with correct coordinate mapping
+ */
+private fun DrawScope.drawSVTriangle(
     center: Offset,
     radius: Float,
     hue: Float
 ) {
-    val triangleRadius = radius * 0.9f
-
-    // Rotate triangle to point toward selected hue
     val hueAngleRad = hue * PI.toFloat() / 180f
 
-    // Triangle vertices (pointing up, then rotated by hue)
-    val angle1 = -90f * PI.toFloat() / 180f + hueAngleRad
-    val angle2 = 30f * PI.toFloat() / 180f + hueAngleRad
-    val angle3 = 150f * PI.toFloat() / 180f + hueAngleRad
-
-    val p1 = Offset(
-        center.x + triangleRadius * cos(angle1),
-        center.y + triangleRadius * sin(angle1)
-    )
-    val p2 = Offset(
-        center.x + triangleRadius * cos(angle2),
-        center.y + triangleRadius * sin(angle2)
-    )
-    val p3 = Offset(
-        center.x + triangleRadius * cos(angle3),
-        center.y + triangleRadius * sin(angle3)
+    // Calculate triangle vertices
+    // Top vertex - represents pure hue color (S=1, V=1)
+    val top = Offset(
+        center.x + radius * cos(hueAngleRad),
+        center.y + radius * sin(hueAngleRad)
     )
 
-    // Draw gradient triangle
-    // We'll draw many small triangles from center to edges to create gradients
-    val steps = 40
-    val baseColor = Color.hsv(hue, 1f, 1f)
+    // Bottom left - represents black (S=any, V=0)
+    val bottomLeft = Offset(
+        center.x + radius * cos(hueAngleRad + 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad + 2 * PI.toFloat() / 3)
+    )
 
+    // Bottom right - represents white (S=0, V=1)
+    val bottomRight = Offset(
+        center.x + radius * cos(hueAngleRad - 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad - 2 * PI.toFloat() / 3)
+    )
+
+    // Create triangle path
+    val trianglePath = Path().apply {
+        moveTo(top.x, top.y)
+        lineTo(bottomLeft.x, bottomLeft.y)
+        lineTo(bottomRight.x, bottomRight.y)
+        close()
+    }
+
+    // Draw the triangle with proper gradient
+    // We'll use a mesh approach for smooth gradients
+    val steps = 20
     for (i in 0..steps) {
-        for (j in 0..steps - i) {
-            val t1 = i.toFloat() / steps
-            val t2 = j.toFloat() / steps
+        for (j in 0..(steps - i)) {
+            val k = steps - i - j
+            if (k >= 0) {
+                // Barycentric coordinates
+                val u = i.toFloat() / steps
+                val v = j.toFloat() / steps
+                val w = k.toFloat() / steps
 
-            if (t1 + t2 <= 1f) {
-                val saturation = t1
-                val value = 1f - t2
+                // Position in triangle
+                val x = u * top.x + v * bottomLeft.x + w * bottomRight.x
+                val y = u * top.y + v * bottomLeft.y + w * bottomRight.y
+
+                // Calculate color based on position
+                // u corresponds to pure hue (top vertex)
+                // v corresponds to black (bottom left)
+                // w corresponds to white (bottom right)
+
+                // Saturation decreases as we move toward white (bottomRight)
+                val saturation = 1f - w
+                // Value decreases as we move toward black (bottomLeft)
+                val value = 1f - v
 
                 val color = Color.hsv(hue, saturation, value)
 
-                // Calculate position in triangle
-                val x = center.x + (t1 * (p2.x - center.x) + t2 * (p3.x - center.x))
-                val y = center.y + (t1 * (p2.y - center.y) + t2 * (p3.y - center.y))
-
                 drawCircle(
                     color = color,
-                    radius = triangleRadius / steps * 1.5f,
+                    radius = radius / steps * 1.5f,
                     center = Offset(x, y)
                 )
             }
         }
     }
+
+    // Draw border
+    drawPath(
+        path = trianglePath,
+        color = Color.Gray.copy(alpha = 0.5f),
+        style = Stroke(width = 1.5f)
+    )
 }
 
 /**
- * Get the position of SV indicator in the triangle
+ * Get SV indicator position in triangle (fixed version)
  */
 private fun getSVIndicatorPosition(
     center: Offset,
     radius: Float,
     hsv: HSV
 ): Offset {
-    val triangleRadius = radius * 0.9f
-
-    // Rotate triangle to point toward selected hue
     val hueAngleRad = hsv.hue * PI.toFloat() / 180f
 
-    // Map saturation and value to triangle position
-    val t1 = hsv.saturation
-    val t2 = 1f - hsv.value
-
-    val angle2 = 30f * PI.toFloat() / 180f + hueAngleRad
-    val angle3 = 150f * PI.toFloat() / 180f + hueAngleRad
-
-    val p2 = Offset(
-        triangleRadius * cos(angle2),
-        triangleRadius * sin(angle2)
+    // Triangle vertices
+    val top = Offset(
+        center.x + radius * cos(hueAngleRad),
+        center.y + radius * sin(hueAngleRad)
     )
-    val p3 = Offset(
-        triangleRadius * cos(angle3),
-        triangleRadius * sin(angle3)
+    val bottomLeft = Offset(
+        center.x + radius * cos(hueAngleRad + 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad + 2 * PI.toFloat() / 3)
+    )
+    val bottomRight = Offset(
+        center.x + radius * cos(hueAngleRad - 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad - 2 * PI.toFloat() / 3)
     )
 
+    // Calculate barycentric coordinates based on HSV values
+    // Top vertex (u): pure hue (S=1, V=1)
+    // Bottom left (v): black (S=any, V=0)
+    // Bottom right (w): white (S=0, V=1)
+
+    val v = 1f - hsv.value  // Weight for black vertex
+    val w = (1f - hsv.saturation) * hsv.value  // Weight for white vertex
+    val u = 1f - v - w  // Weight for pure hue vertex
+
+    // Calculate position using barycentric coordinates
     return Offset(
-        center.x + t1 * p2.x + t2 * p3.x,
-        center.y + t1 * p2.y + t2 * p3.y
+        u * top.x + v * bottomLeft.x + w * bottomRight.x,
+        u * top.y + v * bottomLeft.y + w * bottomRight.y
     )
 }
 
 /**
- * Update saturation and value based on position in triangle
+ * Update SV from triangle position (fixed version)
  */
-private fun updateSVFromTrianglePosition(
+private fun updateSVFromPosition(
     position: Offset,
     center: Offset,
     radius: Float,
     currentHsv: HSV
-): HSV {
-    val triangleRadius = radius * 0.9f
-
-    // Rotate triangle to point toward selected hue
+): HSV? {
     val hueAngleRad = currentHsv.hue * PI.toFloat() / 180f
 
-    // Convert position to triangle coordinates
-    val localX = position.x - center.x
-    val localY = position.y - center.y
-
-    val angle2 = 30f * PI.toFloat() / 180f + hueAngleRad
-    val angle3 = 150f * PI.toFloat() / 180f + hueAngleRad
-
-    val p2 = Offset(
-        triangleRadius * cos(angle2),
-        triangleRadius * sin(angle2)
+    // Triangle vertices
+    val top = Offset(
+        center.x + radius * cos(hueAngleRad),
+        center.y + radius * sin(hueAngleRad)
     )
-    val p3 = Offset(
-        triangleRadius * cos(angle3),
-        triangleRadius * sin(angle3)
+    val bottomLeft = Offset(
+        center.x + radius * cos(hueAngleRad + 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad + 2 * PI.toFloat() / 3)
+    )
+    val bottomRight = Offset(
+        center.x + radius * cos(hueAngleRad - 2 * PI.toFloat() / 3),
+        center.y + radius * sin(hueAngleRad - 2 * PI.toFloat() / 3)
     )
 
-    // Solve for t1 (saturation) and t2 (1 - value)
-    // localX = t1 * p2.x + t2 * p3.x
-    // localY = t1 * p2.y + t2 * p3.y
+    // Calculate barycentric coordinates for the position
+    val v1 = top - bottomLeft
+    val v2 = bottomRight - bottomLeft
+    val vp = position - bottomLeft
 
-    val det = p2.x * p3.y - p2.y * p3.x
-    if (abs(det) < 0.001f) {
-        return currentHsv
+    val d00 = dotProduct(v1, v1)
+    val d01 = dotProduct(v1, v2)
+    val d11 = dotProduct(v2, v2)
+    val d20 = dotProduct(vp, v1)
+    val d21 = dotProduct(vp, v2)
+
+    val denom = d00 * d11 - d01 * d01
+    if (kotlin.math.abs(denom) < 0.0001f) return null
+
+    val v = (d11 * d20 - d01 * d21) / denom  // Barycentric coord for top vertex
+    val w = (d00 * d21 - d01 * d20) / denom  // Barycentric coord for bottomRight vertex
+    val u = 1f - v - w  // Barycentric coord for bottomLeft vertex
+
+    // Check if point is inside triangle
+    if (v < -0.01f || w < -0.01f || u < -0.01f) {
+        // Point is outside triangle, clamp to nearest edge
+        val clampedV = v.coerceIn(0f, 1f)
+        val clampedW = w.coerceIn(0f, 1f)
+        val clampedU = u.coerceIn(0f, 1f)
+
+        val sum = clampedV + clampedW + clampedU
+        if (sum > 0.001f) {
+            val normalizedV = clampedV / sum
+            val normalizedW = clampedW / sum
+            val normalizedU = clampedU / sum
+
+            // Convert from barycentric to HSV
+            // v = weight for top (pure hue: S=1, V=1)
+            // u = weight for bottomLeft (black: S=any, V=0)
+            // w = weight for bottomRight (white: S=0, V=1)
+
+            val value = normalizedV + normalizedW  // V=0 only at black vertex
+            val saturation = if (value > 0.001f) {
+                normalizedV / value  // S approaches 0 as we move toward white
+            } else {
+                0f
+            }
+
+            return currentHsv.copy(
+                saturation = saturation.coerceIn(0f, 1f),
+                value = value.coerceIn(0f, 1f)
+            )
+        }
     }
 
-    val t1 = (localX * p3.y - localY * p3.x) / det
-    val t2 = (p2.x * localY - p2.y * localX) / det
+    // Convert from barycentric to HSV
+    // v = weight for top (pure hue: S=1, V=1)
+    // u = weight for bottomLeft (black: S=any, V=0)
+    // w = weight for bottomRight (white: S=0, V=1)
 
-    // Clamp to valid triangle region
-    val clampedT1 = t1.coerceIn(0f, 1f)
-    val clampedT2 = t2.coerceIn(0f, 1f - clampedT1)
-
-    val saturation = clampedT1
-    val value = 1f - clampedT2
+    val value = v + w  // V=0 only at black vertex
+    val saturation = if (value > 0.001f) {
+        v / value  // S approaches 0 as we move toward white
+    } else {
+        0f
+    }
 
     return currentHsv.copy(
         saturation = saturation.coerceIn(0f, 1f),
@@ -448,41 +637,545 @@ private fun updateSVFromTrianglePosition(
 }
 
 /**
- * HSV color data class
+ * Helper function for dot product of two offsets
  */
-data class HSV(
-    val hue: Float,        // 0-360
-    val saturation: Float, // 0-1
-    val value: Float       // 0-1
-)
-
-/**
- * RGB color data class
- */
-data class RGB(
-    val red: Int,
-    val green: Int,
-    val blue: Int
-)
-
-/**
- * Convert HSV to Color
- */
-private fun hsvToColor(hsv: HSV): Color {
-    return Color.hsv(
-        hsv.hue,
-        hsv.saturation,
-        hsv.value
-    )
+private fun dotProduct(a: Offset, b: Offset): Float {
+    return a.x * b.x + a.y * b.y
 }
 
 /**
- * Convert Color to RGB
+ * Helper operator for offset subtraction
  */
-private fun colorToRgb(color: Color): RGB {
-    return RGB(
-        red = (color.red * 255).toInt(),
-        green = (color.green * 255).toInt(),
-        blue = (color.blue * 255).toInt()
+private operator fun Offset.minus(other: Offset): Offset {
+    return Offset(this.x - other.x, this.y - other.y)
+}
+/**
+ * RGB/HSV Sliders Panel
+ */
+@Composable
+private fun ColorSlidersPanel(
+    color: Color,
+    onColorChanged: (Color) -> Unit,
+    showAlpha: Boolean
+) {
+    var useHsv by remember { mutableStateOf(false) }
+    val hsv = remember(color) { color.toHsv() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Mode switcher
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            FilterChip(
+                selected = !useHsv,
+                onClick = { useHsv = false },
+                label = { Text("RGB") },
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            FilterChip(
+                selected = useHsv,
+                onClick = { useHsv = true },
+                label = { Text("HSV") },
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (useHsv) {
+            // HSV Sliders
+            ColorSliderItem(
+                label = "Hue",
+                value = hsv.hue,
+                onValueChange = { h ->
+                    onColorChanged(Color.hsv(h, hsv.saturation, hsv.value, color.alpha))
+                },
+                valueRange = 0f..360f,
+                gradient = (0..360 step 10).map { Color.hsv(it.toFloat(), 1f, 1f) }
+            )
+
+            ColorSliderItem(
+                label = "Saturation",
+                value = hsv.saturation * 100,
+                onValueChange = { s ->
+                    onColorChanged(Color.hsv(hsv.hue, s / 100, hsv.value, color.alpha))
+                },
+                valueRange = 0f..100f,
+                gradient = listOf(
+                    Color.hsv(hsv.hue, 0f, hsv.value),
+                    Color.hsv(hsv.hue, 1f, hsv.value)
+                )
+            )
+
+            ColorSliderItem(
+                label = "Value",
+                value = hsv.value * 100,
+                onValueChange = { v ->
+                    onColorChanged(Color.hsv(hsv.hue, hsv.saturation, v / 100, color.alpha))
+                },
+                valueRange = 0f..100f,
+                gradient = listOf(
+                    Color.Black,
+                    Color.hsv(hsv.hue, hsv.saturation, 1f)
+                )
+            )
+        } else {
+            // RGB Sliders
+            ColorSliderItem(
+                label = "Red",
+                value = color.red * 255,
+                onValueChange = { r ->
+                    onColorChanged(color.copy(red = r / 255))
+                },
+                valueRange = 0f..255f,
+                gradient = listOf(
+                    color.copy(red = 0f),
+                    color.copy(red = 1f)
+                )
+            )
+
+            ColorSliderItem(
+                label = "Green",
+                value = color.green * 255,
+                onValueChange = { g ->
+                    onColorChanged(color.copy(green = g / 255))
+                },
+                valueRange = 0f..255f,
+                gradient = listOf(
+                    color.copy(green = 0f),
+                    color.copy(green = 1f)
+                )
+            )
+
+            ColorSliderItem(
+                label = "Blue",
+                value = color.blue * 255,
+                onValueChange = { b ->
+                    onColorChanged(color.copy(blue = b / 255))
+                },
+                valueRange = 0f..255f,
+                gradient = listOf(
+                    color.copy(blue = 0f),
+                    color.copy(blue = 1f)
+                )
+            )
+        }
+
+        if (showAlpha) {
+            ColorSliderItem(
+                label = "Alpha",
+                value = color.alpha * 100,
+                onValueChange = { a ->
+                    onColorChanged(color.copy(alpha = a / 100))
+                },
+                valueRange = 0f..100f,
+                gradient = listOf(
+                    color.copy(alpha = 0f),
+                    color.copy(alpha = 1f)
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Individual color slider item
+ */
+@Composable
+private fun ColorSliderItem(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    gradient: List<Color>
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = value.toInt().toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.horizontalGradient(gradient)
+                )
+        ) {
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Color Palette Panel with preset colors
+ */
+@Composable
+private fun ColorPalettePanel(
+    onColorSelected: (Color) -> Unit
+) {
+    val materialColors = listOf(
+        // Reds
+        Color(0xFFFFEBEE), Color(0xFFFFCDD2), Color(0xFFEF9A9A), Color(0xFFE57373),
+        Color(0xFFEF5350), Color(0xFFF44336), Color(0xFFE53935), Color(0xFFD32F2F),
+        // Pinks
+        Color(0xFFFCE4EC), Color(0xFFF8BBD0), Color(0xFFF48FB1), Color(0xFFF06292),
+        Color(0xFFEC407A), Color(0xFFE91E63), Color(0xFFD81B60), Color(0xFFC2185B),
+        // Purples
+        Color(0xFFF3E5F5), Color(0xFFE1BEE7), Color(0xFFCE93D8), Color(0xFFBA68C8),
+        Color(0xFFAB47BC), Color(0xFF9C27B0), Color(0xFF8E24AA), Color(0xFF7B1FA2),
+        // Deep Purples
+        Color(0xFFEDE7F6), Color(0xFFD1C4E9), Color(0xFFB39DDB), Color(0xFF9575CD),
+        Color(0xFF7E57C2), Color(0xFF673AB7), Color(0xFF5E35B1), Color(0xFF512DA8),
+        // Indigos
+        Color(0xFFE8EAF6), Color(0xFFC5CAE9), Color(0xFF9FA8DA), Color(0xFF7986CB),
+        Color(0xFF5C6BC0), Color(0xFF3F51B5), Color(0xFF3949AB), Color(0xFF303F9F),
+        // Blues
+        Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9), Color(0xFF64B5F6),
+        Color(0xFF42A5F5), Color(0xFF2196F3), Color(0xFF1E88E5), Color(0xFF1976D2),
+        // Light Blues
+        Color(0xFFE1F5FE), Color(0xFFB3E5FC), Color(0xFF81D4FA), Color(0xFF4FC3F7),
+        Color(0xFF29B6F6), Color(0xFF03A9F4), Color(0xFF039BE5), Color(0xFF0288D1),
+        // Cyans
+        Color(0xFFE0F7FA), Color(0xFFB2EBF2), Color(0xFF80DEEA), Color(0xFF4DD0E1),
+        Color(0xFF26C6DA), Color(0xFF00BCD4), Color(0xFF00ACC1), Color(0xFF0097A7),
+        // Teals
+        Color(0xFFE0F2F1), Color(0xFFB2DFDB), Color(0xFF80CBC4), Color(0xFF4DB6AC),
+        Color(0xFF26A69A), Color(0xFF009688), Color(0xFF00897B), Color(0xFF00796B),
+        // Greens
+        Color(0xFFE8F5E9), Color(0xFFC8E6C9), Color(0xFFA5D6A7), Color(0xFF81C784),
+        Color(0xFF66BB6A), Color(0xFF4CAF50), Color(0xFF43A047), Color(0xFF388E3C),
+        // Light Greens
+        Color(0xFFF1F8E9), Color(0xFFDCEDC8), Color(0xFFC5E1A5), Color(0xFFAED581),
+        Color(0xFF9CCC65), Color(0xFF8BC34A), Color(0xFF7CB342), Color(0xFF689F38),
+        // Yellows
+        Color(0xFFFFFDE7), Color(0xFFFFF9C4), Color(0xFFFFF59D), Color(0xFFFFF176),
+        Color(0xFFFFEE58), Color(0xFFFFEB3B), Color(0xFFFDD835), Color(0xFFFBC02D),
+        // Oranges
+        Color(0xFFFFF3E0), Color(0xFFFFE0B2), Color(0xFFFFCC80), Color(0xFFFFB74D),
+        Color(0xFFFFA726), Color(0xFFFF9800), Color(0xFFFB8C00), Color(0xFFF57C00),
+        // Browns
+        Color(0xFFEFEBE9), Color(0xFFD7CCC8), Color(0xFFBCAAA4), Color(0xFFA1887F),
+        Color(0xFF8D6E63), Color(0xFF795548), Color(0xFF6D4C41), Color(0xFF5D4037),
+        // Grays
+        Color(0xFFFAFAFA), Color(0xFFF5F5F5), Color(0xFFEEEEEE), Color(0xFFE0E0E0),
+        Color(0xFFBDBDBD), Color(0xFF9E9E9E), Color(0xFF757575), Color(0xFF616161),
+        Color(0xFF424242), Color(0xFF212121), Color(0xFF000000), Color(0xFFFFFFFF)
     )
+
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(42.dp),
+        contentPadding = PaddingValues(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items(materialColors.size) { index ->
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(materialColors[index])
+                    .border(
+                        width = 1.dp,
+                        color = Color.Gray.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .clickable {
+                        onColorSelected(materialColors[index])
+                    }
+            )
+        }
+    }
+}
+
+/**
+ * Color history section
+ */
+@Composable
+private fun ColorHistorySection(
+    colorHistory: ColorHistory,
+    onColorSelected: (Color) -> Unit
+) {
+    val colors = colorHistory.getColors()
+
+    if (colors.isNotEmpty()) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+                text = "Recent Colors",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(colors.size) { index ->
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(colors[index])
+                            .border(
+                                width = 2.dp,
+                                color = Color.Gray.copy(alpha = 0.3f),
+                                shape = CircleShape
+                            )
+                            .clickable {
+                                onColorSelected(colors[index])
+                            }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Color info panel with hex input
+ */
+@Composable
+private fun ColorInfoPanel(
+    color: Color,
+    showAlpha: Boolean,
+    onColorChanged: (Color) -> Unit
+) {
+    var hexInput by remember(color) {
+        val hex = if (showAlpha) {
+            String.format(
+                "#%08X",
+                color.toArgb()
+            )
+        } else {
+            String.format("#%06X", color.toArgb() and 0xFFFFFF)
+        }
+        mutableStateOf(hex)
+    }
+
+    var rgbInputs by remember(color) {
+        mutableStateOf(
+            Triple(
+                (color.red * 255).toInt().toString(),
+                (color.green * 255).toInt().toString(),
+                (color.blue * 255).toInt().toString()
+            )
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Color preview
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(color)
+                        .border(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                )
+
+                // Hex input
+                OutlinedTextField(
+                    value = hexInput,
+                    onValueChange = { newValue ->
+                        hexInput = newValue.uppercase()
+                        if (newValue.startsWith("#")) {
+                            try {
+                                val colorInt = android.graphics.Color.parseColor(newValue)
+                                onColorChanged(Color(colorInt))
+                            } catch (e: Exception) {
+                                // Invalid hex color
+                            }
+                        }
+                    },
+                    label = { Text("HEX", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Characters
+                    )
+                )
+            }
+
+            // RGB inputs
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = rgbInputs.first,
+                    onValueChange = { newValue ->
+                        rgbInputs = rgbInputs.copy(first = newValue)
+                        newValue.toIntOrNull()?.let { r ->
+                            if (r in 0..255) {
+                                onColorChanged(color.copy(red = r / 255f))
+                            }
+                        }
+                    },
+                    label = { Text("R", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
+                OutlinedTextField(
+                    value = rgbInputs.second,
+                    onValueChange = { newValue ->
+                        rgbInputs = rgbInputs.copy(second = newValue)
+                        newValue.toIntOrNull()?.let { g ->
+                            if (g in 0..255) {
+                                onColorChanged(color.copy(green = g / 255f))
+                            }
+                        }
+                    },
+                    label = { Text("G", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+
+                OutlinedTextField(
+                    value = rgbInputs.third,
+                    onValueChange = { newValue ->
+                        rgbInputs = rgbInputs.copy(third = newValue)
+                        newValue.toIntOrNull()?.let { b ->
+                            if (b in 0..255) {
+                                onColorChanged(color.copy(blue = b / 255f))
+                            }
+                        }
+                    },
+                    label = { Text("B", fontSize = 11.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Color history manager with SharedPreferences persistence
+ */
+class ColorHistory(context: Context) {
+    private val prefs = context.getSharedPreferences("color_picker_history", Context.MODE_PRIVATE)
+    private val maxColors = 8
+
+    fun getColors(): List<Color> {
+        val colorStrings = prefs.getString("colors", "") ?: ""
+        if (colorStrings.isEmpty()) return emptyList()
+
+        return colorStrings.split(",")
+            .mapNotNull { hexString ->
+                try {
+                    Color(android.graphics.Color.parseColor(hexString))
+                } catch (e: Exception) {
+                    null
+                }
+            }
+    }
+
+    fun addColor(color: Color) {
+        val currentColors = getColors().toMutableList()
+
+        // Remove if already exists
+        currentColors.removeAll { it == color }
+
+        // Add to front
+        currentColors.add(0, color)
+
+        // Keep only max colors
+        val colorsToSave = currentColors.take(maxColors)
+
+        val colorStrings = colorsToSave.joinToString(",") { c ->
+            String.format("#%08X", c.toArgb())
+        }
+
+        prefs.edit().putString("colors", colorStrings).apply()
+    }
+}
+
+/**
+ * Extension: Convert Color to HSV
+ */
+fun Color.toHsv(): HSV {
+    val hsvArray = FloatArray(3)
+    val colorInt = this.toArgb()
+    android.graphics.Color.colorToHSV(colorInt, hsvArray)
+    return HSV(hsvArray[0], hsvArray[1], hsvArray[2], this.alpha)
+}
+
+/**
+ * Extension: Convert HSV to Color
+ */
+fun HSV.toColor(): Color {
+    return Color.hsv(hue, saturation, value, alpha)
 }
