@@ -445,6 +445,53 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
         triggerAutoSave()
     }
 
+    /**
+     * Apply user data from PersonalInfo to tagged elements in the template
+     * This replaces tagged TextElements and ImageElements with actual user data
+     */
+    fun applyUserDataToTemplate(personalInfo: com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo) {
+        saveToUndoStack()
+
+        val currentPages = _gridResume.value.pages
+        val updatedPages = currentPages.map { page ->
+            val updatedElements = page.elements.map { element ->
+                val tag = element.userInfoTag
+                if (tag == null || tag == UserInfoTag.NONE) {
+                    return@map element
+                }
+
+                when (element) {
+                    is ResumeElement.TextElement -> {
+                        val content = when (tag) {
+                            UserInfoTag.NAME -> personalInfo.fullName
+                            UserInfoTag.EMAIL -> personalInfo.email
+                            UserInfoTag.PHONE -> personalInfo.phone
+                            UserInfoTag.LOCATION -> personalInfo.location
+                            UserInfoTag.GITHUB -> personalInfo.github
+                            UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                            UserInfoTag.WEBSITE -> personalInfo.portfolio
+                            UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
+                            UserInfoTag.NONE -> element.content
+                        }
+                        element.copy(content = content)
+                    }
+                    is ResumeElement.ImageElement -> {
+                        if (tag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
+                            element.copy(imageUrl = personalInfo.avatar)
+                        } else {
+                            element
+                        }
+                    }
+                    else -> element
+                }
+            }
+            page.copy(elements = updatedElements)
+        }
+
+        _gridResume.value = _gridResume.value.copy(pages = updatedPages)
+        triggerAutoSave()
+    }
+
     // ============================================================================
     // Undo/Redo
     // ============================================================================

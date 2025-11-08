@@ -24,7 +24,8 @@ data class PersonalInfo(
     val location: String = "",
     val linkedIn: String = "",
     val portfolio: String = "",
-    val github: String = ""
+    val github: String = "",
+    val avatar: String = "" // Profile picture URI or URL
 )
 
 data class WorkExperience(

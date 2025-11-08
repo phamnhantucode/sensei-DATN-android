@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
@@ -60,6 +62,11 @@ fun GridEditorScreen(
     var showTemplateDialog by remember { mutableStateOf(false) }
     var showElementPicker by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var applyingTemplateData by remember { mutableStateOf(false) }
+
+    // Load resume data for template application
+    val scope = rememberCoroutineScope()
+    val repository = remember { ResumeRepository.getInstance(context) }
 
     // Calculate and set optimal default zoom on first composition
     LaunchedEffect(Unit) {
@@ -87,12 +94,28 @@ fun GridEditorScreen(
             GridEditorTopBar(
                 resumeName = gridResume.name,
                 isSaving = isSaving,
+                isApplyingData = applyingTemplateData,
                 onNavigateBack = onNavigateBack,
                 onSave = { viewModel.save() },
                 onExport = { showExportDialog = true },
                 onPreview = onNavigateToPreview,
                 onSwitchMode = onSwitchToFormEditor,
-                onShowTemplates = { showTemplateDialog = true }
+                onShowTemplates = { showTemplateDialog = true },
+                onApplyTemplateData = {
+                    scope.launch {
+                        applyingTemplateData = true
+                        try {
+                            val result = repository.getLatestResume()
+                            result.onSuccess { resume ->
+                                resume?.let {
+                                    viewModel.applyUserDataToTemplate(it.personalInfo)
+                                }
+                            }
+                        } finally {
+                            applyingTemplateData = false
+                        }
+                    }
+                }
             )
         },
         bottomBar = {
@@ -250,12 +273,14 @@ fun GridEditorScreen(
 private fun GridEditorTopBar(
     resumeName: String,
     isSaving: Boolean,
+    isApplyingData: Boolean = false,
     onNavigateBack: () -> Unit,
     onSave: () -> Unit,
     onExport: () -> Unit,
     onPreview: () -> Unit,
     onSwitchMode: () -> Unit,
-    onShowTemplates: () -> Unit
+    onShowTemplates: () -> Unit,
+    onApplyTemplateData: () -> Unit = {}
 ) {
     TopAppBar(
         title = {
@@ -278,6 +303,23 @@ private fun GridEditorTopBar(
             }
         },
         actions = {
+            // Apply Template Data (debug only)
+            if (BuildConfig.DEBUG) {
+                IconButton(
+                    onClick = onApplyTemplateData,
+                    enabled = !isApplyingData
+                ) {
+                    if (isApplyingData) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.PersonAdd, contentDescription = "Apply User Data")
+                    }
+                }
+            }
+
             // Switch to form editor
             IconButton(onClick = onSwitchMode) {
                 Icon(Icons.Default.Edit, contentDescription = "Switch to Form Editor")

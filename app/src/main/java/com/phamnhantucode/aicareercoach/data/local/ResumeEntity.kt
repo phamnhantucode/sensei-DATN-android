@@ -75,6 +75,7 @@ class ResumeConverters {
             put("linkedIn", info.linkedIn)
             put("portfolio", info.portfolio)
             put("github", info.github)
+            put("avatar", info.avatar)
         }
     }
 
@@ -86,7 +87,8 @@ class ResumeConverters {
             location = json.getString("location"),
             linkedIn = json.getString("linkedIn"),
             portfolio = json.getString("portfolio"),
-            github = json.getString("github")
+            github = json.getString("github"),
+            avatar = json.optString("avatar", "") // Use optString for backward compatibility
         )
     }
 

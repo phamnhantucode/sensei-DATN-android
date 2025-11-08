@@ -93,6 +93,22 @@ enum class EditorType {
     GRID   // New grid-based editor
 }
 
+/**
+ * User information tags for template mode
+ * Used to mark elements that should be replaced with user data when applying a template
+ */
+enum class UserInfoTag {
+    NONE,       // No tag - regular element
+    NAME,       // Full name
+    EMAIL,      // Email address
+    PHONE,      // Phone number
+    LOCATION,   // Location/address
+    GITHUB,     // GitHub URL
+    LINKEDIN,   // LinkedIn URL
+    WEBSITE,    // Portfolio/website URL
+    AVATAR      // Profile picture
+}
+
 // ============================================================================
 // Resume Element Hierarchy
 // ============================================================================
@@ -106,6 +122,7 @@ sealed class ResumeElement {
     abstract val style: ElementStyle
     abstract val zIndex: Int
     abstract val locked: Boolean
+    abstract val userInfoTag: UserInfoTag?
 
     /**
      * Text element - displays formatted text
@@ -116,6 +133,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val content: String = "",
         val textStyle: TextStyle = TextStyle(),
         val alignment: TextAlignment = TextAlignment.LEFT,
@@ -132,6 +150,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val imageUrl: String = "", // Can be file:// or http://
         val contentScale: ImageScale = ImageScale.FIT,
         val cornerRadius: Float = 0f,
@@ -148,6 +167,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = -1, // Behind by default
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val shapeType: ShapeType = ShapeType.RECTANGLE,
         val cornerRadius: Float = 0f,
         val customHeightDp: Float? = null, // Custom height for dividers (overrides rowSpan)
@@ -163,6 +183,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val chartType: ChartType = ChartType.HORIZONTAL_BAR,
         val data: ChartData = ChartData()
     ) : ResumeElement()
@@ -176,6 +197,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val children: List<String> = emptyList(), // Child element IDs
         val padding: Padding = Padding(),
         val clipContent: Boolean = false
@@ -190,6 +212,7 @@ sealed class ResumeElement {
         override val style: ElementStyle = ElementStyle(),
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
         val iconName: String = "", // Material icon name or emoji
         val iconType: IconType = IconType.MATERIAL
     ) : ResumeElement()

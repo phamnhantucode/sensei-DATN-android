@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,8 +29,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.phamnhantucode.aicareercoach.BuildConfig
 import kotlin.math.roundToInt
 
 /**
@@ -260,6 +264,11 @@ fun DraggableElement(
             LockIndicator()
         }
 
+        // Template tag indicator (debug mode only) - shows when element has a tag
+        if (BuildConfig.DEBUG && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
+            TemplateTagIndicator(tag = element.userInfoTag!!)
+        }
+
         // Properties button (rendered last, on top of everything)
         if (isSelected && !element.locked) {
             PropertiesButton(
@@ -471,6 +480,34 @@ private fun BoxScope.LockIndicator() {
                 contentDescription = "Locked",
                 modifier = Modifier.size(12.dp),
                 tint = Color.White
+            )
+        }
+    }
+}
+
+/**
+ * Template tag indicator (debug mode only)
+ * Shows which user info tag is applied to this element
+ */
+@Composable
+private fun BoxScope.TemplateTagIndicator(tag: UserInfoTag) {
+    Surface(
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(4.dp)
+            .zIndex(100f),
+        color = Color(0xFF9C27B0).copy(alpha = 0.9f), // Purple color for template tags
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = tag.name,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
     }

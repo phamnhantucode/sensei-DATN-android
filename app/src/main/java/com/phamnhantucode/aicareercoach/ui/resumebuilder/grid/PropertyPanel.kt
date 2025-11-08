@@ -24,7 +24,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.rememberAsyncImagePainter
+import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo
+import kotlinx.coroutines.launch
 
 /**
  * Property panel for editing element properties
@@ -39,6 +43,21 @@ fun PropertyPanel(
     onRemoveElement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repository = remember { ResumeRepository.getInstance(context) }
+    var personalInfo by remember { mutableStateOf<PersonalInfo?>(null) }
+
+    // Load personal info when panel opens
+    LaunchedEffect(Unit) {
+        scope.launch {
+            val result = repository.getLatestResume()
+            result.onSuccess { resume ->
+                personalInfo = resume?.personalInfo
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -79,7 +98,8 @@ fun PropertyPanel(
             // Common properties (all elements)
             CommonPropertiesSection(
                 element = element,
-                onUpdateElement = onUpdateElement
+                onUpdateElement = onUpdateElement,
+                personalInfo = personalInfo
             )
 
             Divider()
@@ -173,10 +193,12 @@ fun PropertyPanel(
 /**
  * Common properties section (position, size, z-index, lock)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommonPropertiesSection(
     element: ResumeElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    personalInfo: PersonalInfo?
 ) {
     PropertySection(title = "Position & Size") {
         // Position
@@ -250,6 +272,118 @@ private fun CommonPropertiesSection(
                     onUpdateElement(updateElementLocked(element, locked))
                 }
             )
+        }
+
+        // Template Mode Tag (only for TextElement and ImageElement)
+        if (element is ResumeElement.TextElement || element is ResumeElement.ImageElement) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+            var showTagMenu by remember { mutableStateOf(false) }
+
+            Column {
+                Text(
+                    text = "Template Tag",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = showTagMenu,
+                    onExpandedChange = { showTagMenu = it }
+                ) {
+                    OutlinedTextField(
+                        value = element.userInfoTag?.name ?: "NONE",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("User Info Tag") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTagMenu) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = showTagMenu,
+                        onDismissRequest = { showTagMenu = false }
+                    ) {
+                        UserInfoTag.values().forEach { tag ->
+                            // Filter tags based on element type
+                            val isApplicable = when (element) {
+                                is ResumeElement.ImageElement -> tag == UserInfoTag.AVATAR || tag == UserInfoTag.NONE
+                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR
+                                else -> true
+                            }
+
+                            if (isApplicable) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = tag.name,
+                                            color = if (tag == element.userInfoTag)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        val newTag = if (tag == UserInfoTag.NONE) null else tag
+                                        var updatedElement = updateElementTag(element, newTag)
+
+                                        // Auto-apply user data if personalInfo is available and tag is not NONE
+                                        if (newTag != null && personalInfo != null) {
+                                            updatedElement = when (updatedElement) {
+                                                is ResumeElement.TextElement -> {
+                                                    val content = when (newTag) {
+                                                        UserInfoTag.NAME -> personalInfo.fullName
+                                                        UserInfoTag.EMAIL -> personalInfo.email
+                                                        UserInfoTag.PHONE -> personalInfo.phone
+                                                        UserInfoTag.LOCATION -> personalInfo.location
+                                                        UserInfoTag.GITHUB -> personalInfo.github
+                                                        UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                                                        UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                                        UserInfoTag.AVATAR -> updatedElement.content
+                                                        UserInfoTag.NONE -> updatedElement.content
+                                                    }
+                                                    updatedElement.copy(content = content)
+                                                }
+                                                is ResumeElement.ImageElement -> {
+                                                    if (newTag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
+                                                        updatedElement.copy(imageUrl = personalInfo.avatar)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                else -> updatedElement
+                                            }
+                                        }
+
+                                        onUpdateElement(updatedElement)
+                                        showTagMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
+                    Text(
+                        text = if (personalInfo != null) {
+                            "Template tag applied - content auto-updated with user data"
+                        } else {
+                            "Template tag set - waiting for user data from Resume Builder"
+                        },
+                        fontSize = 12.sp,
+                        color = if (personalInfo != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        },
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -903,5 +1037,16 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.ChartElement -> element.copy(style = newStyle)
         is ResumeElement.ContainerElement -> element.copy(style = newStyle)
         is ResumeElement.IconElement -> element.copy(style = newStyle)
+    }
+}
+
+private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeElement {
+    return when (element) {
+        is ResumeElement.TextElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ImageElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ShapeElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ChartElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ContainerElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.IconElement -> element.copy(userInfoTag = tag)
     }
 }

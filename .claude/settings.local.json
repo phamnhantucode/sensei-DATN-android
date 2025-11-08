@@ -9,7 +9,8 @@
       "Bash(find \"D:\\Workspace\\Android\\AICareerCoach\" -type f ( -name \"*resume*\" -o -name \"*grid*\" -o -name \"*editor*\" ) 2)",
       "Bash(nul)",
       "Bash(find:*)",
-      "WebFetch(domain:clerk.com)"
+      "WebFetch(domain:clerk.com)",
+      "Bash(dir /s \"D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\\com\\phamnhantucode\\aicareercoach\\ui\\resumebuilder\\grid\")"
     ],
     "deny": [],
     "ask": []
