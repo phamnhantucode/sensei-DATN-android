@@ -331,6 +331,13 @@ class GridEditorViewModel(context: Context) : ViewModel() {
     }
 
     /**
+     * Set zoom level directly (for pinch-to-zoom gestures)
+     */
+    fun setZoomLevel(zoom: Float) {
+        _zoomLevel.value = zoom.coerceIn(0.25f, 2f)
+    }
+
+    /**
      * Reset zoom to 100%
      */
     fun resetZoom() {

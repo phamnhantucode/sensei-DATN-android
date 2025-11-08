@@ -87,6 +87,17 @@ fun DraggableElement(
         element.position.rowSpan * cellSizePx
     }
 
+    // For thin elements (like dividers), use a minimum interaction height to make selection easier
+    // Visual rendering stays thin, but the clickable/selectable area is larger
+    val minInteractionHeightPx = 24f * density
+    val interactionHeight = if (element is ResumeElement.ShapeElement &&
+        (element.shapeType == ShapeType.DIVIDER || element.shapeType == ShapeType.LINE) &&
+        height < minInteractionHeightPx) {
+        minInteractionHeightPx
+    } else {
+        height
+    }
+
     Box(
         modifier = Modifier
             .offset {
@@ -97,7 +108,7 @@ fun DraggableElement(
             }
             .size(
                 width = GridUtils.pxToDp(width, density),
-                height = GridUtils.pxToDp(height, density)
+                height = GridUtils.pxToDp(interactionHeight, density)
             )
             .graphicsLayer {
                 // Scale up slightly when dragging for visual feedback
@@ -105,10 +116,16 @@ fun DraggableElement(
                 scaleX = scale
                 scaleY = scale
 
-                // Add shadow/elevation effect
-                shadowElevation = if (isDragging) 8f else if (isSelected) 4f else 0f
+                // Add shadow/elevation effect (but not for dividers/lines)
+                val isDividerOrLine = element is ResumeElement.ShapeElement &&
+                    (element.shapeType == ShapeType.DIVIDER || element.shapeType == ShapeType.LINE)
+                shadowElevation = if (isDividerOrLine) {
+                    0f
+                } else {
+                    if (isDragging) 8f else if (isSelected) 4f else 0f
+                }
             }
-            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, height) {
+            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, interactionHeight) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
 
@@ -480,8 +497,19 @@ fun DragGhost(
 
     val x = position.col * cellSizePx
     val y = position.row * cellSizePx
-    val width = position.colSpan * cellSizePx
-    val height = position.rowSpan * cellSizePx
+
+    // Calculate width and height, respecting custom dimensions for ShapeElements
+    val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
+        element.customWidthDp * density * zoomLevel
+    } else {
+        position.colSpan * cellSizePx
+    }
+
+    val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
+        element.customHeightDp * density * zoomLevel
+    } else {
+        position.rowSpan * cellSizePx
+    }
 
     Box(
         modifier = Modifier

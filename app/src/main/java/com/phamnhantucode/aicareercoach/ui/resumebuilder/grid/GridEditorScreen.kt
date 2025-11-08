@@ -1,6 +1,11 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,13 +17,19 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Main grid-based resume editor screen
@@ -110,7 +121,8 @@ fun GridEditorScreen(
                         }
                         viewModel.updateElement(updatedElement)
                     },
-                    onOpenProperties = { showPropertyPanel = true }
+                    onOpenProperties = { showPropertyPanel = true },
+                    onZoomChange = { viewModel.setZoomLevel(it) }
                 )
 
                 // Floating action button to add elements
@@ -372,7 +384,8 @@ private fun GridCanvas(
     onDrag: (ResumeElement, GridPosition) -> Unit,
     onDragEnd: (ResumeElement, GridPosition) -> Unit,
     onResize: (ResumeElement, GridPosition) -> Unit,
-    onOpenProperties: () -> Unit
+    onOpenProperties: () -> Unit,
+    onZoomChange: (Float) -> Unit
 ) {
     val density = LocalDensity.current.density
     val cellSizePx = gridResume.gridConfig.cellSizeDp * density
@@ -383,11 +396,49 @@ private fun GridCanvas(
 
     val scrollStateVertical = rememberScrollState()
     val scrollStateHorizontal = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Track zoom level for pinch-to-zoom gesture
+    var currentZoom by remember { mutableFloatStateOf(zoomLevel) }
+
+    // Update currentZoom when zoomLevel changes externally (from buttons)
+    LaunchedEffect(zoomLevel) {
+        currentZoom = zoomLevel
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    // Wait for first pointer down
+                    val firstDown = awaitFirstDown(requireUnconsumed = false)
+
+                    // Track if we're in a zoom gesture
+                    var isZooming = false
+
+                    do {
+                        val event = awaitPointerEvent()
+                        val pointerCount = event.changes.size
+
+                        // Only handle zoom if we have 2+ fingers
+                        if (pointerCount >= 2) {
+                            val zoom = event.calculateZoom()
+                            if (zoom != 1f) {
+                                isZooming = true
+                                currentZoom = (currentZoom * zoom).coerceIn(0.25f, 2f)
+                                onZoomChange(currentZoom)
+                                // Consume the event so scroll doesn't interfere
+                                event.changes.forEach { it.consume() }
+                            }
+                        } else if (pointerCount == 1 && !isZooming) {
+                            // Single finger and not zooming - let it pass through for element interaction
+                            // Don't consume
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
             .verticalScroll(scrollStateVertical)
             .horizontalScroll(scrollStateHorizontal),
         contentAlignment = Alignment.Center
@@ -401,6 +452,13 @@ private fun GridCanvas(
                 )
                 .background(Color.White)
                 .padding(0.dp)
+                .pointerInput(Unit) {
+                    // Tap outside to deselect
+                    detectTapGestures {
+                        // Tapped on background, deselect current element
+                        onElementDeselect()
+                    }
+                }
         ) {
             // Grid background
             GridBackground(
@@ -446,10 +504,26 @@ private fun GridCanvas(
                                 )
                             }
                             is ResumeElement.ShapeElement -> {
-                                // TODO: Implement ShapeElementRenderer
+                                // For dividers/lines with custom height, render at exact height
+                                // (container may be taller for interaction, but visual stays thin)
+                                val isDividerOrLine = element.shapeType == ShapeType.DIVIDER ||
+                                                     element.shapeType == ShapeType.LINE
+                                val visualHeight = if (isDividerOrLine && element.customHeightDp != null) {
+                                    element.customHeightDp.dp
+                                } else {
+                                    null // Use container height
+                                }
+
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxSize()
+                                        .fillMaxWidth()
+                                        .then(
+                                            if (visualHeight != null) {
+                                                Modifier.height(visualHeight).align(Alignment.CenterStart)
+                                            } else {
+                                                Modifier.fillMaxHeight()
+                                            }
+                                        )
                                         .background(Color(element.style.backgroundColor ?: 0xFF000000))
                                 )
                             }
