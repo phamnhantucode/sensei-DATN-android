@@ -28,6 +28,7 @@ fun PropertyPanel(
     element: ResumeElement,
     onUpdateElement: (ResumeElement) -> Unit,
     onClose: () -> Unit,
+    onRemoveElement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -113,6 +114,50 @@ fun PropertyPanel(
                 element = element,
                 onUpdateElement = onUpdateElement
             )
+
+            Divider()
+
+            // Remove element button
+            var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+            Button(
+                onClick = { showDeleteConfirmation = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Remove Element")
+            }
+
+            // Delete confirmation dialog
+            if (showDeleteConfirmation) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmation = false },
+                    title = { Text("Remove Element?") },
+                    text = { Text("Are you sure you want to remove this element? This action cannot be undone.") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showDeleteConfirmation = false
+                                onRemoveElement()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Remove")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirmation = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }

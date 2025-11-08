@@ -128,6 +128,8 @@ fun DraggableElement(
             .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, interactionHeight) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
+                    // Consume down event immediately to prevent parent from also handling it
+                    down.consume()
 
                     // Check if touch is on a resize handle (only for selected, unlocked elements)
                     if (isSelected && !element.locked) {
@@ -135,8 +137,8 @@ fun DraggableElement(
                         val touchX = down.position.x
                         val touchY = down.position.y
 
-                        if (isTouchOnResizeHandle(touchX, touchY, width, height, handleHitSize)) {
-                            // Touch is on a resize handle - don't consume, let resize handle process it
+                        if (isTouchOnResizeHandle(touchX, touchY, width, interactionHeight, handleHitSize)) {
+                            // Touch is on a resize handle - let resize handle process it
                             return@awaitEachGesture
                         }
                     }

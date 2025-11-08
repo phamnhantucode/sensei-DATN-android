@@ -3,6 +3,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -147,7 +149,11 @@ fun GridEditorScreen(
                     PropertyPanel(
                         element = selectedElement!!,
                         onUpdateElement = { viewModel.updateElement(it) },
-                        onClose = { showPropertyPanel = false }
+                        onClose = { showPropertyPanel = false },
+                        onRemoveElement = {
+                            viewModel.removeElement(selectedElement!!.id)
+                            showPropertyPanel = false
+                        }
                     )
                 }
             }
@@ -453,10 +459,14 @@ private fun GridCanvas(
                 .background(Color.White)
                 .padding(0.dp)
                 .pointerInput(Unit) {
-                    // Tap outside to deselect
-                    detectTapGestures {
-                        // Tapped on background, deselect current element
-                        onElementDeselect()
+                    // Tap outside to deselect - only respond to unconsumed taps
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = true)
+                        val up = waitForUpOrCancellation()
+                        if (up != null && !up.isConsumed) {
+                            // This was a tap on the background (not consumed by child elements)
+                            onElementDeselect()
+                        }
                     }
                 }
         ) {
@@ -504,27 +514,8 @@ private fun GridCanvas(
                                 )
                             }
                             is ResumeElement.ShapeElement -> {
-                                // For dividers/lines with custom height, render at exact height
-                                // (container may be taller for interaction, but visual stays thin)
-                                val isDividerOrLine = element.shapeType == ShapeType.DIVIDER ||
-                                                     element.shapeType == ShapeType.LINE
-                                val visualHeight = if (isDividerOrLine && element.customHeightDp != null) {
-                                    element.customHeightDp.dp
-                                } else {
-                                    null // Use container height
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .then(
-                                            if (visualHeight != null) {
-                                                Modifier.height(visualHeight).align(Alignment.CenterStart)
-                                            } else {
-                                                Modifier.fillMaxHeight()
-                                            }
-                                        )
-                                        .background(Color(element.style.backgroundColor ?: 0xFF000000))
+                                ShapeElementRenderer(
+                                    element = element
                                 )
                             }
                             else -> {

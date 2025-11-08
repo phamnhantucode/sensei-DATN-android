@@ -3,6 +3,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +38,12 @@ fun ShapeElementRenderer(
                     ShapeType.LINE, ShapeType.DIVIDER -> {
                         // Lines and dividers should only fill width
                         Modifier.fillMaxWidth()
+                    }
+                    ShapeType.CIRCLE -> {
+                        // Circles should maintain 1:1 aspect ratio
+                        // Use the smaller dimension to ensure a perfect circle
+                        Modifier.fillMaxSize()
+                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
                     }
                     else -> {
                         // Other shapes fill the entire space
