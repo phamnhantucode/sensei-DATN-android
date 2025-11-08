@@ -52,8 +52,8 @@ data class ResumePage(
 
 /**
  * Grid configuration
- * @param columns Number of columns (default: 12)
- * @param rows Number of rows (default: 16)
+ * @param columns Number of columns (default: 48)
+ * @param rows Number of rows (default: 68 to match A4 aspect ratio √2)
  * @param cellSizeDp Size of each cell in DP
  * @param showGrid Whether to show grid lines
  * @param snapToGrid Whether to snap elements to grid
@@ -61,7 +61,7 @@ data class ResumePage(
  */
 data class GridConfig(
     val columns: Int = 48,
-    val rows: Int = 64,
+    val rows: Int = 68,  // 48 × √2 ≈ 67.9, rounded to 68 for A4 aspect ratio
     val cellSizeDp: Float = 12f,
     val showGrid: Boolean = true,
     val snapToGrid: Boolean = true,
@@ -119,6 +119,7 @@ sealed class ResumeElement {
         val content: String = "",
         val textStyle: TextStyle = TextStyle(),
         val alignment: TextAlignment = TextAlignment.LEFT,
+        val verticalAlignment: VerticalTextAlignment? = VerticalTextAlignment.CENTER,
         val maxLines: Int? = null
     ) : ResumeElement()
 
@@ -134,6 +135,7 @@ sealed class ResumeElement {
         val imageUrl: String = "", // Can be file:// or http://
         val contentScale: ImageScale = ImageScale.FIT,
         val cornerRadius: Float = 0f,
+        val isCircle: Boolean = false, // If true, crops image to circle
         val description: String = "" // Alt text
     ) : ResumeElement()
 
@@ -277,6 +279,12 @@ enum class TextAlignment {
     CENTER,
     RIGHT,
     JUSTIFY
+}
+
+enum class VerticalTextAlignment {
+    TOP,
+    CENTER,
+    BOTTOM
 }
 
 enum class ImageScale {

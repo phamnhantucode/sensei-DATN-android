@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidPdfGenerator
@@ -19,10 +21,16 @@ import java.util.*
 /**
  * ViewModel for the grid-based resume editor
  */
-class GridEditorViewModel(context: Context) : ViewModel() {
+class GridEditorViewModel(private val context: Context) : ViewModel() {
 
     private val repository = ResumeRepository.getInstance(context)
     private val pdfExporter = AndroidPdfGenerator(context)
+    private val sharedPreferences = context.getSharedPreferences("grid_resume_prefs", Context.MODE_PRIVATE)
+
+    // Configure Gson with custom type adapter for sealed classes
+    private val gson = GsonBuilder()
+        .registerTypeAdapter(ResumeElement::class.java, ResumeElementTypeAdapter())
+        .create()
 
     // Main state
     private val _gridResume = MutableStateFlow(GridResume())
@@ -47,7 +55,7 @@ class GridEditorViewModel(context: Context) : ViewModel() {
     private val _pdfExportState = MutableStateFlow<PdfExportState>(PdfExportState.Idle)
     val pdfExportState: StateFlow<PdfExportState> = _pdfExportState.asStateFlow()
 
-    // Zoom state
+    // Zoom state - will be calculated dynamically based on screen size
     private val _zoomLevel = MutableStateFlow(1f)
     val zoomLevel: StateFlow<Float> = _zoomLevel.asStateFlow()
 
@@ -80,18 +88,34 @@ class GridEditorViewModel(context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
-                // Try to load latest resume
-                val result = repository.getLatestResume()
-                val formResume = result.getOrNull()
+                // First, try to load the GridResume from SharedPreferences
+                val savedGridResumeJson = sharedPreferences.getString("latest_grid_resume", null)
 
-                if (formResume != null) {
-                    // Convert form resume to grid resume
-                    _gridResume.value = formResume.toGridResume()
+                if (savedGridResumeJson != null) {
+                    // Load from SharedPreferences
+                    try {
+                        val savedGridResume = gson.fromJson(savedGridResumeJson, GridResume::class.java)
+                        _gridResume.value = savedGridResume
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        // If parsing fails, fall back to creating default
+                        _gridResume.value = createDefaultResume()
+                    }
                 } else {
-                    // Create new resume with default template
-                    _gridResume.value = createDefaultResume()
+                    // No saved GridResume, try to load from form resume
+                    val result = repository.getLatestResume()
+                    val formResume = result.getOrNull()
+
+                    if (formResume != null) {
+                        // Convert form resume to grid resume
+                        _gridResume.value = formResume.toGridResume()
+                    } else {
+                        // Create new resume with default template
+                        _gridResume.value = createDefaultResume()
+                    }
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 _gridResume.value = createDefaultResume()
             } finally {
                 _isLoading.value = false
@@ -124,11 +148,13 @@ class GridEditorViewModel(context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _isSaving.value = true
             try {
-                // For now, we'll save a simplified version
-                // In a real implementation, you'd save the GridResume to a separate table
-                // or convert it back to form Resume
+                // Save GridResume directly to SharedPreferences as JSON
+                val gridResumeJson = gson.toJson(_gridResume.value)
+                sharedPreferences.edit()
+                    .putString("latest_grid_resume", gridResumeJson)
+                    .apply()
 
-                // Convert to form resume for compatibility
+                // Also convert to form resume for compatibility with other parts of the app
                 val formResume = _gridResume.value.toFormResume()
                 val result = repository.saveResume(formResume, syncToRemote = true)
 
@@ -138,6 +164,7 @@ class GridEditorViewModel(context: Context) : ViewModel() {
                     _events.emit(GridEditorEvent.SaveError("Failed to save resume"))
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 _events.emit(GridEditorEvent.SaveError("Error: ${e.message}"))
             } finally {
                 _isSaving.value = false
@@ -233,7 +260,11 @@ class GridEditorViewModel(context: Context) : ViewModel() {
      * Selects an element
      */
     fun selectElement(element: ResumeElement) {
-        _selectedElement.value = element
+        // Always fetch the latest version of the element from the page
+        // to ensure we have the most up-to-date properties
+        val currentPage = _gridResume.value.pages.firstOrNull()
+        val latestElement = currentPage?.elements?.find { it.id == element.id } ?: element
+        _selectedElement.value = latestElement
     }
 
     /**
@@ -251,10 +282,14 @@ class GridEditorViewModel(context: Context) : ViewModel() {
      * Starts dragging an element
      */
     fun startDrag(element: ResumeElement) {
+        // Get the latest version of the element from the page to ensure we have all recent changes
+        val currentPage = _gridResume.value.pages.firstOrNull()
+        val latestElement = currentPage?.elements?.find { it.id == element.id } ?: element
+
         _draggedElement.value = DragState(
-            element = element,
-            originalPosition = element.position,
-            currentPosition = element.position,
+            element = latestElement,
+            originalPosition = latestElement.position,
+            currentPosition = latestElement.position,
             isValidPosition = true
         )
     }
@@ -292,16 +327,24 @@ class GridEditorViewModel(context: Context) : ViewModel() {
         if (clampedPosition != dragState.originalPosition) {
             saveToUndoStack()
 
-            // Update element position
-            val updatedElement = updateElementPositionValue(dragState.element, clampedPosition)
             val currentPage = _gridResume.value.pages.firstOrNull() ?: return
 
-            val updatedPage = currentPage.updateElement(updatedElement.id) { updatedElement }
-            updatePage(updatedPage)
+            // IMPORTANT: Get the latest element from the page, not from dragState
+            // This ensures we preserve any property changes made during the drag
+            val latestElementFromPage = currentPage.elements.find { it.id == dragState.element.id }
 
-            // Update selection
-            if (_selectedElement.value?.id == updatedElement.id) {
-                _selectedElement.value = updatedElement
+            if (latestElementFromPage != null) {
+                // Update only the position, preserving all other properties
+                val updatedElement = updateElementPositionValue(latestElementFromPage, clampedPosition)
+
+                val updatedPage = currentPage.updateElement(updatedElement.id) { updatedElement }
+                updatePage(updatedPage)
+
+                // Update selection - fetch the latest version from the updated page
+                if (_selectedElement.value?.id == updatedElement.id) {
+                    val finalElement = updatedPage.elements.find { it.id == updatedElement.id }
+                    _selectedElement.value = finalElement
+                }
             }
 
             triggerAutoSave()

@@ -60,13 +60,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.LocalDate
@@ -133,6 +137,7 @@ private fun IndustryInsightsLayout(
                             .padding(16.dp)
                     ) {
                         HeaderSection(
+                            userProfileImageUrl = uiState.userProfileImageUrl,
                             onNavigateToResumeBuilder = onNavigateToResumeBuilder,
                             onNavigateToInterviewPrep = onNavigateToInterviewPrep,
                             onNavigateToCoverLetter = onNavigateToCoverLetter,
@@ -187,6 +192,7 @@ private fun IndustryInsightsLayout(
 
 @Composable
 private fun HeaderSection(
+    userProfileImageUrl: String?,
     onNavigateToResumeBuilder: () -> Unit,
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
@@ -225,21 +231,38 @@ private fun HeaderSection(
                         .clickable { onNavigateToAccountSettings() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Surface(
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                    if (!userProfileImageUrl.isNullOrBlank()) {
+                        // Show user's actual profile image
+                        val context = LocalContext.current
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(userProfileImageUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "User avatar",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Fallback to placeholder icon
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = "User avatar",
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = "User avatar",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }

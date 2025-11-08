@@ -3,6 +3,7 @@ package com.phamnhantucode.aicareercoach.ui.industryinsights
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository.IndustryInsightRecord
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository.IndustryInsightLoadResult
@@ -15,6 +16,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -24,6 +27,7 @@ data class IndustryInsightsUiState(
     val insights: List<IndustryInsightUiModel> = emptyList(),
     val selectedIndustryId: String? = null,
     val errorMessage: String? = null,
+    val userProfileImageUrl: String? = null,
 ) {
     val selectedInsight: IndustryInsightUiModel?
         get() = selectedIndustryId?.let { id ->
@@ -41,6 +45,13 @@ class IndustryInsightsViewModel(
     private var loadJob: Job? = null
 
     init {
+        // Subscribe to Clerk user changes to update profile image
+        Clerk.userFlow.onEach { user ->
+            _uiState.update { state ->
+                state.copy(userProfileImageUrl = user?.imageUrl)
+            }
+        }.launchIn(viewModelScope)
+
         refreshInsights()
     }
 

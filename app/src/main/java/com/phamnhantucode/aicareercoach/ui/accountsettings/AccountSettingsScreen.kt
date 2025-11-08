@@ -77,6 +77,10 @@ fun AccountSettingsScreen(
         onBack = onBack,
         onSignOut = viewModel::signOut,
         onThemeModeChange = viewModel::setThemeMode,
+        onEditProfile = viewModel::openEditProfileDialog,
+        onEditProfileFormDataChange = viewModel::updateEditProfileFormData,
+        onSaveProfile = viewModel::saveProfileChanges,
+        onCancelEditProfile = viewModel::cancelEditProfile,
         modifier = modifier
     )
 }
@@ -88,6 +92,10 @@ private fun AccountSettingsContent(
     onBack: () -> Unit,
     onSignOut: () -> Unit,
     onThemeModeChange: (com.phamnhantucode.aicareercoach.data.preferences.ThemeMode) -> Unit,
+    onEditProfile: () -> Unit,
+    onEditProfileFormDataChange: (EditProfileFormData) -> Unit,
+    onSaveProfile: () -> Unit,
+    onCancelEditProfile: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -133,7 +141,10 @@ private fun AccountSettingsContent(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    ProfileSection(uiState)
+                    ProfileSection(
+                        uiState = uiState,
+                        onEditProfile = onEditProfile
+                    )
                     ConnectedAccountsSection(uiState.connectedAccounts)
                     AppSettingsSection(
                         isSigningOut = uiState.isSigningOut,
@@ -141,6 +152,16 @@ private fun AccountSettingsContent(
                         themeMode = uiState.themeMode,
                         onSignOut = onSignOut,
                         onThemeModeChange = onThemeModeChange
+                    )
+                }
+
+                // Edit Profile Bottom Sheet
+                if (uiState.editProfileState.isOpen) {
+                    EditProfileBottomSheet(
+                        editState = uiState.editProfileState,
+                        onDismiss = onCancelEditProfile,
+                        onFormDataChange = onEditProfileFormDataChange,
+                        onSave = onSaveProfile
                     )
                 }
             }
@@ -181,7 +202,10 @@ private fun AccountSettingsSignedOutState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ProfileSection(uiState: AccountSettingsUiState) {
+private fun ProfileSection(
+    uiState: AccountSettingsUiState,
+    onEditProfile: () -> Unit
+) {
     val context = LocalContext.current
     val displayName = uiState.fullName?.takeUnless { it.isBlank() } ?: "Signed-in user"
     val email = uiState.primaryEmail ?: "Email not available"
@@ -192,52 +216,70 @@ private fun ProfileSection(uiState: AccountSettingsUiState) {
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            if (!uiState.profileImageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(uiState.profileImageUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Profile image",
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "User avatar",
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!uiState.profileImageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(uiState.profileImageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Profile image",
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "User avatar",
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Edit Profile Button
+            Button(
+                onClick = onEditProfile,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                Text(
-                    text = email,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            ) {
+                Text("Edit Profile")
             }
         }
     }
@@ -515,7 +557,11 @@ private fun AccountSettingsScreenPreview() {
             ),
             onBack = {},
             onSignOut = {},
-            onThemeModeChange = {}
+            onThemeModeChange = {},
+            onEditProfile = {},
+            onEditProfileFormDataChange = {},
+            onSaveProfile = {},
+            onCancelEditProfile = {}
         )
     }
 }

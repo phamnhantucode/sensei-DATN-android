@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextAlignment
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.VerticalTextAlignment
 
 /**
  * Renders a text element on the resume
@@ -71,7 +73,8 @@ fun TextElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding(8.dp),
+        contentAlignment = (element.verticalAlignment ?: VerticalTextAlignment.CENTER).toAlignment()
     ) {
         if (isEditing) {
             EditableText(
@@ -173,5 +176,16 @@ private fun TextAlignment.toTextAlign(): TextAlign {
         TextAlignment.CENTER -> TextAlign.Center
         TextAlignment.RIGHT -> TextAlign.Right
         TextAlignment.JUSTIFY -> TextAlign.Justify
+    }
+}
+
+/**
+ * Converts VerticalTextAlignment to Compose Alignment
+ */
+private fun VerticalTextAlignment.toAlignment(): Alignment {
+    return when (this) {
+        VerticalTextAlignment.TOP -> Alignment.TopStart
+        VerticalTextAlignment.CENTER -> Alignment.CenterStart
+        VerticalTextAlignment.BOTTOM -> Alignment.BottomStart
     }
 }

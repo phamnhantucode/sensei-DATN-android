@@ -3,6 +3,8 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
@@ -16,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -34,14 +37,29 @@ fun ImageElementRenderer(
     val backgroundColor = element.style.backgroundColor?.let { Color(it) }
     val borderColor = element.style.borderColor?.let { Color(it) }
 
+    // Determine shape based on isCircle flag
+    val shape: Shape = if (element.isCircle) {
+        CircleShape
+    } else {
+        RoundedCornerShape(element.cornerRadius.dp.coerceAtLeast(element.style.borderRadius.dp))
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .then(
+                // For circles, ensure 1:1 aspect ratio
+                if (element.isCircle) {
+                    Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true)
+                } else {
+                    Modifier
+                }
+            )
+            .then(
                 if (backgroundColor != null) {
                     Modifier.background(
                         color = backgroundColor,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
+                        shape = shape
                     )
                 } else {
                     Modifier
@@ -52,7 +70,7 @@ fun ImageElementRenderer(
                     Modifier.border(
                         width = element.style.borderWidth.dp,
                         color = borderColor,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
+                        shape = shape
                     )
                 } else {
                     Modifier
@@ -62,7 +80,7 @@ fun ImageElementRenderer(
                 if (element.style.shadowBlur > 0) {
                     Modifier.shadow(
                         elevation = element.style.shadowBlur.dp,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
+                        shape = shape
                     )
                 } else {
                     Modifier
@@ -77,7 +95,7 @@ fun ImageElementRenderer(
                 contentScale = element.contentScale.toContentScale(),
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(element.cornerRadius.dp)),
+                    .clip(shape),
                 loading = {
                     // Loading placeholder
                     Box(

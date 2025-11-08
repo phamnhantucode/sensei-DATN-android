@@ -1,5 +1,11 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,9 +20,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 
 /**
  * Property panel for editing element properties
@@ -326,18 +334,36 @@ private fun TextElementProperties(
             }
         }
 
-        // Text alignment
-        Row(
+        // Horizontal text alignment
+        Text("Horizontal Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            TextAlignment.values().forEach { alignment ->
+            TextAlignment.entries.forEach { alignment ->
                 FilterChip(
                     selected = element.alignment == alignment,
                     onClick = {
                         onUpdateElement(element.copy(alignment = alignment))
                     },
                     label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Vertical text alignment
+        Text("Vertical Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            VerticalTextAlignment.entries.forEach { vAlignment ->
+                FilterChip(
+                    selected = (element.verticalAlignment ?: VerticalTextAlignment.CENTER) == vAlignment,
+                    onClick = {
+                        onUpdateElement(element.copy(verticalAlignment = vAlignment))
+                    },
+                    label = { Text(vAlignment.name) }
                 )
             }
         }
@@ -366,30 +392,149 @@ private fun TextElementProperties(
 }
 
 /**
- * Image element properties (placeholder)
+ * Image element properties
  */
 @Composable
 private fun ImageElementProperties(
     element: ResumeElement.ImageElement,
     onUpdateElement: (ResumeElement) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Grant persistent URI permission
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // Permission already granted or not needed
+            }
+
+            // Update element with selected image URI
+            onUpdateElement(element.copy(imageUrl = it.toString()))
+        }
+    }
+
     PropertySection(title = "Image") {
+        // Image preview
+        if (element.imageUrl.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(Color.LightGray, MaterialTheme.shapes.medium)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.medium),
+                contentAlignment = Alignment.Center
+            ) {
+                // Try to load and display the image
+                val uri = try {
+                    Uri.parse(element.imageUrl)
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (uri != null) {
+                    androidx.compose.foundation.Image(
+                        painter = rememberAsyncImagePainter(uri),
+                        contentDescription = "Selected image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text("Invalid image", color = Color.Gray)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
+
         OutlinedTextField(
             value = element.imageUrl,
             onValueChange = { newUrl ->
                 onUpdateElement(element.copy(imageUrl = newUrl))
             },
             label = { Text("Image URL or Path") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
         )
 
         Button(
-            onClick = { /* TODO: Image picker */ },
+            onClick = {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Default.Image, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text("Choose Image")
+        }
+
+        // Circle crop toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Circle Crop")
+            Switch(
+                checked = element.isCircle,
+                onCheckedChange = { isCircle ->
+                    onUpdateElement(element.copy(isCircle = isCircle))
+                }
+            )
+        }
+
+        // Corner radius (only show if not circle)
+        if (!element.isCircle) {
+            SliderField(
+                label = "Corner Radius: ${element.cornerRadius.toInt()}dp",
+                value = element.cornerRadius,
+                valueRange = 0f..50f,
+                onValueChange = { newRadius ->
+                    onUpdateElement(element.copy(cornerRadius = newRadius))
+                }
+            )
+        }
+
+        // Content scale
+        var showScaleMenu by remember { mutableStateOf(false) }
+        @OptIn(ExperimentalMaterial3Api::class)
+        ExposedDropdownMenuBox(
+            expanded = showScaleMenu,
+            onExpandedChange = { showScaleMenu = it }
+        ) {
+            OutlinedTextField(
+                value = element.contentScale.name,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Content Scale") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showScaleMenu) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = showScaleMenu,
+                onDismissRequest = { showScaleMenu = false }
+            ) {
+                ImageScale.values().forEach { scale ->
+                    DropdownMenuItem(
+                        text = { Text(scale.name) },
+                        onClick = {
+                            onUpdateElement(element.copy(contentScale = scale))
+                            showScaleMenu = false
+                        }
+                    )
+                }
+            }
         }
     }
 }

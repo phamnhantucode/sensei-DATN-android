@@ -27,7 +27,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +47,8 @@ fun GridEditorScreen(
     viewModel: GridEditorViewModel = viewModel()
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val density = LocalDensity.current.density
+    val configuration = LocalConfiguration.current
     val gridResume by viewModel.gridResume.collectAsState()
     val selectedElement by viewModel.selectedElement.collectAsState()
     val draggedElement by viewModel.draggedElement.collectAsState()
@@ -56,6 +60,27 @@ fun GridEditorScreen(
     var showTemplateDialog by remember { mutableStateOf(false) }
     var showElementPicker by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+
+    // Calculate and set optimal default zoom on first composition
+    LaunchedEffect(Unit) {
+        val cellSizePx = gridResume.gridConfig.cellSizeDp * density
+        val screenWidthPx = configuration.screenWidthDp * density
+        val screenHeightPx = configuration.screenHeightDp * density
+
+        // Reserve space for top bar (~64dp), bottom bar (~56dp), and some padding
+        val availableHeightPx = screenHeightPx - (120 * density)
+        val availableWidthPx = screenWidthPx
+
+        val optimalZoom = GridUtils.calculateOptimalZoom(
+            gridConfig = gridResume.gridConfig,
+            availableWidthPx = availableWidthPx,
+            availableHeightPx = availableHeightPx,
+            cellSizePx = cellSizePx,
+            padding = 0.85f // 85% of viewport for some breathing room
+        )
+
+        viewModel.setZoomLevel(optimalZoom)
+    }
 
     Scaffold(
         topBar = {
@@ -113,6 +138,7 @@ fun GridEditorScreen(
                         val clampedPosition = GridUtils.clampPosition(newPosition, gridResume.gridConfig)
 
                         // Update element with new position (size)
+                        // IMPORTANT: Use copy() which preserves all properties including shapeType, isCircle, etc.
                         val updatedElement = when (element) {
                             is ResumeElement.TextElement -> element.copy(position = clampedPosition)
                             is ResumeElement.ImageElement -> element.copy(position = clampedPosition)
@@ -149,7 +175,10 @@ fun GridEditorScreen(
                     PropertyPanel(
                         element = selectedElement!!,
                         onUpdateElement = { viewModel.updateElement(it) },
-                        onClose = { showPropertyPanel = false },
+                        onClose = {
+                            showPropertyPanel = false
+                            viewModel.deselectElement()
+                        },
                         onRemoveElement = {
                             viewModel.removeElement(selectedElement!!.id)
                             showPropertyPanel = false
@@ -506,11 +535,8 @@ private fun GridCanvas(
                                 )
                             }
                             is ResumeElement.ImageElement -> {
-                                // TODO: Implement ImageElementRenderer
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.LightGray)
+                                ImageElementRenderer(
+                                    element = element
                                 )
                             }
                             is ResumeElement.ShapeElement -> {

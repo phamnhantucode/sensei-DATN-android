@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -147,50 +148,59 @@ fun DraggableElement(
                     var dragStartCalled = false
 
                     // Try to detect drag
-                    val dragResult = drag(down.id) { change ->
-                        if (!hasDragged) {
-                            hasDragged = true
-                            if (!dragStartCalled) {
-                                onDragStart(element)
-                                dragStartCalled = true
+                    if (!element.locked) {
+                        // Element is unlocked - allow dragging
+                        drag(down.id) { change ->
+                            if (!hasDragged) {
+                                hasDragged = true
+                                if (!dragStartCalled) {
+                                    onDragStart(element)
+                                    dragStartCalled = true
+                                }
                             }
+
+                            val dragAmount = change.positionChange()
+                            change.consume()
+
+                            offsetX += dragAmount.x
+                            offsetY += dragAmount.y
+
+                            // Calculate grid bounds in pixels
+                            val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
+                            val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
+
+                            // Clamp offsets to keep element within bounds
+                            val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
+                            val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
+
+                            // Update offsets to clamped values
+                            offsetX = clampedX - baseX
+                            offsetY = clampedY - baseY
+
+                            // Calculate current grid position with snap
+                            val (newRow, newCol) = GridUtils.offsetToGridPosition(
+                                offsetX = clampedX,
+                                offsetY = clampedY,
+                                cellSizePx = cellSizePx,
+                                snapEnabled = gridConfig.snapToGrid,
+                                threshold = gridConfig.snapThreshold
+                            )
+
+                            currentDragPosition = GridPosition(
+                                row = newRow,
+                                col = newCol,
+                                rowSpan = element.position.rowSpan,
+                                colSpan = element.position.colSpan
+                            )
+
+                            onDrag(element, currentDragPosition)
                         }
-
-                        val dragAmount = change.positionChange()
-                        change.consume()
-
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-
-                        // Calculate grid bounds in pixels
-                        val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
-                        val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
-
-                        // Clamp offsets to keep element within bounds
-                        val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
-                        val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
-
-                        // Update offsets to clamped values
-                        offsetX = clampedX - baseX
-                        offsetY = clampedY - baseY
-
-                        // Calculate current grid position with snap
-                        val (newRow, newCol) = GridUtils.offsetToGridPosition(
-                            offsetX = clampedX,
-                            offsetY = clampedY,
-                            cellSizePx = cellSizePx,
-                            snapEnabled = gridConfig.snapToGrid,
-                            threshold = gridConfig.snapThreshold
-                        )
-
-                        currentDragPosition = GridPosition(
-                            row = newRow,
-                            col = newCol,
-                            rowSpan = element.position.rowSpan,
-                            colSpan = element.position.colSpan
-                        )
-
-                        onDrag(element, currentDragPosition)
+                    } else {
+                        // Element is locked - consume the drag gesture without allowing movement
+                        drag(down.id) { change ->
+                            // Consume the gesture but don't update position
+                            change.consume()
+                        }
                     }
 
                     // Handle end of gesture
@@ -231,7 +241,10 @@ fun DraggableElement(
                 }
             }
     ) {
-        // Selection border
+        // Content (rendered first, at the bottom)
+        content()
+
+        // Selection border (rendered second, above content)
         if (isSelected) {
             SelectionBorder(
                 element = element,
@@ -242,20 +255,17 @@ fun DraggableElement(
             )
         }
 
-        // Lock indicator
-        if (element.locked) {
+        // Lock indicator (rendered third, above selection border) - only when selected
+        if (isSelected && element.locked) {
             LockIndicator()
         }
 
-        // Properties button (floating near selected element)
+        // Properties button (rendered last, on top of everything)
         if (isSelected && !element.locked) {
             PropertiesButton(
                 onOpenProperties = { onOpenProperties(element) }
             )
         }
-
-        // Content
-        content()
     }
 }
 
@@ -328,12 +338,16 @@ private fun BoxScope.ResizeHandles(
         // Use captured gesture start position, fallback to current if not set
         val basePosition = gestureStartPosition ?: currentPosition.value
 
+        // Check if we should enforce 1:1 aspect ratio (for circle shapes)
+        val enforceSquare = element is ResumeElement.ShapeElement && element.shapeType == ShapeType.CIRCLE
+
         val newPosition = calculateResizedPosition(
             originalPosition = basePosition,
             handle = handle,
             deltaX = accumulatedDeltaX,
             deltaY = accumulatedDeltaY,
-            cellSizePx = cellSizePx
+            cellSizePx = cellSizePx,
+            enforceSquare = enforceSquare
         )
         onResize(element, newPosition)
     }
@@ -443,16 +457,21 @@ private fun BoxScope.LockIndicator() {
         modifier = Modifier
             .align(Alignment.TopEnd)
             .padding(4.dp)
-            .size(20.dp),
+            .size(20.dp)
+            .zIndex(100f), // High z-index to appear above everything including shapes
         color = Color.Gray.copy(alpha = 0.8f),
         shape = RoundedCornerShape(4.dp)
     ) {
-        // Lock icon would go here
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            // Simple lock representation
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "Locked",
+                modifier = Modifier.size(12.dp),
+                tint = Color.White
+            )
         }
     }
 }
@@ -608,15 +627,24 @@ fun calculateResizedPosition(
     handle: ResizeHandle,
     deltaX: Float,
     deltaY: Float,
-    cellSizePx: Float
+    cellSizePx: Float,
+    enforceSquare: Boolean = false
 ): GridPosition {
     val deltaCol = (deltaX / cellSizePx).roundToInt()
     val deltaRow = (deltaY / cellSizePx).roundToInt()
 
     val newPosition = when (handle) {
         ResizeHandle.TOP_LEFT -> {
-            val newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
-            val newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+            var newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
+            var newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+
+            // Enforce 1:1 aspect ratio for squares/circles
+            if (enforceSquare) {
+                val minSpan = minOf(newRowSpan, newColSpan)
+                newRowSpan = minSpan
+                newColSpan = minSpan
+            }
+
             val newRow = originalPosition.row + (originalPosition.rowSpan - newRowSpan)
             val newCol = originalPosition.col + (originalPosition.colSpan - newColSpan)
 
@@ -628,8 +656,16 @@ fun calculateResizedPosition(
             )
         }
         ResizeHandle.TOP_RIGHT -> {
-            val newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
-            val newColSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
+            var newRowSpan = (originalPosition.rowSpan - deltaRow).coerceAtLeast(1)
+            var newColSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
+
+            // Enforce 1:1 aspect ratio for squares/circles
+            if (enforceSquare) {
+                val minSpan = minOf(newRowSpan, newColSpan)
+                newRowSpan = minSpan
+                newColSpan = minSpan
+            }
+
             val newRow = originalPosition.row + (originalPosition.rowSpan - newRowSpan)
 
             originalPosition.copy(
@@ -639,8 +675,16 @@ fun calculateResizedPosition(
             )
         }
         ResizeHandle.BOTTOM_LEFT -> {
-            val newRowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1)
-            val newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+            var newRowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1)
+            var newColSpan = (originalPosition.colSpan - deltaCol).coerceAtLeast(1)
+
+            // Enforce 1:1 aspect ratio for squares/circles
+            if (enforceSquare) {
+                val minSpan = minOf(newRowSpan, newColSpan)
+                newRowSpan = minSpan
+                newColSpan = minSpan
+            }
+
             val newCol = originalPosition.col + (originalPosition.colSpan - newColSpan)
 
             originalPosition.copy(
@@ -649,10 +693,22 @@ fun calculateResizedPosition(
                 colSpan = newColSpan
             )
         }
-        ResizeHandle.BOTTOM_RIGHT -> originalPosition.copy(
-            rowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1),
-            colSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
-        )
+        ResizeHandle.BOTTOM_RIGHT -> {
+            var newRowSpan = (originalPosition.rowSpan + deltaRow).coerceAtLeast(1)
+            var newColSpan = (originalPosition.colSpan + deltaCol).coerceAtLeast(1)
+
+            // Enforce 1:1 aspect ratio for squares/circles
+            if (enforceSquare) {
+                val minSpan = minOf(newRowSpan, newColSpan)
+                newRowSpan = minSpan
+                newColSpan = minSpan
+            }
+
+            originalPosition.copy(
+                rowSpan = newRowSpan,
+                colSpan = newColSpan
+            )
+        }
         else -> originalPosition // Edge handles not implemented yet
     }
 

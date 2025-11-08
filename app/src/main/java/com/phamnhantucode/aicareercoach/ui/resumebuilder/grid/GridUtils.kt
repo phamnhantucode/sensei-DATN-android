@@ -349,6 +349,35 @@ object GridUtils {
         val colDistance = kotlin.math.abs(pos1.col - pos2.col)
         return rowDistance + colDistance
     }
+
+    /**
+     * Calculates optimal default zoom level to fit page in viewport
+     * @param gridConfig Grid configuration
+     * @param availableWidthPx Available viewport width in pixels
+     * @param availableHeightPx Available viewport height in pixels
+     * @param cellSizePx Cell size in pixels
+     * @param padding Padding factor (0.0 to 1.0) - e.g., 0.9 means 90% of viewport
+     * @return Optimal zoom level (0.25 to 2.0)
+     */
+    fun calculateOptimalZoom(
+        gridConfig: GridConfig,
+        availableWidthPx: Float,
+        availableHeightPx: Float,
+        cellSizePx: Float,
+        padding: Float = 0.9f
+    ): Float {
+        val (pageWidthPx, pageHeightPx) = getGridSizePx(gridConfig, cellSizePx)
+
+        // Calculate zoom needed to fit width and height
+        val zoomToFitWidth = (availableWidthPx * padding) / pageWidthPx
+        val zoomToFitHeight = (availableHeightPx * padding) / pageHeightPx
+
+        // Use the smaller zoom to ensure both dimensions fit
+        val optimalZoom = minOf(zoomToFitWidth, zoomToFitHeight)
+
+        // Clamp to reasonable zoom range
+        return optimalZoom.coerceIn(0.25f, 2f)
+    }
 }
 
 /**

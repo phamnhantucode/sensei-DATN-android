@@ -41,6 +41,11 @@ android {
             "CLERK_PUBLISHABLE_KEY",
             "\"pk_test_YXJyaXZpbmctZm93bC05LmNsZXJrLmFjY291bnRzLmRldiQ\""
         )
+        buildConfigField(
+            "String",
+            "CLERK_SECRET_KEY",
+            "\"sk_test_HLWvqkKidtIFeRAX79Au1LIha2ZIUB954rSKVrtgq7\""
+        )
         buildConfigField("String", "NEON_API_URL", "\"$neonApiUrl\"")
         buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
         buildConfigField("String", "NEON_DB_ROLE", "\"$neonDbRole\"")
@@ -100,6 +105,7 @@ dependencies {
     implementation(libs.clerk.android)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Room for local database
     implementation(libs.androidx.room.runtime)

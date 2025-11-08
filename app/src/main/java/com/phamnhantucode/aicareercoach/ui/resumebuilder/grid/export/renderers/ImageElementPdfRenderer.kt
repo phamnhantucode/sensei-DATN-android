@@ -33,16 +33,29 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
             }
 
         // Draw background and border
-        drawElementStyle(canvas, element.style, bounds, mapper, context, element.cornerRadius)
+        drawElementStyle(canvas, element.style, bounds, mapper, context, element.cornerRadius, element.isCircle)
 
-        // Calculate image destination rect based on content scale
-        val imageRect = calculateImageRect(bitmap, bounds, element.contentScale)
-
-        // Draw image with optional corner radius
-        if (element.cornerRadius > 0f) {
-            drawRoundedImage(canvas, bitmap, imageRect, element.cornerRadius, mapper, element.style.opacity)
+        // Calculate image destination rect based on content scale and shape
+        val imageRect = if (element.isCircle) {
+            // For circles, use a square bounds (1:1 aspect ratio)
+            val size = minOf(bounds.width(), bounds.height())
+            val centerX = bounds.centerX()
+            val centerY = bounds.centerY()
+            RectF(
+                centerX - size / 2,
+                centerY - size / 2,
+                centerX + size / 2,
+                centerY + size / 2
+            )
         } else {
-            drawImage(canvas, bitmap, imageRect, element.style.opacity)
+            calculateImageRect(bitmap, bounds, element.contentScale)
+        }
+
+        // Draw image with shape
+        when {
+            element.isCircle -> drawCircleImage(canvas, bitmap, imageRect, element.style.opacity)
+            element.cornerRadius > 0f -> drawRoundedImage(canvas, bitmap, imageRect, element.cornerRadius, mapper, element.style.opacity)
+            else -> drawImage(canvas, bitmap, imageRect, element.style.opacity)
         }
     }
 
@@ -167,6 +180,31 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
     }
 
     /**
+     * Draw image as circle
+     */
+    private fun drawCircleImage(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        destRect: RectF,
+        opacity: Float
+    ) {
+        val paint = Paint().apply {
+            isAntiAlias = true
+            alpha = (opacity * 255).toInt().coerceIn(0, 255)
+        }
+
+        // Create circular path
+        val path = Path().apply {
+            addOval(destRect, Path.Direction.CW)
+        }
+
+        canvas.save()
+        canvas.clipPath(path)
+        canvas.drawBitmap(bitmap, null, destRect, paint)
+        canvas.restore()
+    }
+
+    /**
      * Draw placeholder for failed images
      */
     private fun drawPlaceholder(
@@ -214,10 +252,26 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
         bounds: RectF,
         mapper: GridCoordinateMapper,
         context: PdfRenderContext,
-        cornerRadius: Float
+        cornerRadius: Float,
+        isCircle: Boolean
     ) {
         val paint = Paint().apply {
             isAntiAlias = true
+        }
+
+        // For circles, use the smaller dimension as the size
+        val shapeBounds = if (isCircle) {
+            val size = minOf(bounds.width(), bounds.height())
+            val centerX = bounds.centerX()
+            val centerY = bounds.centerY()
+            RectF(
+                centerX - size / 2,
+                centerY - size / 2,
+                centerX + size / 2,
+                centerY + size / 2
+            )
+        } else {
+            bounds
         }
 
         val radius = mapper.cornerRadiusToPdfPoints(cornerRadius.coerceAtLeast(style.borderRadius))
@@ -237,13 +291,13 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
                 )
             }
 
-            val shadowBounds = RectF(bounds)
+            val shadowBounds = RectF(shapeBounds)
             shadowBounds.offset(style.shadowOffsetX, style.shadowOffsetY)
 
-            if (radius > 0f) {
-                canvas.drawRoundRect(shadowBounds, radius, radius, shadowPaint)
-            } else {
-                canvas.drawRect(shadowBounds, shadowPaint)
+            when {
+                isCircle -> canvas.drawOval(shadowBounds, shadowPaint)
+                radius > 0f -> canvas.drawRoundRect(shadowBounds, radius, radius, shadowPaint)
+                else -> canvas.drawRect(shadowBounds, shadowPaint)
             }
         }
 
@@ -255,10 +309,10 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
             )
             paint.style = Paint.Style.FILL
 
-            if (radius > 0f) {
-                canvas.drawRoundRect(bounds, radius, radius, paint)
-            } else {
-                canvas.drawRect(bounds, paint)
+            when {
+                isCircle -> canvas.drawOval(shapeBounds, paint)
+                radius > 0f -> canvas.drawRoundRect(shapeBounds, radius, radius, paint)
+                else -> canvas.drawRect(shapeBounds, paint)
             }
         }
 
@@ -271,10 +325,10 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = mapper.borderWidthToPdfPoints(style.borderWidth)
 
-            if (radius > 0f) {
-                canvas.drawRoundRect(bounds, radius, radius, paint)
-            } else {
-                canvas.drawRect(bounds, paint)
+            when {
+                isCircle -> canvas.drawOval(shapeBounds, paint)
+                radius > 0f -> canvas.drawRoundRect(shapeBounds, radius, radius, paint)
+                else -> canvas.drawRect(shapeBounds, paint)
             }
         }
     }

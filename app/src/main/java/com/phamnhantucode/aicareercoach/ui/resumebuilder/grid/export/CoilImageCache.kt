@@ -3,6 +3,10 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -28,6 +32,8 @@ class CoilImageCache(private val context: Context) : ImageCache {
 
         try {
             val bitmap = when {
+                // Handle content:// URIs (from Android photo picker)
+                url.startsWith("content://") -> loadContentUri(url)
                 // Handle file:// URIs
                 url.startsWith("file://") -> loadLocalImage(url)
                 // Handle HTTP/HTTPS URLs
@@ -42,6 +48,26 @@ class CoilImageCache(private val context: Context) : ImageCache {
         } catch (e: Exception) {
             e.printStackTrace()
             cache[url] = null
+            null
+        }
+    }
+
+    private suspend fun loadContentUri(contentUri: String): Bitmap? {
+        return try {
+            val uri = Uri.parse(contentUri)
+
+            // Use ImageDecoder for Android P+ or MediaStore for older versions
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
