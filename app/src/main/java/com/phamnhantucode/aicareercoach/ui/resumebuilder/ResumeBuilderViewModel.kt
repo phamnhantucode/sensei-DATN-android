@@ -1,8 +1,11 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clerk.api.Clerk
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +20,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ResumeBuilderViewModel(context: Context) : ViewModel() {
+
+    companion object {
+        private const val TAG = "ResumeBuilderViewModel"
+    }
 
     private val repository = ResumeRepository.getInstance(context)
 
@@ -39,8 +46,15 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
     private var isAutoSaveEnabled = true
 
     init {
-        // Start with a blank resume
-        // Users can manually load a saved resume if needed
+        // Load latest resume or auto-fill from user profile
+        viewModelScope.launch {
+            loadLatestResume()
+
+            // If no resume exists or personal info is blank, auto-fill from user profile
+            if (_resume.value.id.isEmpty() || _resume.value.personalInfo.fullName.isBlank()) {
+                autofillFromUserProfile()
+            }
+        }
     }
 
     // ========== Save/Load Functions ==========
@@ -143,6 +157,75 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
     fun updatePersonalInfo(personalInfo: PersonalInfo) {
         _resume.update { it.copy(personalInfo = personalInfo) }
         triggerAutoSave()
+    }
+
+    /**
+     * Auto-fill personal info from Clerk user and Neon user profile
+     */
+    fun autofillFromUserProfile() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val clerkUser = Clerk.user
+                if (clerkUser == null) {
+                    Log.w(TAG, "Cannot autofill: user not logged in")
+                    return@launch
+                }
+
+                // Get Neon user profile for extended data
+                val neonUser = try {
+                    NeonUserService.getUser(clerkUser.id)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to get Neon user profile", e)
+                    null
+                }
+
+                // Build personal info from Clerk user
+                val firstName = clerkUser.firstName?.takeUnless { it.isBlank() } ?: ""
+                val lastName = clerkUser.lastName?.takeUnless { it.isBlank() } ?: ""
+                val fullName = "$firstName $lastName".trim()
+
+                // Get primary email
+                val primaryEmailId = clerkUser.primaryEmailAddressId
+                val email = primaryEmailId?.let { id ->
+                    clerkUser.emailAddresses.firstOrNull { it.id == id }?.emailAddress
+                } ?: clerkUser.emailAddresses.firstOrNull()?.emailAddress ?: ""
+
+                val avatar = clerkUser.imageUrl ?: ""
+
+                val personalInfo = PersonalInfo(
+                    fullName = fullName.ifBlank { _resume.value.personalInfo.fullName },
+                    email = email.ifBlank { _resume.value.personalInfo.email },
+                    phone = _resume.value.personalInfo.phone, // Keep existing
+                    location = _resume.value.personalInfo.location, // Keep existing
+                    linkedIn = _resume.value.personalInfo.linkedIn, // Keep existing
+                    portfolio = _resume.value.personalInfo.portfolio, // Keep existing
+                    github = _resume.value.personalInfo.github, // Keep existing
+                    avatar = avatar.ifBlank { _resume.value.personalInfo.avatar }
+                )
+
+                // Update resume with autofilled data
+                _resume.update {
+                    var updated = it.copy(personalInfo = personalInfo)
+
+                    // If Neon user has skills, pre-populate (only if current skills are empty)
+                    if (neonUser != null && neonUser.skills.isNotEmpty() && it.skills.isEmpty()) {
+                        updated = updated.copy(skills = neonUser.skills)
+                    }
+
+                    // If Neon user has bio, use as professional summary (only if current summary is empty)
+                    if (neonUser != null && !neonUser.bio.isNullOrBlank() && it.professionalSummary.isBlank()) {
+                        updated = updated.copy(professionalSummary = neonUser.bio)
+                    }
+
+                    updated
+                }
+
+                Log.d(TAG, "Auto-filled resume from user profile")
+                triggerAutoSave()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error auto-filling from user profile", e)
+            }
+        }
     }
 
     // ========== Professional Summary ==========

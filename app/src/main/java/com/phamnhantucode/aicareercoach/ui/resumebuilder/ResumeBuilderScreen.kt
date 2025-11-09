@@ -92,7 +92,7 @@ fun ResumeBuilderScreen(
     onNavigateToGridEditor: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val viewModel: ResumeBuilderViewModel = remember { ResumeBuilderViewModel(context) }
+    val viewModel: ResumeBuilderViewModel = viewModel { ResumeBuilderViewModel(context) }
 
     val resume by viewModel.resume.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
@@ -329,7 +329,8 @@ fun ResumeBuilderScreen(
                     ) {
                         PersonalInfoForm(
                             personalInfo = resume.personalInfo,
-                            onUpdate = viewModel::updatePersonalInfo
+                            onUpdate = viewModel::updatePersonalInfo,
+                            onAutofillFromProfile = viewModel::autofillFromUserProfile
                         )
                     }
 
@@ -662,11 +663,20 @@ private fun ResumeSectionCard(
 @Composable
 private fun PersonalInfoForm(
     personalInfo: PersonalInfo,
-    onUpdate: (PersonalInfo) -> Unit
+    onUpdate: (PersonalInfo) -> Unit,
+    onAutofillFromProfile: () -> Unit = {}
 ) {
     var editedInfo by remember(personalInfo) { mutableStateOf(personalInfo) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Auto-fill button
+        OutlinedButton(
+            onClick = onAutofillFromProfile,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("✨ Auto-fill from My Profile")
+        }
+
         OutlinedTextField(
             value = editedInfo.fullName,
             onValueChange = {

@@ -114,6 +114,10 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                         _gridResume.value = createDefaultResume()
                     }
                 }
+
+                // Automatically sync user data from Resume Builder for tagged elements
+                // This ensures elements with tags always have the latest user information
+                syncUserDataOnLoad()
             } catch (e: Exception) {
                 e.printStackTrace()
                 _gridResume.value = createDefaultResume()
@@ -127,18 +131,24 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
      * Loads a specific resume by converting from form format
      */
     fun loadResume(formResume: Resume) {
-        saveToUndoStack()
-        _gridResume.value = formResume.toGridResume()
-        _events.tryEmit(GridEditorEvent.ResumeLoaded)
+        viewModelScope.launch(Dispatchers.IO) {
+            saveToUndoStack()
+            _gridResume.value = formResume.toGridResume()
+            syncUserDataOnLoad()
+            _events.tryEmit(GridEditorEvent.ResumeLoaded)
+        }
     }
 
     /**
      * Loads a grid resume directly
      */
     fun loadGridResume(resume: GridResume) {
-        saveToUndoStack()
-        _gridResume.value = resume
-        _events.tryEmit(GridEditorEvent.ResumeLoaded)
+        viewModelScope.launch(Dispatchers.IO) {
+            saveToUndoStack()
+            _gridResume.value = resume
+            syncUserDataOnLoad()
+            _events.tryEmit(GridEditorEvent.ResumeLoaded)
+        }
     }
 
     /**
@@ -446,11 +456,36 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
     }
 
     /**
+     * Automatically syncs user data from Resume Builder on load
+     * Called after resume is loaded to ensure tagged elements have latest data
+     */
+    private suspend fun syncUserDataOnLoad() {
+        try {
+            val result = repository.getLatestResume()
+            result.getOrNull()?.let { formResume ->
+                // Update all tagged elements with fresh user data
+                applyUserDataToTemplate(formResume.personalInfo, saveToUndo = false)
+            }
+        } catch (e: Exception) {
+            // Silently fail - not critical, user can manually refresh
+            e.printStackTrace()
+        }
+    }
+
+    /**
      * Apply user data from PersonalInfo to tagged elements in the template
      * This replaces tagged TextElements and ImageElements with actual user data
+     *
+     * @param personalInfo User's personal information from Resume Builder
+     * @param saveToUndo Whether to save current state to undo stack (default: true)
      */
-    fun applyUserDataToTemplate(personalInfo: com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo) {
-        saveToUndoStack()
+    fun applyUserDataToTemplate(
+        personalInfo: com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo,
+        saveToUndo: Boolean = true
+    ) {
+        if (saveToUndo) {
+            saveToUndoStack()
+        }
 
         val currentPages = _gridResume.value.pages
         val updatedPages = currentPages.map { page ->
@@ -489,7 +524,10 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
         }
 
         _gridResume.value = _gridResume.value.copy(pages = updatedPages)
-        triggerAutoSave()
+
+        if (saveToUndo) {
+            triggerAutoSave()
+        }
     }
 
     // ============================================================================

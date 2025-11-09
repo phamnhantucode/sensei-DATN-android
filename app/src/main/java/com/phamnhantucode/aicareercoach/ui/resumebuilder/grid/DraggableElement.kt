@@ -264,8 +264,8 @@ fun DraggableElement(
             LockIndicator()
         }
 
-        // Template tag indicator (debug mode only) - shows when element has a tag
-        if (BuildConfig.DEBUG && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
+        // Template tag indicator - shows when element is selected and has a tag
+        if (isSelected && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
             TemplateTagIndicator(tag = element.userInfoTag!!)
         }
 
@@ -486,8 +486,9 @@ private fun BoxScope.LockIndicator() {
 }
 
 /**
- * Template tag indicator (debug mode only)
- * Shows which user info tag is applied to this element
+ * Template tag indicator
+ * Shows which user info tag is applied to this element when selected
+ * Displays a purple badge with the tag name (e.g., NAME, EMAIL, PHONE)
  */
 @Composable
 private fun BoxScope.TemplateTagIndicator(tag: UserInfoTag) {

@@ -58,6 +58,42 @@ fun PropertyPanel(
         }
     }
 
+    // Auto-update text elements with user data when personalInfo loads and element has a tag
+    LaunchedEffect(personalInfo, element.userInfoTag) {
+        if (personalInfo != null && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
+            when (element) {
+                is ResumeElement.TextElement -> {
+                    // Only auto-fill if content is empty to avoid overwriting user edits
+                    if (element.content.isEmpty()) {
+                        val content = when (element.userInfoTag) {
+                            UserInfoTag.NAME -> personalInfo?.fullName ?: ""
+                            UserInfoTag.EMAIL -> personalInfo?.email ?: ""
+                            UserInfoTag.PHONE -> personalInfo?.phone ?: ""
+                            UserInfoTag.LOCATION -> personalInfo?.location ?: ""
+                            UserInfoTag.GITHUB -> personalInfo?.github ?: ""
+                            UserInfoTag.LINKEDIN -> personalInfo?.linkedIn ?: ""
+                            UserInfoTag.WEBSITE -> personalInfo?.portfolio ?: ""
+                            else -> element.content
+                        }
+                        if (content.isNotEmpty()) {
+                            onUpdateElement(element.copy(content = content))
+                        }
+                    }
+                }
+                is ResumeElement.ImageElement -> {
+                    // Only auto-fill if imageUrl is empty
+                    if (element.imageUrl.isEmpty() && element.userInfoTag == UserInfoTag.AVATAR) {
+                        val avatar = personalInfo?.avatar ?: ""
+                        if (avatar.isNotEmpty()) {
+                            onUpdateElement(element.copy(imageUrl = avatar))
+                        }
+                    }
+                }
+                else -> { /* No auto-fill for other element types */ }
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -382,6 +418,46 @@ private fun CommonPropertiesSection(
                         },
                         modifier = Modifier.padding(top = 4.dp)
                     )
+
+                    // Add a refresh button to manually reload data from user profile
+                    if (personalInfo != null) {
+                        OutlinedButton(
+                            onClick = {
+                                // Manually refresh content from personalInfo based on current tag
+                                val updatedElement = when (element) {
+                                    is ResumeElement.TextElement -> {
+                                        val content = when (element.userInfoTag) {
+                                            UserInfoTag.NAME -> personalInfo.fullName
+                                            UserInfoTag.EMAIL -> personalInfo.email
+                                            UserInfoTag.PHONE -> personalInfo.phone
+                                            UserInfoTag.LOCATION -> personalInfo.location
+                                            UserInfoTag.GITHUB -> personalInfo.github
+                                            UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                                            UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                            else -> element.content
+                                        }
+                                        element.copy(content = content)
+                                    }
+                                    is ResumeElement.ImageElement -> {
+                                        if (element.userInfoTag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
+                                            element.copy(imageUrl = personalInfo.avatar)
+                                        } else {
+                                            element
+                                        }
+                                    }
+                                    else -> element
+                                }
+                                onUpdateElement(updatedElement)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Refresh from Resume Builder", fontSize = 12.sp)
+                        }
+                    }
                 }
             }
         }
