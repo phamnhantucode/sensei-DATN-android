@@ -71,18 +71,46 @@ fun ContactElementRenderer(
             )
             .padding(8.dp)
     ) {
+        // Map alignment enums to Compose alignment values (with null safety for backward compatibility)
+        val horizontalArrangement = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> Arrangement.Start
+            HorizontalAlignment.CENTER -> Arrangement.Center
+            HorizontalAlignment.END -> Arrangement.End
+        }
+
+        val verticalArrangementForColumn = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
+            VerticalAlignment.TOP -> Arrangement.Top
+            VerticalAlignment.CENTER -> Arrangement.Center
+            VerticalAlignment.BOTTOM -> Arrangement.Bottom
+        }
+
+        val verticalAlignmentForRow = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
+            VerticalAlignment.TOP -> Alignment.Top
+            VerticalAlignment.CENTER -> Alignment.CenterVertically
+            VerticalAlignment.BOTTOM -> Alignment.Bottom
+        }
+
+        val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> Alignment.Start
+            HorizontalAlignment.CENTER -> Alignment.CenterHorizontally
+            HorizontalAlignment.END -> Alignment.End
+        }
+
         when (element.orientation) {
             ContactOrientation.VERTICAL -> {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(element.spacing.dp)
+                    verticalArrangement = verticalArrangementForColumn,
+                    horizontalAlignment = horizontalAlignmentForColumn
                 ) {
                     element.items.forEach { item ->
                         ContactItemRow(
                             item = item,
                             iconStyle = element.iconStyle,
                             textStyle = element.textStyle,
-                            iconSize = element.iconSize
+                            iconSize = element.iconSize,
+                            iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
+                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER
                         )
                     }
                 }
@@ -90,15 +118,17 @@ fun ContactElementRenderer(
             ContactOrientation.HORIZONTAL -> {
                 Row(
                     modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(element.spacing.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = horizontalArrangement,
+                    verticalAlignment = verticalAlignmentForRow
                 ) {
                     element.items.forEach { item ->
                         ContactItemRow(
                             item = item,
                             iconStyle = element.iconStyle,
                             textStyle = element.textStyle,
-                            iconSize = element.iconSize
+                            iconSize = element.iconSize,
+                            iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
+                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER
                         )
                     }
                 }
@@ -115,39 +145,23 @@ private fun ContactItemRow(
     item: ContactItem,
     iconStyle: ContactIconStyle,
     textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
-    iconSize: Float
+    iconSize: Float,
+    iconAfterText: Boolean = false,
+    verticalAlignment: VerticalAlignment = VerticalAlignment.CENTER
 ) {
+    val rowVerticalAlignment = when (verticalAlignment) {
+        VerticalAlignment.TOP -> Alignment.Top
+        VerticalAlignment.CENTER -> Alignment.CenterVertically
+        VerticalAlignment.BOTTOM -> Alignment.Bottom
+    }
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = rowVerticalAlignment
     ) {
-        when (iconStyle) {
-            ContactIconStyle.ICON -> {
-                // Show icon prefix
-                if (item.iconName.isNotEmpty()) {
-                    val icon = getContactIcon(item.type, item.iconName)
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = item.label.ifEmpty { item.type.name },
-                        modifier = Modifier.size(iconSize.dp),
-                        tint = Color(textStyle.color)
-                    )
-                }
-            }
-            ContactIconStyle.BOLD_LABEL -> {
-                // Show bold label prefix
-                if (item.label.isNotEmpty()) {
-                    Text(
-                        text = item.label,
-                        style = textStyle.toComposeTextStyle().copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
-            }
-            ContactIconStyle.NONE -> {
-                // No prefix
-            }
+        // Render icon/label before text (default)
+        if (!iconAfterText) {
+            RenderIconOrLabel(item, iconStyle, textStyle, iconSize)
         }
 
         // Contact value
@@ -156,6 +170,51 @@ private fun ContactItemRow(
                 text = item.value,
                 style = textStyle.toComposeTextStyle()
             )
+        }
+
+        // Render icon/label after text (when horizontalAlignment is END)
+        if (iconAfterText) {
+            RenderIconOrLabel(item, iconStyle, textStyle, iconSize)
+        }
+    }
+}
+
+/**
+ * Renders the icon or label for a contact item
+ */
+@Composable
+private fun RenderIconOrLabel(
+    item: ContactItem,
+    iconStyle: ContactIconStyle,
+    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    iconSize: Float
+) {
+    when (iconStyle) {
+        ContactIconStyle.ICON -> {
+            // Show icon prefix
+            if (item.iconName.isNotEmpty()) {
+                val icon = getContactIcon(item.type, item.iconName)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = item.label.ifEmpty { item.type.name },
+                    modifier = Modifier.size(iconSize.dp),
+                    tint = Color(textStyle.color)
+                )
+            }
+        }
+        ContactIconStyle.BOLD_LABEL -> {
+            // Show bold label prefix
+            if (item.label.isNotEmpty()) {
+                Text(
+                    text = item.label,
+                    style = textStyle.toComposeTextStyle().copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+        ContactIconStyle.NONE -> {
+            // No prefix
         }
     }
 }

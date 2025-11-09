@@ -78,51 +78,39 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         mapper: GridCoordinateMapper,
         context: PdfRenderContext
     ) {
-        var currentY = 0f
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
+        val iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END
+
+        // Calculate vertical starting position based on vertical alignment
+        val totalItemHeight = element.items.sumOf {
+            if (it.value.isEmpty()) 0.0 else (textPaint.textSize + spacing).toDouble()
+        }.toFloat() - spacing // Remove last spacing
+
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalItemHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalItemHeight
+        }
 
         element.items.forEach { item ->
             if (item.value.isEmpty()) return@forEach
 
-            var currentX = 0f
+            // Measure the entire item width
+            val itemWidth = measureItemWidth(item, element, textPaint, boldTextPaint, mapper)
 
-            // Render icon or label based on style
-            when (element.iconStyle) {
-                ContactIconStyle.ICON -> {
-                    // Draw simple circle as icon placeholder
-                    // In a real implementation, you'd draw actual icons here
-                    val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
-                    val iconPaint = Paint().apply {
-                        color = context.colorConverter.toIntColorWithOpacity(
-                            element.textStyle.color,
-                            element.style.opacity
-                        )
-                        style = Paint.Style.FILL
-                        isAntiAlias = true
-                    }
+            // Calculate horizontal starting position based on horizontal alignment
+            var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                HorizontalAlignment.START -> 0f
+                HorizontalAlignment.CENTER -> (bounds.width() - itemWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - itemWidth
+            }
 
-                    canvas.drawCircle(
-                        currentX + iconSize / 2f,
-                        currentY + textPaint.textSize / 2f,
-                        iconSize / 3f,
-                        iconPaint
-                    )
-                    currentX += iconSize + mapper.borderWidthToPdfPoints(4f)
-                }
-                ContactIconStyle.BOLD_LABEL -> {
-                    if (item.label.isNotEmpty()) {
-                        canvas.drawText(
-                            item.label,
-                            currentX,
-                            currentY + textPaint.textSize,
-                            boldTextPaint
-                        )
-                        currentX += boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
-                    }
-                }
-                ContactIconStyle.NONE -> {
-                    // No prefix
-                }
+            // Render in order based on iconAfterText
+            if (!iconAfterText) {
+                currentX += drawIconOrLabel(
+                    canvas, item, element, currentX, currentY,
+                    textPaint, boldTextPaint, mapper, context
+                )
             }
 
             // Draw value
@@ -132,6 +120,15 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                 currentY + textPaint.textSize,
                 textPaint
             )
+            currentX += textPaint.measureText(item.value)
+
+            if (iconAfterText) {
+                currentX += mapper.borderWidthToPdfPoints(4f)
+                drawIconOrLabel(
+                    canvas, item, element, currentX, currentY,
+                    textPaint, boldTextPaint, mapper, context
+                )
+            }
 
             currentY += textPaint.textSize + spacing
         }
@@ -149,60 +146,145 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         mapper: GridCoordinateMapper,
         context: PdfRenderContext
     ) {
-        var currentX = 0f
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
-        val centerY = bounds.height() / 2f
+        val iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END
+
+        // Calculate vertical position based on vertical alignment
+        val baselineY = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
+            VerticalAlignment.TOP -> textPaint.textSize
+            VerticalAlignment.CENTER -> bounds.height() / 2f + textPaint.textSize / 3f
+            VerticalAlignment.BOTTOM -> bounds.height()
+        }
+
+        // Calculate total width of all items
+        val totalWidth = element.items.filter { it.value.isNotEmpty() }.sumOf {
+            measureItemWidth(it, element, textPaint, boldTextPaint, mapper).toDouble()
+        }.toFloat() + (spacing * (element.items.count { it.value.isNotEmpty() } - 1))
+
+        // Calculate horizontal starting position based on horizontal alignment
+        var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (bounds.width() - totalWidth) / 2f
+            HorizontalAlignment.END -> bounds.width() - totalWidth
+        }
 
         element.items.forEach { item ->
             if (item.value.isEmpty()) return@forEach
 
-            // Render icon or label based on style
-            when (element.iconStyle) {
-                ContactIconStyle.ICON -> {
-                    // Draw simple circle as icon placeholder
-                    val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
-                    val iconPaint = Paint().apply {
-                        color = context.colorConverter.toIntColorWithOpacity(
-                            element.textStyle.color,
-                            element.style.opacity
-                        )
-                        style = Paint.Style.FILL
-                        isAntiAlias = true
-                    }
-
-                    canvas.drawCircle(
-                        currentX + iconSize / 2f,
-                        centerY,
-                        iconSize / 3f,
-                        iconPaint
-                    )
-                    currentX += iconSize + mapper.borderWidthToPdfPoints(4f)
-                }
-                ContactIconStyle.BOLD_LABEL -> {
-                    if (item.label.isNotEmpty()) {
-                        canvas.drawText(
-                            item.label,
-                            currentX,
-                            centerY + textPaint.textSize / 3f,
-                            boldTextPaint
-                        )
-                        currentX += boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
-                    }
-                }
-                ContactIconStyle.NONE -> {
-                    // No prefix
-                }
+            // Render in order based on iconAfterText
+            if (!iconAfterText) {
+                currentX += drawIconOrLabel(
+                    canvas, item, element, currentX, baselineY - textPaint.textSize,
+                    textPaint, boldTextPaint, mapper, context
+                )
             }
 
             // Draw value
             canvas.drawText(
                 item.value,
                 currentX,
-                centerY + textPaint.textSize / 3f,
+                baselineY,
                 textPaint
             )
+            currentX += textPaint.measureText(item.value)
 
-            currentX += textPaint.measureText(item.value) + spacing
+            if (iconAfterText) {
+                currentX += mapper.borderWidthToPdfPoints(4f)
+                currentX += drawIconOrLabel(
+                    canvas, item, element, currentX, baselineY - textPaint.textSize,
+                    textPaint, boldTextPaint, mapper, context
+                )
+            } else {
+                currentX += spacing
+            }
+
+            if (!iconAfterText) {
+                currentX += spacing
+            }
+        }
+    }
+
+    /**
+     * Measure the total width of an item (icon/label + value + spacing)
+     */
+    private fun measureItemWidth(
+        item: ContactItem,
+        element: ResumeElement.ContactElement,
+        textPaint: TextPaint,
+        boldTextPaint: TextPaint,
+        mapper: GridCoordinateMapper
+    ): Float {
+        var width = textPaint.measureText(item.value)
+
+        when (element.iconStyle) {
+            ContactIconStyle.ICON -> {
+                val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
+                width += iconSize + mapper.borderWidthToPdfPoints(4f)
+            }
+            ContactIconStyle.BOLD_LABEL -> {
+                if (item.label.isNotEmpty()) {
+                    width += boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
+                }
+            }
+            ContactIconStyle.NONE -> {
+                // No additional width
+            }
+        }
+
+        return width
+    }
+
+    /**
+     * Draw icon or label and return the width consumed
+     */
+    private fun drawIconOrLabel(
+        canvas: Canvas,
+        item: ContactItem,
+        element: ResumeElement.ContactElement,
+        x: Float,
+        y: Float,
+        textPaint: TextPaint,
+        boldTextPaint: TextPaint,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ): Float {
+        return when (element.iconStyle) {
+            ContactIconStyle.ICON -> {
+                // Draw simple circle as icon placeholder
+                val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
+                val iconPaint = Paint().apply {
+                    color = context.colorConverter.toIntColorWithOpacity(
+                        element.textStyle.color,
+                        element.style.opacity
+                    )
+                    style = Paint.Style.FILL
+                    isAntiAlias = true
+                }
+
+                canvas.drawCircle(
+                    x + iconSize / 2f,
+                    y + textPaint.textSize / 2f,
+                    iconSize / 3f,
+                    iconPaint
+                )
+                iconSize + mapper.borderWidthToPdfPoints(4f)
+            }
+            ContactIconStyle.BOLD_LABEL -> {
+                if (item.label.isNotEmpty()) {
+                    canvas.drawText(
+                        item.label,
+                        x,
+                        y + textPaint.textSize,
+                        boldTextPaint
+                    )
+                    boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
+                } else {
+                    0f
+                }
+            }
+            ContactIconStyle.NONE -> {
+                0f
+            }
         }
     }
 

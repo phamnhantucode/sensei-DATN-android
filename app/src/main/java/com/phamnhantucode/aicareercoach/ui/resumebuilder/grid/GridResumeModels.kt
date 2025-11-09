@@ -233,7 +233,9 @@ sealed class ResumeElement {
         val spacing: Float = 8f, // dp between items
         val orientation: ContactOrientation = ContactOrientation.VERTICAL,
         val textStyle: TextStyle = TextStyle(),
-        val iconSize: Float = 16f // Size of icons in dp
+        val iconSize: Float = 16f, // Size of icons in dp
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.CENTER
     ) : ResumeElement()
 }
 
@@ -385,6 +387,18 @@ enum class ContactIconStyle {
 enum class ContactOrientation {
     VERTICAL,   // Stacked
     HORIZONTAL  // Side by side
+}
+
+enum class HorizontalAlignment {
+    START,   // Left alignment
+    CENTER,  // Center alignment
+    END      // Right alignment
+}
+
+enum class VerticalAlignment {
+    TOP,     // Top alignment
+    CENTER,  // Center alignment
+    BOTTOM   // Bottom alignment
 }
 
 /**

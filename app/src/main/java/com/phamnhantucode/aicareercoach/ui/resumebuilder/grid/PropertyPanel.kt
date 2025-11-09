@@ -926,6 +926,40 @@ private fun ContactElementProperties(
             }
         }
 
+        // Horizontal alignment
+        Text("Horizontal Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            HorizontalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.horizontalAlignment ?: HorizontalAlignment.START) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(horizontalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Vertical alignment
+        Text("Vertical Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            VerticalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.verticalAlignment ?: VerticalAlignment.CENTER) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(verticalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
         // Spacing slider
         SliderField(
             label = "Item Spacing: ${element.spacing.toInt()}dp",
