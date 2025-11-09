@@ -41,6 +41,7 @@ class AndroidPdfGenerator(
     private val chartRenderer = ChartElementPdfRenderer()
     private val iconRenderer = IconElementPdfRenderer()
     private val contactRenderer = ContactElementPdfRenderer()
+    private val workExperienceRenderer = WorkExperienceElementPdfRenderer()
 
     override fun generatePdf(resume: GridResume, outputFile: File): Flow<PdfExportState> = flow {
         try {
@@ -202,6 +203,11 @@ class AndroidPdfGenerator(
                     is ResumeElement.ContactElement -> {
                         val bounds = mapper.gridToPdfRect(element.position)
                         contactRenderer.render(canvas, element, bounds, mapper, renderContext)
+                    }
+
+                    is ResumeElement.WorkExperienceElement -> {
+                        val bounds = mapper.gridToPdfRect(element.position)
+                        workExperienceRenderer.render(canvas, element, bounds, mapper, renderContext)
                     }
 
                     is ResumeElement.ContainerElement -> {

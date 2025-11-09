@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import coil.compose.rememberAsyncImagePainter
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import kotlinx.coroutines.launch
 
 /**
@@ -46,14 +47,16 @@ fun PropertyPanel(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repository = remember { ResumeRepository.getInstance(context) }
+    var resume by remember { mutableStateOf<Resume?>(null) }
     var personalInfo by remember { mutableStateOf<PersonalInfo?>(null) }
 
-    // Load personal info when panel opens
+    // Load resume when panel opens
     LaunchedEffect(Unit) {
         scope.launch {
             val result = repository.getLatestResume()
-            result.onSuccess { resume ->
-                personalInfo = resume?.personalInfo
+            result.onSuccess { formResume ->
+                resume = formResume
+                personalInfo = formResume?.personalInfo
             }
         }
     }
@@ -135,7 +138,8 @@ fun PropertyPanel(
             CommonPropertiesSection(
                 element = element,
                 onUpdateElement = onUpdateElement,
-                personalInfo = personalInfo
+                personalInfo = personalInfo,
+                resume = resume
             )
 
             Divider()
@@ -168,6 +172,12 @@ fun PropertyPanel(
                 }
                 is ResumeElement.ContactElement -> {
                     ContactElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
+                is ResumeElement.WorkExperienceElement -> {
+                    WorkExperienceElementProperties(
                         element = element,
                         onUpdateElement = onUpdateElement
                     )
@@ -240,7 +250,8 @@ fun PropertyPanel(
 private fun CommonPropertiesSection(
     element: ResumeElement,
     onUpdateElement: (ResumeElement) -> Unit,
-    personalInfo: PersonalInfo?
+    personalInfo: PersonalInfo?,
+    resume: Resume?
 ) {
     PropertySection(title = "Position & Size") {
         // Position
@@ -316,8 +327,10 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Template Mode Tag (only for TextElement and ImageElement)
-        if (element is ResumeElement.TextElement || element is ResumeElement.ImageElement) {
+        // Template Mode Tag (for TextElement, ImageElement, and WorkExperienceElement)
+        if (element is ResumeElement.TextElement ||
+            element is ResumeElement.ImageElement ||
+            element is ResumeElement.WorkExperienceElement) {
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
             var showTagMenu by remember { mutableStateOf(false) }
@@ -353,8 +366,9 @@ private fun CommonPropertiesSection(
                             // Filter tags based on element type
                             val isApplicable = when (element) {
                                 is ResumeElement.ImageElement -> tag == UserInfoTag.AVATAR || tag == UserInfoTag.NONE
-                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR
-                                else -> true
+                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE
+                                is ResumeElement.WorkExperienceElement -> tag == UserInfoTag.WORK_EXPERIENCE || tag == UserInfoTag.NONE
+                                else -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE
                             }
 
                             if (isApplicable) {
@@ -385,6 +399,7 @@ private fun CommonPropertiesSection(
                                                         UserInfoTag.LINKEDIN -> personalInfo.linkedIn
                                                         UserInfoTag.WEBSITE -> personalInfo.portfolio
                                                         UserInfoTag.AVATAR -> updatedElement.content
+                                                        UserInfoTag.WORK_EXPERIENCE -> updatedElement.content
                                                         UserInfoTag.NONE -> updatedElement.content
                                                     }
                                                     updatedElement.copy(content = content)
@@ -392,6 +407,35 @@ private fun CommonPropertiesSection(
                                                 is ResumeElement.ImageElement -> {
                                                     if (newTag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
                                                         updatedElement.copy(imageUrl = personalInfo.avatar)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.WorkExperienceElement -> {
+                                                    if (newTag == UserInfoTag.WORK_EXPERIENCE && resume != null && resume.workExperiences.isNotEmpty()) {
+                                                        // Convert form WorkExperience to grid WorkExperienceItem
+                                                        val workExperienceItems = resume.workExperiences.map { work ->
+                                                            WorkExperienceItem(
+                                                                jobTitle = work.jobTitle,
+                                                                company = work.company,
+                                                                location = work.location,
+                                                                startDate = work.startDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                endDate = if (work.isCurrentRole) {
+                                                                    "Present"
+                                                                } else {
+                                                                    work.endDate?.format(
+                                                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                    ) ?: ""
+                                                                },
+                                                                isCurrentRole = work.isCurrentRole,
+                                                                responsibilities = work.responsibilities.map { resp ->
+                                                                    ResponsibilityItem(text = resp)
+                                                                }
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = workExperienceItems)
                                                     } else {
                                                         updatedElement
                                                     }
@@ -447,6 +491,35 @@ private fun CommonPropertiesSection(
                                     is ResumeElement.ImageElement -> {
                                         if (element.userInfoTag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
                                             element.copy(imageUrl = personalInfo.avatar)
+                                        } else {
+                                            element
+                                        }
+                                    }
+                                    is ResumeElement.WorkExperienceElement -> {
+                                        if (element.userInfoTag == UserInfoTag.WORK_EXPERIENCE && resume != null && resume.workExperiences.isNotEmpty()) {
+                                            // Convert form WorkExperience to grid WorkExperienceItem
+                                            val workExperienceItems = resume.workExperiences.map { work ->
+                                                WorkExperienceItem(
+                                                    jobTitle = work.jobTitle,
+                                                    company = work.company,
+                                                    location = work.location,
+                                                    startDate = work.startDate?.format(
+                                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                    ) ?: "",
+                                                    endDate = if (work.isCurrentRole) {
+                                                        "Present"
+                                                    } else {
+                                                        work.endDate?.format(
+                                                            java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                        ) ?: ""
+                                                    },
+                                                    isCurrentRole = work.isCurrentRole,
+                                                    responsibilities = work.responsibilities.map { resp ->
+                                                        ResponsibilityItem(text = resp)
+                                                    }
+                                                )
+                                            }
+                                            element.copy(items = workExperienceItems)
                                         } else {
                                             element
                                         }
@@ -1195,6 +1268,605 @@ private fun ContactItemEditor(
 }
 
 /**
+ * Work Experience element properties
+ */
+@Composable
+private fun WorkExperienceElementProperties(
+    element: ResumeElement.WorkExperienceElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Work Experience Items") {
+        // Work experience items list
+        element.items.forEachIndexed { index, item ->
+            WorkExperienceItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add work experience item button
+        Button(
+            onClick = {
+                val newItem = WorkExperienceItem(
+                    jobTitle = "Job Title",
+                    company = "Company Name",
+                    location = "Location",
+                    startDate = "",
+                    endDate = "",
+                    isCurrentRole = false,
+                    responsibilities = emptyList()
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Work Experience")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            WorkExperienceDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Orientation toggle
+        Text("Orientation", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            WorkExperienceOrientation.entries.forEach { orientation ->
+                FilterChip(
+                    selected = element.orientation == orientation,
+                    onClick = {
+                        onUpdateElement(element.copy(orientation = orientation))
+                    },
+                    label = { Text(orientation.name) }
+                )
+            }
+        }
+
+        // Show/Hide options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Location", fontSize = 12.sp)
+            Switch(
+                checked = element.showLocation,
+                onCheckedChange = { onUpdateElement(element.copy(showLocation = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Dates", fontSize = 12.sp)
+            Switch(
+                checked = element.showDates,
+                onCheckedChange = { onUpdateElement(element.copy(showDates = it)) }
+            )
+        }
+
+        // Horizontal alignment
+        Text("Horizontal Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            HorizontalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.horizontalAlignment ?: HorizontalAlignment.START) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(horizontalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Vertical alignment
+        Text("Vertical Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            VerticalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.verticalAlignment ?: VerticalAlignment.TOP) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(verticalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Spacing sliders
+        SliderField(
+            label = "Entry Spacing: ${element.spacing.toInt()}dp",
+            value = element.spacing,
+            valueRange = 0f..32f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(spacing = newSpacing))
+            }
+        )
+
+        SliderField(
+            label = "Item Spacing: ${element.itemSpacing.toInt()}dp",
+            value = element.itemSpacing,
+            valueRange = 0f..16f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(itemSpacing = newSpacing))
+            }
+        )
+
+        SliderField(
+            label = "Responsibility Spacing: ${element.responsibilitySpacing.toInt()}dp",
+            value = element.responsibilitySpacing,
+            valueRange = 0f..12f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(responsibilitySpacing = newSpacing))
+            }
+        )
+    }
+
+    PropertySection(title = "Date & Bullet Settings") {
+        // Date format
+        Text("Date Format", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            DateFormat.entries.forEach { format ->
+                FilterChip(
+                    selected = element.dateFormat == format,
+                    onClick = {
+                        onUpdateElement(element.copy(dateFormat = format))
+                    },
+                    label = { Text(format.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Date separator
+        OutlinedTextField(
+            value = element.dateSeparator,
+            onValueChange = { onUpdateElement(element.copy(dateSeparator = it)) },
+            label = { Text("Date Separator") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        // Bullet style
+        Text("Bullet Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            BulletStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.bulletStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(bulletStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+    }
+
+    // Text styles - collapsible sections to save space
+    var showTitleStyle by remember { mutableStateOf(false) }
+    var showCompanyStyle by remember { mutableStateOf(false) }
+    var showDateStyle by remember { mutableStateOf(false) }
+    var showLocationStyle by remember { mutableStateOf(false) }
+    var showResponsibilityStyle by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { showTitleStyle = !showTitleStyle }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Title Style", fontWeight = FontWeight.Medium)
+            Icon(
+                if (showTitleStyle) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        if (showTitleStyle) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                TextStyleControls(
+                    textStyle = element.titleStyle,
+                    onTextStyleChange = { onUpdateElement(element.copy(titleStyle = it)) }
+                )
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { showCompanyStyle = !showCompanyStyle }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Company Style", fontWeight = FontWeight.Medium)
+            Icon(
+                if (showCompanyStyle) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        if (showCompanyStyle) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                TextStyleControls(
+                    textStyle = element.companyStyle,
+                    onTextStyleChange = { onUpdateElement(element.copy(companyStyle = it)) }
+                )
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { showDateStyle = !showDateStyle }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Date Style", fontWeight = FontWeight.Medium)
+            Icon(
+                if (showDateStyle) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        if (showDateStyle) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                TextStyleControls(
+                    textStyle = element.dateStyle,
+                    onTextStyleChange = { onUpdateElement(element.copy(dateStyle = it)) }
+                )
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { showLocationStyle = !showLocationStyle }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Location Style", fontWeight = FontWeight.Medium)
+            Icon(
+                if (showLocationStyle) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        if (showLocationStyle) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                TextStyleControls(
+                    textStyle = element.locationStyle,
+                    onTextStyleChange = { onUpdateElement(element.copy(locationStyle = it)) }
+                )
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        onClick = { showResponsibilityStyle = !showResponsibilityStyle }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Responsibility Style", fontWeight = FontWeight.Medium)
+            Icon(
+                if (showResponsibilityStyle) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
+            )
+        }
+        if (showResponsibilityStyle) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                TextStyleControls(
+                    textStyle = element.responsibilityStyle,
+                    onTextStyleChange = { onUpdateElement(element.copy(responsibilityStyle = it)) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single work experience item
+ */
+@Composable
+private fun WorkExperienceItemEditor(
+    item: WorkExperienceItem,
+    onUpdate: (WorkExperienceItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (item.jobTitle.isNotEmpty()) item.jobTitle else "Work Experience",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Job Title
+            OutlinedTextField(
+                value = item.jobTitle,
+                onValueChange = { onUpdate(item.copy(jobTitle = it)) },
+                label = { Text("Job Title") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Company
+            OutlinedTextField(
+                value = item.company,
+                onValueChange = { onUpdate(item.copy(company = it)) },
+                label = { Text("Company") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Location
+            OutlinedTextField(
+                value = item.location,
+                onValueChange = { onUpdate(item.copy(location = it)) },
+                label = { Text("Location") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Start Date
+            OutlinedTextField(
+                value = item.startDate,
+                onValueChange = { onUpdate(item.copy(startDate = it)) },
+                label = { Text("Start Date (yyyy-MM-dd)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("2020-01-15") }
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Current Role Checkbox
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Current Role", fontSize = 12.sp)
+                Checkbox(
+                    checked = item.isCurrentRole,
+                    onCheckedChange = { onUpdate(item.copy(isCurrentRole = it)) }
+                )
+            }
+
+            // End Date (only show if not current role)
+            if (!item.isCurrentRole) {
+                OutlinedTextField(
+                    value = item.endDate,
+                    onValueChange = { onUpdate(item.copy(endDate = it)) },
+                    label = { Text("End Date (yyyy-MM-dd)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("2022-06-30") }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Responsibilities
+            Text("Responsibilities", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            item.responsibilities.forEachIndexed { index, responsibility ->
+                ResponsibilityItemEditor(
+                    responsibility = responsibility,
+                    onUpdate = { updated ->
+                        val updatedResponsibilities = item.responsibilities.toMutableList()
+                        updatedResponsibilities[index] = updated
+                        onUpdate(item.copy(responsibilities = updatedResponsibilities))
+                    },
+                    onRemove = {
+                        val updatedResponsibilities = item.responsibilities.toMutableList()
+                        updatedResponsibilities.removeAt(index)
+                        onUpdate(item.copy(responsibilities = updatedResponsibilities))
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Add Responsibility Button
+            Button(
+                onClick = {
+                    val newResponsibility = ResponsibilityItem(text = "")
+                    onUpdate(item.copy(responsibilities = item.responsibilities + newResponsibility))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add Responsibility", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single responsibility item
+ */
+@Composable
+private fun ResponsibilityItemEditor(
+    responsibility: ResponsibilityItem,
+    onUpdate: (ResponsibilityItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = responsibility.text,
+            onValueChange = { onUpdate(responsibility.copy(text = it)) },
+            modifier = Modifier.weight(1f),
+            singleLine = false,
+            maxLines = 3,
+            placeholder = { Text("Responsibility description", fontSize = 12.sp) }
+        )
+        IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/**
+ * Reusable text style controls
+ */
+@Composable
+private fun TextStyleControls(
+    textStyle: TextStyle,
+    onTextStyleChange: (TextStyle) -> Unit
+) {
+    // Font size
+    SliderField(
+        label = "Font Size: ${textStyle.fontSize.toInt()}sp",
+        value = textStyle.fontSize,
+        valueRange = 8f..48f,
+        onValueChange = { newSize ->
+            onTextStyleChange(textStyle.copy(fontSize = newSize))
+        }
+    )
+
+    // Font weight
+    var showFontWeightMenu by remember { mutableStateOf(false) }
+    @OptIn(ExperimentalMaterial3Api::class)
+    ExposedDropdownMenuBox(
+        expanded = showFontWeightMenu,
+        onExpandedChange = { showFontWeightMenu = it }
+    ) {
+        OutlinedTextField(
+            value = textStyle.fontWeight.toString(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Font Weight") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showFontWeightMenu) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = showFontWeightMenu,
+            onDismissRequest = { showFontWeightMenu = false }
+        ) {
+            listOf(
+                FontWeight.Thin to "Thin",
+                FontWeight.Light to "Light",
+                FontWeight.Normal to "Normal",
+                FontWeight.Medium to "Medium",
+                FontWeight.SemiBold to "SemiBold",
+                FontWeight.Bold to "Bold",
+                FontWeight.ExtraBold to "ExtraBold"
+            ).forEach { (weight, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onTextStyleChange(textStyle.copy(fontWeight = weight))
+                        showFontWeightMenu = false
+                    }
+                )
+            }
+        }
+    }
+
+    // Text color
+    ColorPicker(
+        label = "Text Color",
+        color = Color(textStyle.color),
+        onColorChange = { newColor ->
+            newColor?.let {
+                val colorLong = android.graphics.Color.argb(
+                    (it.alpha * 255).toInt(),
+                    (it.red * 255).toInt(),
+                    (it.green * 255).toInt(),
+                    (it.blue * 255).toInt()
+                ).toLong()
+                onTextStyleChange(textStyle.copy(color = colorLong))
+            }
+        }
+    )
+}
+
+/**
  * Style properties section (border, background, shadow)
  */
 @Composable
@@ -1435,6 +2107,7 @@ private fun updateElementPosition(element: ResumeElement, newPosition: GridPosit
         is ResumeElement.ContainerElement -> element.copy(position = newPosition)
         is ResumeElement.IconElement -> element.copy(position = newPosition)
         is ResumeElement.ContactElement -> element.copy(position = newPosition)
+        is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
     }
 }
 
@@ -1447,6 +2120,7 @@ private fun updateElementZIndex(element: ResumeElement, newZIndex: Int): ResumeE
         is ResumeElement.ContainerElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.IconElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.ContactElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.WorkExperienceElement -> element.copy(zIndex = newZIndex)
     }
 }
 
@@ -1459,6 +2133,7 @@ private fun updateElementLocked(element: ResumeElement, locked: Boolean): Resume
         is ResumeElement.ContainerElement -> element.copy(locked = locked)
         is ResumeElement.IconElement -> element.copy(locked = locked)
         is ResumeElement.ContactElement -> element.copy(locked = locked)
+        is ResumeElement.WorkExperienceElement -> element.copy(locked = locked)
     }
 }
 
@@ -1471,6 +2146,7 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.ContainerElement -> element.copy(style = newStyle)
         is ResumeElement.IconElement -> element.copy(style = newStyle)
         is ResumeElement.ContactElement -> element.copy(style = newStyle)
+        is ResumeElement.WorkExperienceElement -> element.copy(style = newStyle)
     }
 }
 
@@ -1483,5 +2159,6 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.ContainerElement -> element.copy(userInfoTag = tag)
         is ResumeElement.IconElement -> element.copy(userInfoTag = tag)
         is ResumeElement.ContactElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.WorkExperienceElement -> element.copy(userInfoTag = tag)
     }
 }

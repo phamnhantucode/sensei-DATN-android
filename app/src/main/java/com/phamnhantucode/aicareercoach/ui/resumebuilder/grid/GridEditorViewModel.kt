@@ -464,7 +464,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             val result = repository.getLatestResume()
             result.getOrNull()?.let { formResume ->
                 // Update all tagged elements with fresh user data
-                applyUserDataToTemplate(formResume.personalInfo, saveToUndo = false)
+                applyUserDataToTemplate(formResume, saveToUndo = false)
             }
         } catch (e: Exception) {
             // Silently fail - not critical, user can manually refresh
@@ -473,14 +473,14 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
     }
 
     /**
-     * Apply user data from PersonalInfo to tagged elements in the template
-     * This replaces tagged TextElements and ImageElements with actual user data
+     * Apply user data from Resume to tagged elements in the template
+     * This replaces tagged TextElements, ImageElements, and WorkExperienceElements with actual user data
      *
-     * @param personalInfo User's personal information from Resume Builder
+     * @param resume User's resume data from Resume Builder
      * @param saveToUndo Whether to save current state to undo stack (default: true)
      */
     fun applyUserDataToTemplate(
-        personalInfo: com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo,
+        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume,
         saveToUndo: Boolean = true
     ) {
         if (saveToUndo) {
@@ -498,21 +498,22 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                 when (element) {
                     is ResumeElement.TextElement -> {
                         val content = when (tag) {
-                            UserInfoTag.NAME -> personalInfo.fullName
-                            UserInfoTag.EMAIL -> personalInfo.email
-                            UserInfoTag.PHONE -> personalInfo.phone
-                            UserInfoTag.LOCATION -> personalInfo.location
-                            UserInfoTag.GITHUB -> personalInfo.github
-                            UserInfoTag.LINKEDIN -> personalInfo.linkedIn
-                            UserInfoTag.WEBSITE -> personalInfo.portfolio
+                            UserInfoTag.NAME -> resume.personalInfo.fullName
+                            UserInfoTag.EMAIL -> resume.personalInfo.email
+                            UserInfoTag.PHONE -> resume.personalInfo.phone
+                            UserInfoTag.LOCATION -> resume.personalInfo.location
+                            UserInfoTag.GITHUB -> resume.personalInfo.github
+                            UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
+                            UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
                             UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
+                            UserInfoTag.WORK_EXPERIENCE -> element.content // Work experience doesn't apply to text
                             UserInfoTag.NONE -> element.content
                         }
                         element.copy(content = content)
                     }
                     is ResumeElement.ImageElement -> {
-                        if (tag == UserInfoTag.AVATAR && personalInfo.avatar.isNotEmpty()) {
-                            element.copy(imageUrl = personalInfo.avatar)
+                        if (tag == UserInfoTag.AVATAR && resume.personalInfo.avatar.isNotEmpty()) {
+                            element.copy(imageUrl = resume.personalInfo.avatar)
                         } else {
                             element
                         }
@@ -522,19 +523,49 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                         val updatedItems = element.items.map { item ->
                             val tag = item.userInfoTag ?: return@map item
                             val value = when (tag) {
-                                UserInfoTag.NAME -> personalInfo.fullName
-                                UserInfoTag.EMAIL -> personalInfo.email
-                                UserInfoTag.PHONE -> personalInfo.phone
-                                UserInfoTag.LOCATION -> personalInfo.location
-                                UserInfoTag.GITHUB -> personalInfo.github
-                                UserInfoTag.LINKEDIN -> personalInfo.linkedIn
-                                UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                UserInfoTag.NAME -> resume.personalInfo.fullName
+                                UserInfoTag.EMAIL -> resume.personalInfo.email
+                                UserInfoTag.PHONE -> resume.personalInfo.phone
+                                UserInfoTag.LOCATION -> resume.personalInfo.location
+                                UserInfoTag.GITHUB -> resume.personalInfo.github
+                                UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
+                                UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
                                 UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
+                                UserInfoTag.WORK_EXPERIENCE -> item.value // Work experience doesn't apply to contact
                                 UserInfoTag.NONE -> item.value
                             }
                             item.copy(value = value)
                         }
                         element.copy(items = updatedItems)
+                    }
+                    is ResumeElement.WorkExperienceElement -> {
+                        if (tag == UserInfoTag.WORK_EXPERIENCE && resume.workExperiences.isNotEmpty()) {
+                            // Convert form WorkExperience to grid WorkExperienceItem
+                            val workExperienceItems = resume.workExperiences.map { work ->
+                                WorkExperienceItem(
+                                    jobTitle = work.jobTitle,
+                                    company = work.company,
+                                    location = work.location,
+                                    startDate = work.startDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    endDate = if (work.isCurrentRole) {
+                                        "Present"
+                                    } else {
+                                        work.endDate?.format(
+                                            java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                        ) ?: ""
+                                    },
+                                    isCurrentRole = work.isCurrentRole,
+                                    responsibilities = work.responsibilities.map { resp ->
+                                        ResponsibilityItem(text = resp)
+                                    }
+                                )
+                            }
+                            element.copy(items = workExperienceItems)
+                        } else {
+                            element
+                        }
                     }
                     else -> element
                 }
@@ -728,6 +759,25 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     iconSize = 16f
                 )
             }
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.WORK_EXPERIENCE -> {
+                ResumeElement.WorkExperienceElement(
+                    position = position,
+                    items = listOf(
+                        WorkExperienceItem(
+                            jobTitle = "Job Title",
+                            company = "Company Name",
+                            location = "Location",
+                            startDate = "2020-01-01",
+                            endDate = "2022-12-31",
+                            isCurrentRole = false,
+                            responsibilities = listOf(
+                                ResponsibilityItem(text = "Responsibility 1"),
+                                ResponsibilityItem(text = "Responsibility 2")
+                            )
+                        )
+                    )
+                )
+            }
         }
     }
 
@@ -741,6 +791,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             ElementType.ICON -> Pair(4, 4) // Single cell
             ElementType.DIVIDER -> Pair(4, 48) // Full width thin line
             ElementType.CONTACT -> Pair(12, 20) // Vertical list of contact items
+            ElementType.WORK_EXPERIENCE -> Pair(20, 48) // Full width with multiple work items
         }
     }
 
@@ -753,6 +804,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             is ResumeElement.ContainerElement -> element.copy(position = position)
             is ResumeElement.IconElement -> element.copy(position = position)
             is ResumeElement.ContactElement -> element.copy(position = position)
+            is ResumeElement.WorkExperienceElement -> element.copy(position = position)
         }
     }
 

@@ -27,6 +27,7 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             is ResumeElement.ContainerElement -> "ContainerElement"
             is ResumeElement.IconElement -> "IconElement"
             is ResumeElement.ContactElement -> "ContactElement"
+            is ResumeElement.WorkExperienceElement -> "WorkExperienceElement"
         }
         jsonObject.addProperty("elementType", type)
 
@@ -54,6 +55,7 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             "ContainerElement" -> context.deserialize(data, ResumeElement.ContainerElement::class.java)
             "IconElement" -> context.deserialize(data, ResumeElement.IconElement::class.java)
             "ContactElement" -> context.deserialize(data, ResumeElement.ContactElement::class.java)
+            "WorkExperienceElement" -> context.deserialize(data, ResumeElement.WorkExperienceElement::class.java)
             else -> throw JsonParseException("Unknown element type: $type")
         }
     }

@@ -35,6 +35,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactEl
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.WorkExperienceElementRenderer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -109,7 +110,7 @@ fun GridEditorScreen(
                             val result = repository.getLatestResume()
                             result.onSuccess { resume ->
                                 resume?.let {
-                                    viewModel.applyUserDataToTemplate(it.personalInfo)
+                                    viewModel.applyUserDataToTemplate(it)
                                 }
                             }
                         } finally {
@@ -171,6 +172,7 @@ fun GridEditorScreen(
                             is ResumeElement.ContainerElement -> element.copy(position = clampedPosition)
                             is ResumeElement.IconElement -> element.copy(position = clampedPosition)
                             is ResumeElement.ContactElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.WorkExperienceElement -> element.copy(position = clampedPosition)
                         }
                         viewModel.updateElement(updatedElement)
                     },
@@ -593,6 +595,11 @@ private fun GridCanvas(
                                     element = element
                                 )
                             }
+                            is ResumeElement.WorkExperienceElement -> {
+                                WorkExperienceElementRenderer(
+                                    element = element
+                                )
+                            }
                             else -> {
                                 // Placeholder for other element types
                                 Box(
@@ -667,6 +674,11 @@ private fun ElementPickerDialog(
                     icon = Icons.Default.Contacts,
                     label = "Contact Info",
                     onClick = { onElementTypeSelected(ElementType.CONTACT) }
+                )
+                ElementTypeButton(
+                    icon = Icons.Default.Work,
+                    label = "Work Experience",
+                    onClick = { onElementTypeSelected(ElementType.WORK_EXPERIENCE) }
                 )
             }
         },
@@ -845,7 +857,8 @@ enum class ElementType {
     CHART,
     CONTAINER,
     ICON,
-    CONTACT
+    CONTACT,
+    WORK_EXPERIENCE
 }
 
 // Icon aliases for missing icons (using available Material Icons)

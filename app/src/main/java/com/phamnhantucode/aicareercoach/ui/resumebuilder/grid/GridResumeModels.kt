@@ -98,15 +98,16 @@ enum class EditorType {
  * Used to mark elements that should be replaced with user data when applying a template
  */
 enum class UserInfoTag {
-    NONE,       // No tag - regular element
-    NAME,       // Full name
-    EMAIL,      // Email address
-    PHONE,      // Phone number
-    LOCATION,   // Location/address
-    GITHUB,     // GitHub URL
-    LINKEDIN,   // LinkedIn URL
-    WEBSITE,    // Portfolio/website URL
-    AVATAR      // Profile picture
+    NONE,            // No tag - regular element
+    NAME,            // Full name
+    EMAIL,           // Email address
+    PHONE,           // Phone number
+    LOCATION,        // Location/address
+    GITHUB,          // GitHub URL
+    LINKEDIN,        // LinkedIn URL
+    WEBSITE,         // Portfolio/website URL
+    AVATAR,          // Profile picture
+    WORK_EXPERIENCE  // Work experience data
 }
 
 // ============================================================================
@@ -237,6 +238,37 @@ sealed class ResumeElement {
         val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
         val verticalAlignment: VerticalAlignment? = VerticalAlignment.CENTER
     ) : ResumeElement()
+
+    /**
+     * Work Experience element - pre-composed component for employment history
+     * Displays a list of work experiences with job titles, companies, dates, and responsibilities
+     */
+    data class WorkExperienceElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<WorkExperienceItem> = emptyList(),
+        val displayStyle: WorkExperienceDisplayStyle = WorkExperienceDisplayStyle.STANDARD,
+        val orientation: WorkExperienceOrientation = WorkExperienceOrientation.VERTICAL,
+        val showLocation: Boolean = true,
+        val showDates: Boolean = true,
+        val spacing: Float = 16f, // dp between work experience entries
+        val itemSpacing: Float = 4f, // dp between fields within an entry
+        val responsibilitySpacing: Float = 4f, // dp between responsibility bullets
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val titleStyle: TextStyle = TextStyle(fontSize = 16f, fontWeight = FontWeight.Bold),
+        val companyStyle: TextStyle = TextStyle(fontSize = 14f, fontWeight = FontWeight.SemiBold),
+        val dateStyle: TextStyle = TextStyle(fontSize = 12f),
+        val locationStyle: TextStyle = TextStyle(fontSize = 12f),
+        val responsibilityStyle: TextStyle = TextStyle(fontSize = 12f),
+        val dateFormat: DateFormat = DateFormat.MMM_YYYY,
+        val dateSeparator: String = " - ",
+        val bulletStyle: BulletStyle = BulletStyle.DISC
+    ) : ResumeElement()
 }
 
 // ============================================================================
@@ -291,6 +323,30 @@ data class ContactItem(
     val label: String = "", // e.g., "Phone:", "Email:"
     val iconName: String = "", // Material icon name or emoji
     val userInfoTag: UserInfoTag? = null // For template mode
+)
+
+/**
+ * Individual work experience item within a WorkExperienceElement
+ */
+data class WorkExperienceItem(
+    val id: String = UUID.randomUUID().toString(),
+    val jobTitle: String = "",
+    val company: String = "",
+    val location: String = "",
+    val startDate: String = "", // ISO format or formatted string
+    val endDate: String = "", // ISO format or formatted string
+    val isCurrentRole: Boolean = false,
+    val responsibilities: List<ResponsibilityItem> = emptyList(),
+    val userInfoTag: UserInfoTag? = null // For template mode
+)
+
+/**
+ * Individual responsibility/bullet point within a WorkExperienceItem
+ */
+data class ResponsibilityItem(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String = "",
+    val customBullet: String? = null // Optional custom bullet icon/character
 )
 
 // ============================================================================
@@ -399,6 +455,35 @@ enum class VerticalAlignment {
     TOP,     // Top alignment
     CENTER,  // Center alignment
     BOTTOM   // Bottom alignment
+}
+
+enum class WorkExperienceDisplayStyle {
+    STANDARD,  // Traditional layout: Title | Company on separate lines
+    COMPACT,   // Condensed: Title + Company on same line
+    DETAILED   // Expanded with all fields prominently displayed
+}
+
+enum class WorkExperienceOrientation {
+    VERTICAL,   // Stack entries vertically
+    HORIZONTAL  // Arrange entries in columns (side by side)
+}
+
+enum class DateFormat {
+    MMM_YYYY,   // Jan 2020
+    MM_YYYY,    // 01/2020
+    FULL,       // January 2020
+    SHORT,      // 1/20
+    YYYY        // 2020
+}
+
+enum class BulletStyle {
+    DISC,         // •
+    DASH,         // -
+    ARROW,        // →
+    CHEVRON,      // ›
+    NUMBERED,     // 1. 2. 3.
+    CUSTOM_ICON,  // Use custom icon from responsibilityItem
+    NONE          // No bullet
 }
 
 /**
