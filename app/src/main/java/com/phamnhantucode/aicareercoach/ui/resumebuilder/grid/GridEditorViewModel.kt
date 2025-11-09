@@ -517,6 +517,25 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                             element
                         }
                     }
+                    is ResumeElement.ContactElement -> {
+                        // Update contact items with user info based on their tags
+                        val updatedItems = element.items.map { item ->
+                            val tag = item.userInfoTag ?: return@map item
+                            val value = when (tag) {
+                                UserInfoTag.NAME -> personalInfo.fullName
+                                UserInfoTag.EMAIL -> personalInfo.email
+                                UserInfoTag.PHONE -> personalInfo.phone
+                                UserInfoTag.LOCATION -> personalInfo.location
+                                UserInfoTag.GITHUB -> personalInfo.github
+                                UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                                UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
+                                UserInfoTag.NONE -> item.value
+                            }
+                            item.copy(value = value)
+                        }
+                        element.copy(items = updatedItems)
+                    }
                     else -> element
                 }
             }
@@ -673,6 +692,42 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     iconType = IconType.MATERIAL
                 )
             }
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CONTACT -> {
+                ResumeElement.ContactElement(
+                    position = position,
+                    items = listOf(
+                        ContactItem(
+                            type = ContactType.PHONE,
+                            value = "+1 (555) 123-4567",
+                            label = "Phone:",
+                            iconName = "phone",
+                            userInfoTag = UserInfoTag.PHONE
+                        ),
+                        ContactItem(
+                            type = ContactType.EMAIL,
+                            value = "email@example.com",
+                            label = "Email:",
+                            iconName = "email",
+                            userInfoTag = UserInfoTag.EMAIL
+                        ),
+                        ContactItem(
+                            type = ContactType.ADDRESS,
+                            value = "City, State",
+                            label = "Location:",
+                            iconName = "location_on",
+                            userInfoTag = UserInfoTag.LOCATION
+                        )
+                    ),
+                    iconStyle = ContactIconStyle.ICON,
+                    spacing = 8f,
+                    orientation = ContactOrientation.VERTICAL,
+                    textStyle = TextStyle(
+                        fontSize = 12f,
+                        color = 0xFF000000
+                    ),
+                    iconSize = 16f
+                )
+            }
         }
     }
 
@@ -685,6 +740,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             ElementType.CONTAINER -> Pair(16, 24)
             ElementType.ICON -> Pair(4, 4) // Single cell
             ElementType.DIVIDER -> Pair(4, 48) // Full width thin line
+            ElementType.CONTACT -> Pair(12, 20) // Vertical list of contact items
         }
     }
 
@@ -696,6 +752,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             is ResumeElement.ChartElement -> element.copy(position = position)
             is ResumeElement.ContainerElement -> element.copy(position = position)
             is ResumeElement.IconElement -> element.copy(position = position)
+            is ResumeElement.ContactElement -> element.copy(position = position)
         }
     }
 

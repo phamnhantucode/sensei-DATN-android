@@ -166,6 +166,12 @@ fun PropertyPanel(
                         onUpdateElement = onUpdateElement
                     )
                 }
+                is ResumeElement.ContactElement -> {
+                    ContactElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
                 else -> {
                     Text("Properties not yet implemented for this element type")
                 }
@@ -841,6 +847,320 @@ private fun ChartElementProperties(
 }
 
 /**
+ * Contact element properties
+ */
+@Composable
+private fun ContactElementProperties(
+    element: ResumeElement.ContactElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Contact Items") {
+        // Contact items list
+        element.items.forEachIndexed { index, item ->
+            ContactItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add contact item button
+        Button(
+            onClick = {
+                val newItem = ContactItem(
+                    type = ContactType.PHONE,
+                    label = "Phone:",
+                    iconName = "phone"
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Contact Item")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Icon style toggle
+        Text("Icon Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ContactIconStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.iconStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(iconStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Orientation toggle
+        Text("Orientation", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ContactOrientation.entries.forEach { orientation ->
+                FilterChip(
+                    selected = element.orientation == orientation,
+                    onClick = {
+                        onUpdateElement(element.copy(orientation = orientation))
+                    },
+                    label = { Text(orientation.name) }
+                )
+            }
+        }
+
+        // Spacing slider
+        SliderField(
+            label = "Item Spacing: ${element.spacing.toInt()}dp",
+            value = element.spacing,
+            valueRange = 0f..32f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(spacing = newSpacing))
+            }
+        )
+
+        // Icon size slider (only show if using icons)
+        if (element.iconStyle == ContactIconStyle.ICON) {
+            SliderField(
+                label = "Icon Size: ${element.iconSize.toInt()}dp",
+                value = element.iconSize,
+                valueRange = 8f..48f,
+                onValueChange = { newSize ->
+                    onUpdateElement(element.copy(iconSize = newSize))
+                }
+            )
+        }
+    }
+
+    PropertySection(title = "Text Style") {
+        // Font size
+        SliderField(
+            label = "Font Size: ${element.textStyle.fontSize.toInt()}sp",
+            value = element.textStyle.fontSize,
+            valueRange = 8f..48f,
+            onValueChange = { newSize ->
+                onUpdateElement(
+                    element.copy(
+                        textStyle = element.textStyle.copy(fontSize = newSize)
+                    )
+                )
+            }
+        )
+
+        // Font weight
+        var showFontWeightMenu by remember { mutableStateOf(false) }
+        @OptIn(ExperimentalMaterial3Api::class)
+        ExposedDropdownMenuBox(
+            expanded = showFontWeightMenu,
+            onExpandedChange = { showFontWeightMenu = it }
+        ) {
+            OutlinedTextField(
+                value = element.textStyle.fontWeight.toString(),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Font Weight") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showFontWeightMenu) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = showFontWeightMenu,
+                onDismissRequest = { showFontWeightMenu = false }
+            ) {
+                listOf(
+                    FontWeight.Thin to "Thin",
+                    FontWeight.Light to "Light",
+                    FontWeight.Normal to "Normal",
+                    FontWeight.Medium to "Medium",
+                    FontWeight.SemiBold to "SemiBold",
+                    FontWeight.Bold to "Bold",
+                    FontWeight.ExtraBold to "ExtraBold"
+                ).forEach { (weight, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onUpdateElement(
+                                element.copy(
+                                    textStyle = element.textStyle.copy(fontWeight = weight)
+                                )
+                            )
+                            showFontWeightMenu = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Text color
+        ColorPicker(
+            label = "Text Color",
+            color = Color(element.textStyle.color),
+            onColorChange = { newColor ->
+                newColor?.let {
+                    val colorLong = android.graphics.Color.argb(
+                        (it.alpha * 255).toInt(),
+                        (it.red * 255).toInt(),
+                        (it.green * 255).toInt(),
+                        (it.blue * 255).toInt()
+                    ).toLong()
+                    onUpdateElement(
+                        element.copy(
+                            textStyle = element.textStyle.copy(color = colorLong)
+                        )
+                    )
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Editor for a single contact item
+ */
+@Composable
+private fun ContactItemEditor(
+    item: ContactItem,
+    onUpdate: (ContactItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.type.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Remove",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Contact type dropdown
+            var showTypeMenu by remember { mutableStateOf(false) }
+            @OptIn(ExperimentalMaterial3Api::class)
+            ExposedDropdownMenuBox(
+                expanded = showTypeMenu,
+                onExpandedChange = { showTypeMenu = it }
+            ) {
+                OutlinedTextField(
+                    value = item.type.name,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Type") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTypeMenu) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = showTypeMenu,
+                    onDismissRequest = { showTypeMenu = false }
+                ) {
+                    ContactType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.name) },
+                            onClick = {
+                                onUpdate(item.copy(type = type))
+                                showTypeMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Value field
+            OutlinedTextField(
+                value = item.value,
+                onValueChange = { onUpdate(item.copy(value = it)) },
+                label = { Text("Value") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Label field
+            OutlinedTextField(
+                value = item.label,
+                onValueChange = { onUpdate(item.copy(label = it)) },
+                label = { Text("Label (for BOLD_LABEL style)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Template tag dropdown (optional)
+            var showTagMenu by remember { mutableStateOf(false) }
+            @OptIn(ExperimentalMaterial3Api::class)
+            ExposedDropdownMenuBox(
+                expanded = showTagMenu,
+                onExpandedChange = { showTagMenu = it }
+            ) {
+                OutlinedTextField(
+                    value = item.userInfoTag?.name ?: "None",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Template Tag (optional)") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTagMenu) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = showTagMenu,
+                    onDismissRequest = { showTagMenu = false }
+                ) {
+                    listOf(null).plus(UserInfoTag.entries).forEach { tag ->
+                        DropdownMenuItem(
+                            text = { Text(tag?.name ?: "None") },
+                            onClick = {
+                                onUpdate(item.copy(userInfoTag = tag))
+                                showTagMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Style properties section (border, background, shadow)
  */
 @Composable
@@ -1080,6 +1400,7 @@ private fun updateElementPosition(element: ResumeElement, newPosition: GridPosit
         is ResumeElement.ChartElement -> element.copy(position = newPosition)
         is ResumeElement.ContainerElement -> element.copy(position = newPosition)
         is ResumeElement.IconElement -> element.copy(position = newPosition)
+        is ResumeElement.ContactElement -> element.copy(position = newPosition)
     }
 }
 
@@ -1091,6 +1412,7 @@ private fun updateElementZIndex(element: ResumeElement, newZIndex: Int): ResumeE
         is ResumeElement.ChartElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.ContainerElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.IconElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.ContactElement -> element.copy(zIndex = newZIndex)
     }
 }
 
@@ -1102,6 +1424,7 @@ private fun updateElementLocked(element: ResumeElement, locked: Boolean): Resume
         is ResumeElement.ChartElement -> element.copy(locked = locked)
         is ResumeElement.ContainerElement -> element.copy(locked = locked)
         is ResumeElement.IconElement -> element.copy(locked = locked)
+        is ResumeElement.ContactElement -> element.copy(locked = locked)
     }
 }
 
@@ -1113,6 +1436,7 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.ChartElement -> element.copy(style = newStyle)
         is ResumeElement.ContainerElement -> element.copy(style = newStyle)
         is ResumeElement.IconElement -> element.copy(style = newStyle)
+        is ResumeElement.ContactElement -> element.copy(style = newStyle)
     }
 }
 
@@ -1124,5 +1448,6 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.ChartElement -> element.copy(userInfoTag = tag)
         is ResumeElement.ContainerElement -> element.copy(userInfoTag = tag)
         is ResumeElement.IconElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ContactElement -> element.copy(userInfoTag = tag)
     }
 }

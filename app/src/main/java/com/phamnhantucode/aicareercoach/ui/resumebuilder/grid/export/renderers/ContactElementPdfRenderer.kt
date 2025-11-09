@@ -1,0 +1,342 @@
+package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers
+
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.text.TextPaint
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ElementPdfRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordinateMapper
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfRenderContext
+
+/**
+ * Contact Element PDF Renderer
+ *
+ * Renders contact information with icons or labels
+ */
+class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElement> {
+
+    override suspend fun render(
+        canvas: Canvas,
+        element: ResumeElement.ContactElement,
+        bounds: RectF,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ) {
+        if (element.items.isEmpty()) return
+
+        // Draw background and borders
+        drawElementStyle(canvas, element.style, bounds, mapper, context)
+
+        // Create text paint
+        val textPaint = createTextPaint(element, mapper, context)
+        val boldTextPaint = createBoldTextPaint(element, mapper, context)
+
+        canvas.save()
+        canvas.translate(bounds.left, bounds.top)
+        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+
+        // Calculate layout based on orientation
+        when (element.orientation) {
+            ContactOrientation.VERTICAL -> {
+                renderVerticalLayout(
+                    canvas,
+                    element,
+                    bounds,
+                    textPaint,
+                    boldTextPaint,
+                    mapper,
+                    context
+                )
+            }
+            ContactOrientation.HORIZONTAL -> {
+                renderHorizontalLayout(
+                    canvas,
+                    element,
+                    bounds,
+                    textPaint,
+                    boldTextPaint,
+                    mapper,
+                    context
+                )
+            }
+        }
+
+        canvas.restore()
+    }
+
+    /**
+     * Render contact items in vertical layout
+     */
+    private fun renderVerticalLayout(
+        canvas: Canvas,
+        element: ResumeElement.ContactElement,
+        bounds: RectF,
+        textPaint: TextPaint,
+        boldTextPaint: TextPaint,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ) {
+        var currentY = 0f
+        val spacing = mapper.borderWidthToPdfPoints(element.spacing)
+
+        element.items.forEach { item ->
+            if (item.value.isEmpty()) return@forEach
+
+            var currentX = 0f
+
+            // Render icon or label based on style
+            when (element.iconStyle) {
+                ContactIconStyle.ICON -> {
+                    // Draw simple circle as icon placeholder
+                    // In a real implementation, you'd draw actual icons here
+                    val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
+                    val iconPaint = Paint().apply {
+                        color = context.colorConverter.toIntColorWithOpacity(
+                            element.textStyle.color,
+                            element.style.opacity
+                        )
+                        style = Paint.Style.FILL
+                        isAntiAlias = true
+                    }
+
+                    canvas.drawCircle(
+                        currentX + iconSize / 2f,
+                        currentY + textPaint.textSize / 2f,
+                        iconSize / 3f,
+                        iconPaint
+                    )
+                    currentX += iconSize + mapper.borderWidthToPdfPoints(4f)
+                }
+                ContactIconStyle.BOLD_LABEL -> {
+                    if (item.label.isNotEmpty()) {
+                        canvas.drawText(
+                            item.label,
+                            currentX,
+                            currentY + textPaint.textSize,
+                            boldTextPaint
+                        )
+                        currentX += boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
+                    }
+                }
+                ContactIconStyle.NONE -> {
+                    // No prefix
+                }
+            }
+
+            // Draw value
+            canvas.drawText(
+                item.value,
+                currentX,
+                currentY + textPaint.textSize,
+                textPaint
+            )
+
+            currentY += textPaint.textSize + spacing
+        }
+    }
+
+    /**
+     * Render contact items in horizontal layout
+     */
+    private fun renderHorizontalLayout(
+        canvas: Canvas,
+        element: ResumeElement.ContactElement,
+        bounds: RectF,
+        textPaint: TextPaint,
+        boldTextPaint: TextPaint,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ) {
+        var currentX = 0f
+        val spacing = mapper.borderWidthToPdfPoints(element.spacing)
+        val centerY = bounds.height() / 2f
+
+        element.items.forEach { item ->
+            if (item.value.isEmpty()) return@forEach
+
+            // Render icon or label based on style
+            when (element.iconStyle) {
+                ContactIconStyle.ICON -> {
+                    // Draw simple circle as icon placeholder
+                    val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
+                    val iconPaint = Paint().apply {
+                        color = context.colorConverter.toIntColorWithOpacity(
+                            element.textStyle.color,
+                            element.style.opacity
+                        )
+                        style = Paint.Style.FILL
+                        isAntiAlias = true
+                    }
+
+                    canvas.drawCircle(
+                        currentX + iconSize / 2f,
+                        centerY,
+                        iconSize / 3f,
+                        iconPaint
+                    )
+                    currentX += iconSize + mapper.borderWidthToPdfPoints(4f)
+                }
+                ContactIconStyle.BOLD_LABEL -> {
+                    if (item.label.isNotEmpty()) {
+                        canvas.drawText(
+                            item.label,
+                            currentX,
+                            centerY + textPaint.textSize / 3f,
+                            boldTextPaint
+                        )
+                        currentX += boldTextPaint.measureText(item.label) + mapper.borderWidthToPdfPoints(4f)
+                    }
+                }
+                ContactIconStyle.NONE -> {
+                    // No prefix
+                }
+            }
+
+            // Draw value
+            canvas.drawText(
+                item.value,
+                currentX,
+                centerY + textPaint.textSize / 3f,
+                textPaint
+            )
+
+            currentX += textPaint.measureText(item.value) + spacing
+        }
+    }
+
+    /**
+     * Create text paint with styling
+     */
+    private fun createTextPaint(
+        element: ResumeElement.ContactElement,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ): TextPaint {
+        return TextPaint().apply {
+            isAntiAlias = true
+            textSize = mapper.spToPdfPoints(element.textStyle.fontSize)
+            color = context.colorConverter.toIntColorWithOpacity(
+                element.textStyle.color,
+                element.style.opacity
+            )
+
+            // Font weight and style
+            val typefaceStyle = when {
+                element.textStyle.isBold && element.textStyle.isItalic -> Typeface.BOLD_ITALIC
+                element.textStyle.isBold -> Typeface.BOLD
+                element.textStyle.isItalic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            typeface = Typeface.create(Typeface.DEFAULT, typefaceStyle)
+
+            // Underline
+            isUnderlineText = element.textStyle.isUnderlined
+
+            // Letter spacing (in EM units)
+            if (element.textStyle.letterSpacing != 0f) {
+                letterSpacing = element.textStyle.letterSpacing / element.textStyle.fontSize
+            }
+        }
+    }
+
+    /**
+     * Create bold text paint for labels
+     */
+    private fun createBoldTextPaint(
+        element: ResumeElement.ContactElement,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ): TextPaint {
+        return TextPaint().apply {
+            isAntiAlias = true
+            textSize = mapper.spToPdfPoints(element.textStyle.fontSize)
+            color = context.colorConverter.toIntColorWithOpacity(
+                element.textStyle.color,
+                element.style.opacity
+            )
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isUnderlineText = element.textStyle.isUnderlined
+
+            // Letter spacing (in EM units)
+            if (element.textStyle.letterSpacing != 0f) {
+                letterSpacing = element.textStyle.letterSpacing / element.textStyle.fontSize
+            }
+        }
+    }
+
+    /**
+     * Draw element background, border, and shadow
+     */
+    private fun drawElementStyle(
+        canvas: Canvas,
+        style: ElementStyle,
+        bounds: RectF,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ) {
+        val paint = Paint().apply {
+            isAntiAlias = true
+        }
+
+        // Draw shadow
+        if (style.shadowColor != null && style.shadowBlur > 0f) {
+            val shadowPaint = Paint(paint).apply {
+                color = context.colorConverter.toIntColorWithOpacity(
+                    style.shadowColor,
+                    style.opacity
+                )
+                setShadowLayer(
+                    style.shadowBlur,
+                    style.shadowOffsetX,
+                    style.shadowOffsetY,
+                    context.colorConverter.toIntColor(style.shadowColor)
+                )
+            }
+
+            val shadowBounds = RectF(bounds)
+            shadowBounds.offset(style.shadowOffsetX, style.shadowOffsetY)
+
+            if (style.borderRadius > 0f) {
+                val radius = mapper.cornerRadiusToPdfPoints(style.borderRadius)
+                canvas.drawRoundRect(shadowBounds, radius, radius, shadowPaint)
+            } else {
+                canvas.drawRect(shadowBounds, shadowPaint)
+            }
+        }
+
+        // Draw background
+        if (style.backgroundColor != null && !context.colorConverter.isTransparent(style.backgroundColor)) {
+            paint.color = context.colorConverter.toIntColorWithOpacity(
+                style.backgroundColor,
+                style.opacity
+            )
+            paint.style = Paint.Style.FILL
+
+            if (style.borderRadius > 0f) {
+                val radius = mapper.cornerRadiusToPdfPoints(style.borderRadius)
+                canvas.drawRoundRect(bounds, radius, radius, paint)
+            } else {
+                canvas.drawRect(bounds, paint)
+            }
+        }
+
+        // Draw border
+        if (style.borderColor != null && style.borderWidth > 0f) {
+            paint.color = context.colorConverter.toIntColorWithOpacity(
+                style.borderColor,
+                style.opacity
+            )
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = mapper.borderWidthToPdfPoints(style.borderWidth)
+
+            if (style.borderRadius > 0f) {
+                val radius = mapper.cornerRadiusToPdfPoints(style.borderRadius)
+                canvas.drawRoundRect(bounds, radius, radius, paint)
+            } else {
+                canvas.drawRect(bounds, paint)
+            }
+        }
+    }
+}

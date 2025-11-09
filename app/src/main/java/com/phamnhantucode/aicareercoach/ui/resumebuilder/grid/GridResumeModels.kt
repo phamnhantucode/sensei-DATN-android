@@ -216,6 +216,25 @@ sealed class ResumeElement {
         val iconName: String = "", // Material icon name or emoji
         val iconType: IconType = IconType.MATERIAL
     ) : ResumeElement()
+
+    /**
+     * Contact element - pre-composed component for contact information
+     * Displays a list of contact items (phone, email, address, social links, etc.)
+     */
+    data class ContactElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<ContactItem> = emptyList(),
+        val iconStyle: ContactIconStyle = ContactIconStyle.ICON,
+        val spacing: Float = 8f, // dp between items
+        val orientation: ContactOrientation = ContactOrientation.VERTICAL,
+        val textStyle: TextStyle = TextStyle(),
+        val iconSize: Float = 16f // Size of icons in dp
+    ) : ResumeElement()
 }
 
 // ============================================================================
@@ -258,6 +277,18 @@ data class Padding(
     val right: Float = 0f,
     val bottom: Float = 0f,
     val left: Float = 0f
+)
+
+/**
+ * Individual contact item within a ContactElement
+ */
+data class ContactItem(
+    val id: String = UUID.randomUUID().toString(),
+    val type: ContactType = ContactType.CUSTOM,
+    val value: String = "",
+    val label: String = "", // e.g., "Phone:", "Email:"
+    val iconName: String = "", // Material icon name or emoji
+    val userInfoTag: UserInfoTag? = null // For template mode
 )
 
 // ============================================================================
@@ -333,6 +364,27 @@ enum class ChartType {
 enum class IconType {
     MATERIAL,  // Material Icons
     EMOJI      // Unicode emoji
+}
+
+enum class ContactType {
+    PHONE,
+    EMAIL,
+    ADDRESS,
+    LINKEDIN,
+    GITHUB,
+    WEBSITE,
+    CUSTOM
+}
+
+enum class ContactIconStyle {
+    ICON,        // Material icon prefix
+    BOLD_LABEL,  // Bold text prefix like "Phone:"
+    NONE         // Just the value
+}
+
+enum class ContactOrientation {
+    VERTICAL,   // Stacked
+    HORIZONTAL  // Side by side
 }
 
 /**

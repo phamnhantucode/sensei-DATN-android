@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
@@ -169,6 +170,7 @@ fun GridEditorScreen(
                             is ResumeElement.ChartElement -> element.copy(position = clampedPosition)
                             is ResumeElement.ContainerElement -> element.copy(position = clampedPosition)
                             is ResumeElement.IconElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ContactElement -> element.copy(position = clampedPosition)
                         }
                         viewModel.updateElement(updatedElement)
                     },
@@ -586,6 +588,11 @@ private fun GridCanvas(
                                     element = element
                                 )
                             }
+                            is ResumeElement.ContactElement -> {
+                                ContactElementRenderer(
+                                    element = element
+                                )
+                            }
                             else -> {
                                 // Placeholder for other element types
                                 Box(
@@ -655,6 +662,11 @@ private fun ElementPickerDialog(
                     icon = IconAliases.BarChart,
                     label = "Chart",
                     onClick = { onElementTypeSelected(ElementType.CHART) }
+                )
+                ElementTypeButton(
+                    icon = Icons.Default.Contacts,
+                    label = "Contact Info",
+                    onClick = { onElementTypeSelected(ElementType.CONTACT) }
                 )
             }
         },
@@ -832,7 +844,8 @@ enum class ElementType {
     DIVIDER,
     CHART,
     CONTAINER,
-    ICON
+    ICON,
+    CONTACT
 }
 
 // Icon aliases for missing icons (using available Material Icons)
