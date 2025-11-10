@@ -33,6 +33,7 @@ fun TextElementRenderer(
     element: ResumeElement.TextElement,
     isEditing: Boolean = false,
     onContentChange: (String) -> Unit = {},
+    zoomLevel: Float = 1f,
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = element.style.backgroundColor?.let { Color(it) }
@@ -79,14 +80,14 @@ fun TextElementRenderer(
         if (isEditing) {
             EditableText(
                 text = element.content,
-                textStyle = element.textStyle.toComposeTextStyle(),
+                textStyle = element.textStyle.toComposeTextStyle(zoomLevel),
                 alignment = element.alignment,
                 onContentChange = onContentChange
             )
         } else {
             StaticText(
                 text = element.content,
-                textStyle = element.textStyle.toComposeTextStyle(),
+                textStyle = element.textStyle.toComposeTextStyle(zoomLevel),
                 alignment = element.alignment,
                 maxLines = element.maxLines
             )
@@ -155,13 +156,13 @@ private fun EditableText(
 /**
  * Converts custom TextStyle to Compose TextStyle
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(): TextStyle {
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): TextStyle {
     return TextStyle(
-        fontSize = fontSize.sp,
+        fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
         color = Color(color),
-        lineHeight = lineHeight?.sp ?: androidx.compose.ui.unit.TextUnit.Unspecified,
-        letterSpacing = letterSpacing.sp,
+        lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
+        letterSpacing = (letterSpacing * zoomLevel).sp,
         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
         textDecoration = if (isUnderlined) TextDecoration.Underline else TextDecoration.None
     )

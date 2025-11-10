@@ -15,12 +15,13 @@ class GridCoordinateMapper(
     private val pdfConfig: PdfExportConfig
 ) {
     /**
-     * Density conversion: Android DP to PDF points
-     * Standard Android: 160dpi = 1dp
-     * PDF: 72dpi = 1 point
-     * Conversion: 1dp ≈ 0.75 points (72/96)
+     * Density conversion: Android DP/SP to PDF points
+     *
+     * We use 1.0 as base conversion (1 dp = 1 point, 1 sp = 1 point).
+     * This treats both DP and SP units equally at their absolute values.
+     * The grid scale factor is then applied to fit everything proportionally on the PDF page.
      */
-    private val DP_TO_POINTS = 0.75f
+    private val DP_TO_POINTS = 1.0f
 
     /**
      * Calculate cell size in PDF points
@@ -90,13 +91,23 @@ class GridCoordinateMapper(
 
     /**
      * Convert font size (sp) to PDF points
-     * SP (scale-independent pixels) are typically the same as DP for PDF export
+     *
+     * Uses 1:1 base conversion (like DP conversion), treating SP at absolute values.
+     * Then applies the grid scale factor to maintain proportional sizing on PDF page.
+     *
+     * This ensures text scales proportionally with the grid layout, independent of
+     * device density or zoom levels.
+     *
+     * Formula: fontSizeSp * 1.0 * scale
+     * Example: 14sp * 1.0 * 1.03 = 14.42 points in PDF
      *
      * @param fontSizeSp Font size in scale-independent pixels
      * @return Font size in PDF points
      */
     fun spToPdfPoints(fontSizeSp: Float): Float {
-        return fontSizeSp * DP_TO_POINTS * scale
+        val result = fontSizeSp * DP_TO_POINTS * scale
+        android.util.Log.d("PDF_FontSize", "Input: ${fontSizeSp}sp, Scale: $scale, Output: ${result}pts (DP_TO_POINTS=$DP_TO_POINTS)")
+        return result
     }
 
     /**

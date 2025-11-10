@@ -162,6 +162,8 @@ class AndroidPdfGenerator(
         gridConfig: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridConfig
     ) {
         val mapper = GridCoordinateMapper(gridConfig, config)
+        android.util.Log.d("PDF_Export", "GridCoordinateMapper config:\n${mapper.toString()}")
+        android.util.Log.d("PDF_Export", "Device density: ${context.resources.displayMetrics.density}, scaledDensity: ${context.resources.displayMetrics.scaledDensity}")
         val renderContext = PdfRenderContext(config, imageCache, colorConverter)
 
         elements.forEach { element ->

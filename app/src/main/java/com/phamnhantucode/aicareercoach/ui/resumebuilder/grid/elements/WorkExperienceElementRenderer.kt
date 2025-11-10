@@ -27,6 +27,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun WorkExperienceElementRenderer(
     element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f,
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = element.style.backgroundColor?.let { Color(it) }
@@ -98,7 +99,8 @@ fun WorkExperienceElementRenderer(
                     element.items.forEachIndexed { index, item ->
                         WorkExperienceItemRenderer(
                             item = item,
-                            element = element
+                            element = element,
+                            zoomLevel = zoomLevel
                         )
 
                         // Add spacing between items (but not after last item)
@@ -119,7 +121,8 @@ fun WorkExperienceElementRenderer(
                         Box(modifier = Modifier.weight(1f)) {
                             WorkExperienceItemRenderer(
                                 item = item,
-                                element = element
+                                element = element,
+                                zoomLevel = zoomLevel
                             )
                         }
 
@@ -140,17 +143,18 @@ fun WorkExperienceElementRenderer(
 @Composable
 private fun WorkExperienceItemRenderer(
     item: WorkExperienceItem,
-    element: ResumeElement.WorkExperienceElement
+    element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f
 ) {
     when (element.displayStyle) {
         WorkExperienceDisplayStyle.STANDARD -> {
-            StandardWorkExperienceLayout(item, element)
+            StandardWorkExperienceLayout(item, element, zoomLevel)
         }
         WorkExperienceDisplayStyle.COMPACT -> {
-            CompactWorkExperienceLayout(item, element)
+            CompactWorkExperienceLayout(item, element, zoomLevel)
         }
         WorkExperienceDisplayStyle.DETAILED -> {
-            DetailedWorkExperienceLayout(item, element)
+            DetailedWorkExperienceLayout(item, element, zoomLevel)
         }
     }
 }
@@ -161,7 +165,8 @@ private fun WorkExperienceItemRenderer(
 @Composable
 private fun StandardWorkExperienceLayout(
     item: WorkExperienceItem,
-    element: ResumeElement.WorkExperienceElement
+    element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
@@ -170,7 +175,7 @@ private fun StandardWorkExperienceLayout(
         if (item.jobTitle.isNotEmpty()) {
             Text(
                 text = item.jobTitle,
-                style = element.titleStyle.toComposeTextStyle()
+                style = element.titleStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -183,7 +188,7 @@ private fun StandardWorkExperienceLayout(
             if (item.company.isNotEmpty()) {
                 Text(
                     text = item.company,
-                    style = element.companyStyle.toComposeTextStyle(),
+                    style = element.companyStyle.toComposeTextStyle(zoomLevel),
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
@@ -191,7 +196,7 @@ private fun StandardWorkExperienceLayout(
             if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
-                    style = element.dateStyle.toComposeTextStyle()
+                    style = element.dateStyle.toComposeTextStyle(zoomLevel)
                 )
             }
         }
@@ -200,7 +205,7 @@ private fun StandardWorkExperienceLayout(
         if (element.showLocation && item.location.isNotEmpty()) {
             Text(
                 text = item.location,
-                style = element.locationStyle.toComposeTextStyle()
+                style = element.locationStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -208,7 +213,8 @@ private fun StandardWorkExperienceLayout(
         if (item.responsibilities.isNotEmpty()) {
             ResponsibilityList(
                 responsibilities = item.responsibilities,
-                element = element
+                element = element,
+                zoomLevel = zoomLevel
             )
         }
     }
@@ -220,7 +226,8 @@ private fun StandardWorkExperienceLayout(
 @Composable
 private fun CompactWorkExperienceLayout(
     item: WorkExperienceItem,
-    element: ResumeElement.WorkExperienceElement
+    element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
@@ -241,7 +248,7 @@ private fun CompactWorkExperienceLayout(
 
                 Text(
                     text = titleCompany,
-                    style = element.titleStyle.toComposeTextStyle(),
+                    style = element.titleStyle.toComposeTextStyle(zoomLevel),
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
@@ -250,7 +257,7 @@ private fun CompactWorkExperienceLayout(
             if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
-                    style = element.dateStyle.toComposeTextStyle()
+                    style = element.dateStyle.toComposeTextStyle(zoomLevel)
                 )
             }
         }
@@ -259,7 +266,7 @@ private fun CompactWorkExperienceLayout(
         if (element.showLocation && item.location.isNotEmpty()) {
             Text(
                 text = item.location,
-                style = element.locationStyle.toComposeTextStyle()
+                style = element.locationStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -267,7 +274,8 @@ private fun CompactWorkExperienceLayout(
         if (item.responsibilities.isNotEmpty()) {
             ResponsibilityList(
                 responsibilities = item.responsibilities,
-                element = element
+                element = element,
+                zoomLevel = zoomLevel
             )
         }
     }
@@ -279,7 +287,8 @@ private fun CompactWorkExperienceLayout(
 @Composable
 private fun DetailedWorkExperienceLayout(
     item: WorkExperienceItem,
-    element: ResumeElement.WorkExperienceElement
+    element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
@@ -288,7 +297,7 @@ private fun DetailedWorkExperienceLayout(
         if (item.jobTitle.isNotEmpty()) {
             Text(
                 text = item.jobTitle,
-                style = element.titleStyle.toComposeTextStyle()
+                style = element.titleStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -296,7 +305,7 @@ private fun DetailedWorkExperienceLayout(
         if (item.company.isNotEmpty()) {
             Text(
                 text = item.company,
-                style = element.companyStyle.toComposeTextStyle()
+                style = element.companyStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -309,7 +318,7 @@ private fun DetailedWorkExperienceLayout(
             if (element.showLocation && item.location.isNotEmpty()) {
                 Text(
                     text = item.location,
-                    style = element.locationStyle.toComposeTextStyle(),
+                    style = element.locationStyle.toComposeTextStyle(zoomLevel),
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
@@ -317,7 +326,7 @@ private fun DetailedWorkExperienceLayout(
             if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
-                    style = element.dateStyle.toComposeTextStyle()
+                    style = element.dateStyle.toComposeTextStyle(zoomLevel)
                 )
             }
         }
@@ -326,7 +335,8 @@ private fun DetailedWorkExperienceLayout(
         if (item.responsibilities.isNotEmpty()) {
             ResponsibilityList(
                 responsibilities = item.responsibilities,
-                element = element
+                element = element,
+                zoomLevel = zoomLevel
             )
         }
     }
@@ -338,7 +348,8 @@ private fun DetailedWorkExperienceLayout(
 @Composable
 private fun ResponsibilityList(
     responsibilities: List<ResponsibilityItem>,
-    element: ResumeElement.WorkExperienceElement
+    element: ResumeElement.WorkExperienceElement,
+    zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(element.responsibilitySpacing.dp)
@@ -352,13 +363,13 @@ private fun ResponsibilityList(
                     // Bullet
                     Text(
                         text = getBulletCharacter(element.bulletStyle, index, responsibility),
-                        style = element.responsibilityStyle.toComposeTextStyle()
+                        style = element.responsibilityStyle.toComposeTextStyle(zoomLevel)
                     )
 
                     // Responsibility text
                     Text(
                         text = responsibility.text,
-                        style = element.responsibilityStyle.toComposeTextStyle(),
+                        style = element.responsibilityStyle.toComposeTextStyle(zoomLevel),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -430,13 +441,13 @@ private fun formatDate(dateString: String, dateFormat: DateFormat): String {
 /**
  * Converts custom TextStyle to Compose TextStyle
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(): TextStyle {
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): TextStyle {
     return TextStyle(
-        fontSize = fontSize.sp,
+        fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
         color = Color(color),
-        lineHeight = lineHeight?.sp ?: androidx.compose.ui.unit.TextUnit.Unspecified,
-        letterSpacing = letterSpacing.sp,
+        lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
+        letterSpacing = (letterSpacing * zoomLevel).sp,
         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
         textDecoration = if (isUnderlined) TextDecoration.Underline else TextDecoration.None
     )

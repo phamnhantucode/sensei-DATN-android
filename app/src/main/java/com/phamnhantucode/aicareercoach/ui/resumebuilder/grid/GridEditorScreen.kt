@@ -577,7 +577,8 @@ private fun GridCanvas(
                             is ResumeElement.TextElement -> {
                                 TextElementRenderer(
                                     element = element,
-                                    isEditing = false
+                                    isEditing = false,
+                                    zoomLevel = zoomLevel
                                 )
                             }
                             is ResumeElement.ImageElement -> {
@@ -592,12 +593,14 @@ private fun GridCanvas(
                             }
                             is ResumeElement.ContactElement -> {
                                 ContactElementRenderer(
-                                    element = element
+                                    element = element,
+                                    zoomLevel = zoomLevel
                                 )
                             }
                             is ResumeElement.WorkExperienceElement -> {
                                 WorkExperienceElementRenderer(
-                                    element = element
+                                    element = element,
+                                    zoomLevel = zoomLevel
                                 )
                             }
                             else -> {

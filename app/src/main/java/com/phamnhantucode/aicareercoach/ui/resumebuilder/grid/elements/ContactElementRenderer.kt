@@ -29,6 +29,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
 @Composable
 fun ContactElementRenderer(
     element: ResumeElement.ContactElement,
+    zoomLevel: Float = 1f,
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = element.style.backgroundColor?.let { Color(it) }
@@ -110,7 +111,8 @@ fun ContactElementRenderer(
                             textStyle = element.textStyle,
                             iconSize = element.iconSize,
                             iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
-                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER
+                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
+                            zoomLevel = zoomLevel
                         )
                     }
                 }
@@ -128,7 +130,8 @@ fun ContactElementRenderer(
                             textStyle = element.textStyle,
                             iconSize = element.iconSize,
                             iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
-                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER
+                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
+                            zoomLevel = zoomLevel
                         )
                     }
                 }
@@ -147,7 +150,8 @@ private fun ContactItemRow(
     textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
     iconSize: Float,
     iconAfterText: Boolean = false,
-    verticalAlignment: VerticalAlignment = VerticalAlignment.CENTER
+    verticalAlignment: VerticalAlignment = VerticalAlignment.CENTER,
+    zoomLevel: Float = 1f
 ) {
     val rowVerticalAlignment = when (verticalAlignment) {
         VerticalAlignment.TOP -> Alignment.Top
@@ -161,20 +165,20 @@ private fun ContactItemRow(
     ) {
         // Render icon/label before text (default)
         if (!iconAfterText) {
-            RenderIconOrLabel(item, iconStyle, textStyle, iconSize)
+            RenderIconOrLabel(item, iconStyle, textStyle, iconSize, zoomLevel)
         }
 
         // Contact value
         if (item.value.isNotEmpty()) {
             Text(
                 text = item.value,
-                style = textStyle.toComposeTextStyle()
+                style = textStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
         // Render icon/label after text (when horizontalAlignment is END)
         if (iconAfterText) {
-            RenderIconOrLabel(item, iconStyle, textStyle, iconSize)
+            RenderIconOrLabel(item, iconStyle, textStyle, iconSize, zoomLevel)
         }
     }
 }
@@ -187,7 +191,8 @@ private fun RenderIconOrLabel(
     item: ContactItem,
     iconStyle: ContactIconStyle,
     textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
-    iconSize: Float
+    iconSize: Float,
+    zoomLevel: Float = 1f
 ) {
     when (iconStyle) {
         ContactIconStyle.ICON -> {
@@ -197,7 +202,7 @@ private fun RenderIconOrLabel(
                 Icon(
                     imageVector = icon,
                     contentDescription = item.label.ifEmpty { item.type.name },
-                    modifier = Modifier.size(iconSize.dp),
+                    modifier = Modifier.size((iconSize * zoomLevel).dp),
                     tint = Color(textStyle.color)
                 )
             }
@@ -207,7 +212,7 @@ private fun RenderIconOrLabel(
             if (item.label.isNotEmpty()) {
                 Text(
                     text = item.label,
-                    style = textStyle.toComposeTextStyle().copy(
+                    style = textStyle.toComposeTextStyle(zoomLevel).copy(
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -239,13 +244,13 @@ private fun getContactIcon(type: ContactType, customIconName: String): ImageVect
 /**
  * Converts custom TextStyle to Compose TextStyle
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(): TextStyle {
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): TextStyle {
     return TextStyle(
-        fontSize = fontSize.sp,
+        fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
         color = Color(color),
-        lineHeight = lineHeight?.sp ?: androidx.compose.ui.unit.TextUnit.Unspecified,
-        letterSpacing = letterSpacing.sp,
+        lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
+        letterSpacing = (letterSpacing * zoomLevel).sp,
         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
         textDecoration = if (isUnderlined) TextDecoration.Underline else TextDecoration.None
     )
