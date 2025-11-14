@@ -182,6 +182,12 @@ fun PropertyPanel(
                         onUpdateElement = onUpdateElement
                     )
                 }
+                is ResumeElement.EducationElement -> {
+                    EducationElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
                 else -> {
                     Text("Properties not yet implemented for this element type")
                 }
@@ -327,10 +333,11 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Template Mode Tag (for TextElement, ImageElement, and WorkExperienceElement)
+        // Template Mode Tag (for TextElement, ImageElement, WorkExperienceElement, and EducationElement)
         if (element is ResumeElement.TextElement ||
             element is ResumeElement.ImageElement ||
-            element is ResumeElement.WorkExperienceElement) {
+            element is ResumeElement.WorkExperienceElement ||
+            element is ResumeElement.EducationElement) {
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
             var showTagMenu by remember { mutableStateOf(false) }
@@ -366,9 +373,10 @@ private fun CommonPropertiesSection(
                             // Filter tags based on element type
                             val isApplicable = when (element) {
                                 is ResumeElement.ImageElement -> tag == UserInfoTag.AVATAR || tag == UserInfoTag.NONE
-                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE
+                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE && tag != UserInfoTag.EDUCATION
                                 is ResumeElement.WorkExperienceElement -> tag == UserInfoTag.WORK_EXPERIENCE || tag == UserInfoTag.NONE
-                                else -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE
+                                is ResumeElement.EducationElement -> tag == UserInfoTag.EDUCATION || tag == UserInfoTag.NONE
+                                else -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE && tag != UserInfoTag.EDUCATION
                             }
 
                             if (isApplicable) {
@@ -400,6 +408,7 @@ private fun CommonPropertiesSection(
                                                         UserInfoTag.WEBSITE -> personalInfo.portfolio
                                                         UserInfoTag.AVATAR -> updatedElement.content
                                                         UserInfoTag.WORK_EXPERIENCE -> updatedElement.content
+                                                        UserInfoTag.EDUCATION -> updatedElement.content
                                                         UserInfoTag.NONE -> updatedElement.content
                                                     }
                                                     updatedElement.copy(content = content)
@@ -436,6 +445,29 @@ private fun CommonPropertiesSection(
                                                             )
                                                         }
                                                         updatedElement.copy(items = workExperienceItems)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.EducationElement -> {
+                                                    if (newTag == UserInfoTag.EDUCATION && resume != null && resume.education.isNotEmpty()) {
+                                                        // Convert form Education to grid EducationItem
+                                                        val educationItems = resume.education.map { edu ->
+                                                            EducationItem(
+                                                                degree = edu.degree,
+                                                                institution = edu.institution,
+                                                                location = edu.location,
+                                                                startDate = edu.startDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                endDate = edu.endDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                gpa = edu.gpa,
+                                                                achievements = emptyList() // Form-based resume doesn't have achievements yet
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = educationItems)
                                                     } else {
                                                         updatedElement
                                                     }
@@ -520,6 +552,29 @@ private fun CommonPropertiesSection(
                                                 )
                                             }
                                             element.copy(items = workExperienceItems)
+                                        } else {
+                                            element
+                                        }
+                                    }
+                                    is ResumeElement.EducationElement -> {
+                                        if (element.userInfoTag == UserInfoTag.EDUCATION && resume != null && resume.education.isNotEmpty()) {
+                                            // Convert form Education to grid EducationItem
+                                            val educationItems = resume.education.map { edu ->
+                                                EducationItem(
+                                                    degree = edu.degree,
+                                                    institution = edu.institution,
+                                                    location = edu.location,
+                                                    startDate = edu.startDate?.format(
+                                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                    ) ?: "",
+                                                    endDate = edu.endDate?.format(
+                                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                    ) ?: "",
+                                                    gpa = edu.gpa,
+                                                    achievements = emptyList()
+                                                )
+                                            }
+                                            element.copy(items = educationItems)
                                         } else {
                                             element
                                         }
@@ -2097,6 +2152,406 @@ private fun ColorPicker(
     }
 }
 
+/**
+ * Education element properties
+ */
+@Composable
+private fun EducationElementProperties(
+    element: ResumeElement.EducationElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Education Items") {
+        // Education items list
+        element.items.forEachIndexed { index, item ->
+            EducationItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add education item button
+        Button(
+            onClick = {
+                val newItem = EducationItem(
+                    degree = "Degree Name",
+                    institution = "University Name",
+                    location = "Location",
+                    startDate = "",
+                    endDate = "",
+                    gpa = "",
+                    achievements = emptyList()
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Education")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            EducationDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Orientation toggle
+        Text("Orientation", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            EducationOrientation.entries.forEach { orientation ->
+                FilterChip(
+                    selected = element.orientation == orientation,
+                    onClick = {
+                        onUpdateElement(element.copy(orientation = orientation))
+                    },
+                    label = { Text(orientation.name) }
+                )
+            }
+        }
+
+        // Show/Hide options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Location", fontSize = 12.sp)
+            Switch(
+                checked = element.showLocation,
+                onCheckedChange = { onUpdateElement(element.copy(showLocation = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Dates", fontSize = 12.sp)
+            Switch(
+                checked = element.showDates,
+                onCheckedChange = { onUpdateElement(element.copy(showDates = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show GPA", fontSize = 12.sp)
+            Switch(
+                checked = element.showGPA,
+                onCheckedChange = { onUpdateElement(element.copy(showGPA = it)) }
+            )
+        }
+
+        // Horizontal alignment
+        Text("Horizontal Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            HorizontalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.horizontalAlignment ?: HorizontalAlignment.START) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(horizontalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Vertical alignment
+        Text("Vertical Alignment", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            VerticalAlignment.entries.forEach { alignment ->
+                FilterChip(
+                    selected = (element.verticalAlignment ?: VerticalAlignment.TOP) == alignment,
+                    onClick = {
+                        onUpdateElement(element.copy(verticalAlignment = alignment))
+                    },
+                    label = { Text(alignment.name) }
+                )
+            }
+        }
+
+        // Spacing sliders
+        SliderField(
+            label = "Entry Spacing: ${element.spacing.toInt()}dp",
+            value = element.spacing,
+            valueRange = 0f..32f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(spacing = newSpacing))
+            }
+        )
+
+        SliderField(
+            label = "Item Spacing: ${element.itemSpacing.toInt()}dp",
+            value = element.itemSpacing,
+            valueRange = 0f..16f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(itemSpacing = newSpacing))
+            }
+        )
+
+        SliderField(
+            label = "Achievement Spacing: ${element.achievementSpacing.toInt()}dp",
+            value = element.achievementSpacing,
+            valueRange = 0f..12f,
+            onValueChange = { newSpacing ->
+                onUpdateElement(element.copy(achievementSpacing = newSpacing))
+            }
+        )
+    }
+
+    PropertySection(title = "Date & Bullet Settings") {
+        // Date format
+        Text("Date Format", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            DateFormat.entries.forEach { format ->
+                FilterChip(
+                    selected = element.dateFormat == format,
+                    onClick = {
+                        onUpdateElement(element.copy(dateFormat = format))
+                    },
+                    label = { Text(format.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Date separator
+        OutlinedTextField(
+            value = element.dateSeparator,
+            onValueChange = { onUpdateElement(element.copy(dateSeparator = it)) },
+            label = { Text("Date Separator") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        // Bullet style
+        Text("Bullet Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            BulletStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.bulletStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(bulletStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single education item
+ */
+@Composable
+private fun EducationItemEditor(
+    item: EducationItem,
+    onUpdate: (EducationItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (item.degree.isNotEmpty()) item.degree else "Education",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Degree
+            OutlinedTextField(
+                value = item.degree,
+                onValueChange = { onUpdate(item.copy(degree = it)) },
+                label = { Text("Degree") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Institution
+            OutlinedTextField(
+                value = item.institution,
+                onValueChange = { onUpdate(item.copy(institution = it)) },
+                label = { Text("Institution") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Location
+            OutlinedTextField(
+                value = item.location,
+                onValueChange = { onUpdate(item.copy(location = it)) },
+                label = { Text("Location") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Start Date
+            OutlinedTextField(
+                value = item.startDate,
+                onValueChange = { onUpdate(item.copy(startDate = it)) },
+                label = { Text("Start Date (yyyy-MM-dd)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("2016-09-01") }
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // End Date
+            OutlinedTextField(
+                value = item.endDate,
+                onValueChange = { onUpdate(item.copy(endDate = it)) },
+                label = { Text("End Date (yyyy-MM-dd)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("2020-05-31") }
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // GPA
+            OutlinedTextField(
+                value = item.gpa,
+                onValueChange = { onUpdate(item.copy(gpa = it)) },
+                label = { Text("GPA") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("3.8") }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Achievements
+            Text("Achievements", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            item.achievements.forEachIndexed { index, achievement ->
+                AchievementItemEditor(
+                    achievement = achievement,
+                    onUpdate = { updated ->
+                        val updatedAchievements = item.achievements.toMutableList()
+                        updatedAchievements[index] = updated
+                        onUpdate(item.copy(achievements = updatedAchievements))
+                    },
+                    onRemove = {
+                        val updatedAchievements = item.achievements.toMutableList()
+                        updatedAchievements.removeAt(index)
+                        onUpdate(item.copy(achievements = updatedAchievements))
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Add Achievement Button
+            Button(
+                onClick = {
+                    val newAchievement = AchievementItem(text = "")
+                    onUpdate(item.copy(achievements = item.achievements + newAchievement))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Add Achievement", fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single achievement item
+ */
+@Composable
+private fun AchievementItemEditor(
+    achievement: AchievementItem,
+    onUpdate: (AchievementItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = achievement.text,
+            onValueChange = { onUpdate(achievement.copy(text = it)) },
+            modifier = Modifier.weight(1f),
+            singleLine = false,
+            maxLines = 3,
+            placeholder = { Text("Achievement description", fontSize = 12.sp) }
+        )
+        IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
 // Helper functions to update elements immutably
 private fun updateElementPosition(element: ResumeElement, newPosition: GridPosition): ResumeElement {
     return when (element) {
@@ -2108,6 +2563,7 @@ private fun updateElementPosition(element: ResumeElement, newPosition: GridPosit
         is ResumeElement.IconElement -> element.copy(position = newPosition)
         is ResumeElement.ContactElement -> element.copy(position = newPosition)
         is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
+        is ResumeElement.EducationElement -> element.copy(position = newPosition)
     }
 }
 
@@ -2121,6 +2577,7 @@ private fun updateElementZIndex(element: ResumeElement, newZIndex: Int): ResumeE
         is ResumeElement.IconElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.ContactElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.WorkExperienceElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.EducationElement -> element.copy(zIndex = newZIndex)
     }
 }
 
@@ -2134,6 +2591,7 @@ private fun updateElementLocked(element: ResumeElement, locked: Boolean): Resume
         is ResumeElement.IconElement -> element.copy(locked = locked)
         is ResumeElement.ContactElement -> element.copy(locked = locked)
         is ResumeElement.WorkExperienceElement -> element.copy(locked = locked)
+        is ResumeElement.EducationElement -> element.copy(locked = locked)
     }
 }
 
@@ -2147,6 +2605,7 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.IconElement -> element.copy(style = newStyle)
         is ResumeElement.ContactElement -> element.copy(style = newStyle)
         is ResumeElement.WorkExperienceElement -> element.copy(style = newStyle)
+        is ResumeElement.EducationElement -> element.copy(style = newStyle)
     }
 }
 
@@ -2160,5 +2619,6 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.IconElement -> element.copy(userInfoTag = tag)
         is ResumeElement.ContactElement -> element.copy(userInfoTag = tag)
         is ResumeElement.WorkExperienceElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.EducationElement -> element.copy(userInfoTag = tag)
     }
 }

@@ -4,8 +4,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -131,7 +133,14 @@ fun AppNavigation() {
         }
 
         composable(Screen.GridEditor.route) {
-            val viewModel: GridEditorViewModel = remember { GridEditorViewModel(context) }
+            val viewModel: GridEditorViewModel = viewModel(
+                factory = object : ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                        return GridEditorViewModel(context) as T
+                    }
+                }
+            )
             GridEditorScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPreview = { /* TODO: Navigate to preview if needed */ },

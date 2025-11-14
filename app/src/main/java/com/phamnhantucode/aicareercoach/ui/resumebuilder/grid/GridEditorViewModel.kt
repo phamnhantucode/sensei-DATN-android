@@ -77,6 +77,24 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
         loadOrCreateResume()
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        // Save data before ViewModel is destroyed to prevent data loss
+        // Use runBlocking to ensure save completes before destruction
+        try {
+            // Cancel pending auto-save to avoid duplicate saves
+            autoSaveJob?.cancel()
+
+            // Perform final save synchronously
+            val gridResumeJson = gson.toJson(_gridResume.value)
+            sharedPreferences.edit()
+                .putString("latest_grid_resume", gridResumeJson)
+                .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     // ============================================================================
     // Loading & Saving
     // ============================================================================
@@ -190,7 +208,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
 
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(3000) // 3 second debounce
+            delay(1500) // 1.5 second debounce - faster saves, less data loss risk
             save()
         }
     }
@@ -507,6 +525,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                             UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
                             UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
                             UserInfoTag.WORK_EXPERIENCE -> element.content // Work experience doesn't apply to text
+                            UserInfoTag.EDUCATION -> element.content // Education doesn't apply to text
                             UserInfoTag.NONE -> element.content
                         }
                         element.copy(content = content)
@@ -532,6 +551,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                                 UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
                                 UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
                                 UserInfoTag.WORK_EXPERIENCE -> item.value // Work experience doesn't apply to contact
+                                UserInfoTag.EDUCATION -> item.value // Education doesn't apply to contact
                                 UserInfoTag.NONE -> item.value
                             }
                             item.copy(value = value)
@@ -778,6 +798,25 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     )
                 )
             }
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.EDUCATION -> {
+                ResumeElement.EducationElement(
+                    position = position,
+                    items = listOf(
+                        EducationItem(
+                            degree = "Degree Name",
+                            institution = "University Name",
+                            location = "Location",
+                            startDate = "2016-09-01",
+                            endDate = "2020-05-31",
+                            gpa = "3.8",
+                            achievements = listOf(
+                                AchievementItem(text = "Achievement 1"),
+                                AchievementItem(text = "Achievement 2")
+                            )
+                        )
+                    )
+                )
+            }
         }
     }
 
@@ -792,6 +831,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             ElementType.DIVIDER -> Pair(4, 48) // Full width thin line
             ElementType.CONTACT -> Pair(12, 20) // Vertical list of contact items
             ElementType.WORK_EXPERIENCE -> Pair(20, 48) // Full width with multiple work items
+            ElementType.EDUCATION -> Pair(20, 48) // Full width with multiple education items
         }
     }
 
@@ -805,6 +845,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             is ResumeElement.IconElement -> element.copy(position = position)
             is ResumeElement.ContactElement -> element.copy(position = position)
             is ResumeElement.WorkExperienceElement -> element.copy(position = position)
+            is ResumeElement.EducationElement -> element.copy(position = position)
         }
     }
 

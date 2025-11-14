@@ -107,7 +107,8 @@ enum class UserInfoTag {
     LINKEDIN,        // LinkedIn URL
     WEBSITE,         // Portfolio/website URL
     AVATAR,          // Profile picture
-    WORK_EXPERIENCE  // Work experience data
+    WORK_EXPERIENCE, // Work experience data
+    EDUCATION        // Education data
 }
 
 // ============================================================================
@@ -269,6 +270,39 @@ sealed class ResumeElement {
         val dateSeparator: String = " - ",
         val bulletStyle: BulletStyle = BulletStyle.DISC
     ) : ResumeElement()
+
+    /**
+     * Education element - pre-composed component for educational background
+     * Displays a list of education entries with degrees, institutions, dates, and achievements
+     */
+    data class EducationElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<EducationItem> = emptyList(),
+        val displayStyle: EducationDisplayStyle = EducationDisplayStyle.STANDARD,
+        val orientation: EducationOrientation = EducationOrientation.VERTICAL,
+        val showLocation: Boolean = true,
+        val showDates: Boolean = true,
+        val showGPA: Boolean = true,
+        val spacing: Float = 16f, // dp between education entries
+        val itemSpacing: Float = 4f, // dp between fields within an entry
+        val achievementSpacing: Float = 4f, // dp between achievement bullets
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val degreeStyle: TextStyle = TextStyle(fontSize = 16f, fontWeight = FontWeight.Bold),
+        val institutionStyle: TextStyle = TextStyle(fontSize = 14f, fontWeight = FontWeight.SemiBold),
+        val dateStyle: TextStyle = TextStyle(fontSize = 12f),
+        val locationStyle: TextStyle = TextStyle(fontSize = 12f),
+        val gpaStyle: TextStyle = TextStyle(fontSize = 12f),
+        val achievementStyle: TextStyle = TextStyle(fontSize = 12f),
+        val dateFormat: DateFormat = DateFormat.MMM_YYYY,
+        val dateSeparator: String = " - ",
+        val bulletStyle: BulletStyle = BulletStyle.DISC
+    ) : ResumeElement()
 }
 
 // ============================================================================
@@ -344,6 +378,30 @@ data class WorkExperienceItem(
  * Individual responsibility/bullet point within a WorkExperienceItem
  */
 data class ResponsibilityItem(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String = "",
+    val customBullet: String? = null // Optional custom bullet icon/character
+)
+
+/**
+ * Individual education item within an EducationElement
+ */
+data class EducationItem(
+    val id: String = UUID.randomUUID().toString(),
+    val degree: String = "",
+    val institution: String = "",
+    val location: String = "",
+    val startDate: String = "", // ISO format or formatted string
+    val endDate: String = "",
+    val gpa: String = "",
+    val achievements: List<AchievementItem> = emptyList(),
+    val userInfoTag: UserInfoTag? = null // For template mode
+)
+
+/**
+ * Individual achievement/bullet point within an EducationItem
+ */
+data class AchievementItem(
     val id: String = UUID.randomUUID().toString(),
     val text: String = "",
     val customBullet: String? = null // Optional custom bullet icon/character
@@ -464,6 +522,17 @@ enum class WorkExperienceDisplayStyle {
 }
 
 enum class WorkExperienceOrientation {
+    VERTICAL,   // Stack entries vertically
+    HORIZONTAL  // Arrange entries in columns (side by side)
+}
+
+enum class EducationDisplayStyle {
+    STANDARD,  // Traditional layout: Degree | Institution on separate lines
+    COMPACT,   // Condensed: Degree + Institution on same line
+    DETAILED   // Expanded with all fields prominently displayed
+}
+
+enum class EducationOrientation {
     VERTICAL,   // Stack entries vertically
     HORIZONTAL  // Arrange entries in columns (side by side)
 }
