@@ -303,6 +303,44 @@ sealed class ResumeElement {
         val dateSeparator: String = " - ",
         val bulletStyle: BulletStyle = BulletStyle.DISC
     ) : ResumeElement()
+
+    /**
+     * Skill element - pre-composed component for skills section
+     * Displays a list of skills with various visual styles (tags, bars, list, etc.)
+     */
+    data class SkillElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<SkillItem> = emptyList(),
+        val displayStyle: SkillDisplayStyle = SkillDisplayStyle.LIST,
+        val spacing: Float = 8f, // dp between skill items
+        val groupSpacing: Float = 16f, // dp between skill groups (for GROUPED style)
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val skillStyle: TextStyle = TextStyle(fontSize = 14f),
+        val categoryStyle: TextStyle = TextStyle(fontSize = 16f, fontWeight = FontWeight.Bold),
+        val proficiencyLabelStyle: TextStyle = TextStyle(fontSize = 10f),
+        val showBullets: Boolean = true,
+        val bulletStyle: BulletStyle = BulletStyle.DISC,
+        val showProficiencyLabel: Boolean = false,
+        // Tag style properties
+        val tagBackgroundColor: Long? = 0xFFE3F2FD,
+        val tagBorderColor: Long? = null,
+        val tagBorderWidth: Float = 0f,
+        val tagCornerRadius: Float = 16f,
+        // Progress bar properties
+        val progressBarHeight: Float = 8f,
+        val progressBarCornerRadius: Float = 4f,
+        val progressBarColor: Long? = 0xFF2196F3,
+        val progressBarBackgroundColor: Long? = 0xFFE0E0E0,
+        // Dot rating properties
+        val maxDots: Int = 5,
+        val dotSize: Float = 8f
+    ) : ResumeElement()
 }
 
 // ============================================================================
@@ -315,12 +353,16 @@ sealed class ResumeElement {
  * @param col Starting column (0-based)
  * @param rowSpan Number of rows to span
  * @param colSpan Number of columns to span
+ * @param widthMode How to calculate width (FIXED or WRAP_CONTENT)
+ * @param heightMode How to calculate height (FIXED or WRAP_CONTENT)
  */
 data class GridPosition(
     val row: Int = 0,
     val col: Int = 0,
     val rowSpan: Int = 1,
-    val colSpan: Int = 1
+    val colSpan: Int = 1,
+    val widthMode: SizeMode = SizeMode.FIXED,
+    val heightMode: SizeMode = SizeMode.FIXED
 ) {
     fun overlaps(other: GridPosition): Boolean {
         val thisEndRow = row + rowSpan
@@ -405,6 +447,18 @@ data class AchievementItem(
     val id: String = UUID.randomUUID().toString(),
     val text: String = "",
     val customBullet: String? = null // Optional custom bullet icon/character
+)
+
+/**
+ * Individual skill item within a SkillElement
+ */
+data class SkillItem(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val category: String = "", // For grouped display style
+    val proficiency: Float? = null, // 0.0 to 1.0 for bar/dot displays
+    val proficiencyLabel: String = "", // e.g., "Expert", "Advanced", "Intermediate"
+    val userInfoTag: UserInfoTag? = null // For template mode
 )
 
 // ============================================================================
@@ -553,6 +607,14 @@ enum class BulletStyle {
     NUMBERED,     // 1. 2. 3.
     CUSTOM_ICON,  // Use custom icon from responsibilityItem
     NONE          // No bullet
+}
+
+enum class SkillDisplayStyle {
+    LIST,           // Simple bulleted list
+    TAGS,           // Rounded tag/chip style
+    PROGRESS_BARS,  // Skills with proficiency bars
+    DOTS,           // Skills with dot-based proficiency rating
+    GROUPED         // Skills organized by category
 }
 
 /**

@@ -817,6 +817,19 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     )
                 )
             }
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.SKILL -> {
+                ResumeElement.SkillElement(
+                    position = position,
+                    items = listOf(
+                        SkillItem(name = "Kotlin", proficiency = 0.9f, proficiencyLabel = "Expert"),
+                        SkillItem(name = "Android Development", proficiency = 0.85f, proficiencyLabel = "Advanced"),
+                        SkillItem(name = "Jetpack Compose", proficiency = 0.8f, proficiencyLabel = "Advanced"),
+                        SkillItem(name = "Java", proficiency = 0.75f, proficiencyLabel = "Proficient"),
+                        SkillItem(name = "Git", proficiency = 0.7f, proficiencyLabel = "Proficient")
+                    ),
+                    displayStyle = SkillDisplayStyle.LIST
+                )
+            }
         }
     }
 
@@ -832,6 +845,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             ElementType.CONTACT -> Pair(12, 20) // Vertical list of contact items
             ElementType.WORK_EXPERIENCE -> Pair(20, 48) // Full width with multiple work items
             ElementType.EDUCATION -> Pair(20, 48) // Full width with multiple education items
+            ElementType.SKILL -> Pair(16, 48) // Full width with skills list
         }
     }
 
@@ -846,6 +860,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             is ResumeElement.ContactElement -> element.copy(position = position)
             is ResumeElement.WorkExperienceElement -> element.copy(position = position)
             is ResumeElement.EducationElement -> element.copy(position = position)
+            is ResumeElement.SkillElement -> element.copy(position = position)
         }
     }
 

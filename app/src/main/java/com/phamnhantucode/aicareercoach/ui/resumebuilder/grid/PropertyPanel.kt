@@ -2564,6 +2564,7 @@ private fun updateElementPosition(element: ResumeElement, newPosition: GridPosit
         is ResumeElement.ContactElement -> element.copy(position = newPosition)
         is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
         is ResumeElement.EducationElement -> element.copy(position = newPosition)
+        is ResumeElement.SkillElement -> element.copy(position = newPosition)
     }
 }
 
@@ -2578,6 +2579,7 @@ private fun updateElementZIndex(element: ResumeElement, newZIndex: Int): ResumeE
         is ResumeElement.ContactElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.WorkExperienceElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.EducationElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.SkillElement -> element.copy(zIndex = newZIndex)
     }
 }
 
@@ -2592,6 +2594,7 @@ private fun updateElementLocked(element: ResumeElement, locked: Boolean): Resume
         is ResumeElement.ContactElement -> element.copy(locked = locked)
         is ResumeElement.WorkExperienceElement -> element.copy(locked = locked)
         is ResumeElement.EducationElement -> element.copy(locked = locked)
+        is ResumeElement.SkillElement -> element.copy(locked = locked)
     }
 }
 
@@ -2606,6 +2609,7 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.ContactElement -> element.copy(style = newStyle)
         is ResumeElement.WorkExperienceElement -> element.copy(style = newStyle)
         is ResumeElement.EducationElement -> element.copy(style = newStyle)
+        is ResumeElement.SkillElement -> element.copy(style = newStyle)
     }
 }
 
@@ -2620,5 +2624,6 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.ContactElement -> element.copy(userInfoTag = tag)
         is ResumeElement.WorkExperienceElement -> element.copy(userInfoTag = tag)
         is ResumeElement.EducationElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.SkillElement -> element.copy(userInfoTag = tag)
     }
 }

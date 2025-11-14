@@ -35,6 +35,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactEl
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.EducationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.SkillElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.WorkExperienceElementRenderer
 import kotlinx.coroutines.CoroutineScope
@@ -175,6 +176,7 @@ fun GridEditorScreen(
                             is ResumeElement.ContactElement -> element.copy(position = clampedPosition)
                             is ResumeElement.WorkExperienceElement -> element.copy(position = clampedPosition)
                             is ResumeElement.EducationElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.SkillElement -> element.copy(position = clampedPosition)
                         }
                         viewModel.updateElement(updatedElement)
                     },
@@ -611,6 +613,12 @@ private fun GridCanvas(
                                     zoomLevel = zoomLevel
                                 )
                             }
+                            is ResumeElement.SkillElement -> {
+                                SkillElementRenderer(
+                                    element = element,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
                             else -> {
                                 // Placeholder for other element types
                                 Box(
@@ -695,6 +703,11 @@ private fun ElementPickerDialog(
                     icon = Icons.Default.School,
                     label = "Education",
                     onClick = { onElementTypeSelected(ElementType.EDUCATION) }
+                )
+                ElementTypeButton(
+                    icon = Icons.Default.Stars,
+                    label = "Skills",
+                    onClick = { onElementTypeSelected(ElementType.SKILL) }
                 )
             }
         },
@@ -875,7 +888,8 @@ enum class ElementType {
     ICON,
     CONTACT,
     WORK_EXPERIENCE,
-    EDUCATION
+    EDUCATION,
+    SKILL
 }
 
 // Icon aliases for missing icons (using available Material Icons)
