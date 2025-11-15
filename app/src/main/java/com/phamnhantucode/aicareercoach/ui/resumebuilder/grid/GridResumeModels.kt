@@ -341,6 +341,112 @@ sealed class ResumeElement {
         val maxDots: Int = 5,
         val dotSize: Float = 8f
     ) : ResumeElement()
+
+    /**
+     * Project element - pre-composed component for projects section
+     * Displays a list of projects with name, description, technologies, highlights, and links
+     */
+    data class ProjectElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<ProjectItem> = emptyList(),
+        val displayStyle: ProjectDisplayStyle = ProjectDisplayStyle.STANDARD,
+        val showDates: Boolean = true,
+        val showTechnologies: Boolean = true,
+        val showLink: Boolean = true,
+        val showDescription: Boolean = true,
+        val spacing: Float = 16f, // dp between project entries
+        val itemSpacing: Float = 4f, // dp between fields within an entry
+        val highlightSpacing: Float = 4f, // dp between highlight bullets
+        val technologySpacing: Float = 6f, // dp between technology tags
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val nameStyle: TextStyle = TextStyle(fontSize = 16f, fontWeight = FontWeight.Bold),
+        val descriptionStyle: TextStyle = TextStyle(fontSize = 12f),
+        val dateStyle: TextStyle = TextStyle(fontSize = 12f),
+        val technologyStyle: TextStyle = TextStyle(fontSize = 11f),
+        val highlightStyle: TextStyle = TextStyle(fontSize = 12f),
+        val linkStyle: TextStyle = TextStyle(fontSize = 11f, color = 0xFF2196F3),
+        val dateFormat: DateFormat = DateFormat.MMM_YYYY,
+        val dateSeparator: String = " - ",
+        val bulletStyle: BulletStyle = BulletStyle.DISC,
+        // Technology tag styling
+        val technologyTagBackgroundColor: Long? = 0xFFE3F2FD,
+        val technologyTagBorderColor: Long? = null,
+        val technologyTagBorderWidth: Float = 0f,
+        val technologyTagCornerRadius: Float = 12f
+    ) : ResumeElement()
+
+    /**
+     * Certification element - pre-composed component for certifications section
+     * Displays a list of certifications with name, issuer, dates, credential ID, and verification link
+     */
+    data class CertificationElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<CertificationItem> = emptyList(),
+        val displayStyle: CertificationDisplayStyle = CertificationDisplayStyle.STANDARD,
+        val showIssueDate: Boolean = true,
+        val showExpiryDate: Boolean = true,
+        val showCredentialId: Boolean = true,
+        val showVerificationLink: Boolean = true,
+        val showExpiryStatus: Boolean = true,
+        val spacing: Float = 16f, // dp between certification entries
+        val itemSpacing: Float = 4f, // dp between fields within an entry
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val nameStyle: TextStyle = TextStyle(fontSize = 16f, fontWeight = FontWeight.Bold),
+        val issuerStyle: TextStyle = TextStyle(fontSize = 14f, fontWeight = FontWeight.SemiBold),
+        val dateStyle: TextStyle = TextStyle(fontSize = 12f),
+        val credentialIdStyle: TextStyle = TextStyle(fontSize = 11f),
+        val linkStyle: TextStyle = TextStyle(fontSize = 11f, color = 0xFF2196F3),
+        val expiryStatusStyle: TextStyle = TextStyle(fontSize = 11f, fontWeight = FontWeight.Medium),
+        val dateFormat: DateFormat = DateFormat.MMM_YYYY,
+        val activeStatusColor: Long = 0xFF4CAF50, // Green for active
+        val expiredStatusColor: Long = 0xFFFF5722 // Red for expired
+    ) : ResumeElement()
+
+    /**
+     * Language element - pre-composed component for languages section
+     * Displays a list of languages with proficiency levels in various visual styles
+     */
+    data class LanguageElement(
+        override val id: String = UUID.randomUUID().toString(),
+        override val position: GridPosition,
+        override val style: ElementStyle = ElementStyle(),
+        override val zIndex: Int = 0,
+        override val locked: Boolean = false,
+        override val userInfoTag: UserInfoTag? = null,
+        val items: List<LanguageItem> = emptyList(),
+        val displayStyle: LanguageDisplayStyle = LanguageDisplayStyle.TEXT_LABELS,
+        val proficiencyType: LanguageProficiencyType = LanguageProficiencyType.TEXT,
+        val spacing: Float = 8f, // dp between language items
+        val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.TOP,
+        val languageStyle: TextStyle = TextStyle(fontSize = 14f, fontWeight = FontWeight.Medium),
+        val proficiencyLabelStyle: TextStyle = TextStyle(fontSize = 12f),
+        // Tag style properties (for TAGS display style)
+        val tagBackgroundColor: Long? = 0xFFE3F2FD,
+        val tagBorderColor: Long? = null,
+        val tagBorderWidth: Float = 0f,
+        val tagCornerRadius: Float = 16f,
+        // Progress bar properties (for PROGRESS_BARS display style)
+        val progressBarHeight: Float = 8f,
+        val progressBarCornerRadius: Float = 4f,
+        val progressBarColor: Long? = 0xFF2196F3,
+        val progressBarBackgroundColor: Long? = 0xFFE0E0E0,
+        // Dot rating properties (for DOTS display style)
+        val maxDots: Int = 5,
+        val dotSize: Float = 8f
+    ) : ResumeElement()
 }
 
 // ============================================================================
@@ -458,6 +564,77 @@ data class SkillItem(
     val category: String = "", // For grouped display style
     val proficiency: Float? = null, // 0.0 to 1.0 for bar/dot displays
     val proficiencyLabel: String = "", // e.g., "Expert", "Advanced", "Intermediate"
+    val userInfoTag: UserInfoTag? = null // For template mode
+)
+
+/**
+ * Individual project item within a ProjectElement
+ */
+data class ProjectItem(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val description: String = "",
+    val startDate: String = "", // ISO format or formatted string
+    val endDate: String = "",
+    val isOngoing: Boolean = false,
+    val technologies: String = "", // Comma-separated technologies (e.g., "React, TypeScript, Node.js")
+    val link: String = "", // Project URL/GitHub link
+    val highlights: List<ProjectHighlight> = emptyList(),
+    val userInfoTag: UserInfoTag? = null // For template mode
+)
+
+/**
+ * Individual highlight/bullet point within a ProjectItem
+ */
+data class ProjectHighlight(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String = "",
+    val customBullet: String? = null // Optional custom bullet icon/character
+)
+
+/**
+ * Individual certification item within a CertificationElement
+ */
+data class CertificationItem(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "",
+    val issuer: String = "",
+    val issueDate: String = "", // ISO format or formatted string
+    val expiryDate: String = "", // ISO format or formatted string (empty if no expiry)
+    val credentialId: String = "",
+    val verificationLink: String = "",
+    val userInfoTag: UserInfoTag? = null // For template mode
+) {
+    /**
+     * Check if certification is expired
+     */
+    val isExpired: Boolean
+        get() {
+            if (expiryDate.isEmpty()) return false
+            return try {
+                val expiry = java.time.LocalDate.parse(expiryDate)
+                expiry.isBefore(java.time.LocalDate.now())
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    /**
+     * Check if certification is active (not expired)
+     */
+    val isActive: Boolean
+        get() = !isExpired || expiryDate.isEmpty()
+}
+
+/**
+ * Individual language item within a LanguageElement
+ */
+data class LanguageItem(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "", // Language name (e.g., "English", "Spanish")
+    val proficiency: Float = 0.5f, // 0.0 to 1.0 for visual displays
+    val proficiencyLabel: String = "", // e.g., "Native", "Fluent", "Intermediate"
+    val cefrLevel: String? = null, // e.g., "C2", "B2", "A1" (Common European Framework of Reference)
     val userInfoTag: UserInfoTag? = null // For template mode
 )
 
@@ -615,6 +792,36 @@ enum class SkillDisplayStyle {
     PROGRESS_BARS,  // Skills with proficiency bars
     DOTS,           // Skills with dot-based proficiency rating
     GROUPED         // Skills organized by category
+}
+
+enum class ProjectDisplayStyle {
+    STANDARD,  // Traditional layout: Name on top, description below
+    COMPACT,   // Condensed: Minimal spacing, shorter descriptions
+    DETAILED   // Expanded with all fields prominently displayed
+}
+
+enum class CertificationDisplayStyle {
+    STANDARD,  // Traditional layout: Name | Issuer on separate lines
+    COMPACT,   // Condensed: Name + Issuer on same line
+    DETAILED   // Expanded with all fields prominently displayed
+}
+
+enum class LanguageDisplayStyle {
+    TEXT_LABELS,   // Simple text layout (Language - Proficiency)
+    PROGRESS_BARS, // Visual bars showing proficiency
+    DOTS,          // Dot indicators (like Skills)
+    TAGS           // Chip-style tags with proficiency
+}
+
+enum class LanguageProficiencyType {
+    TEXT,    // Text labels (Native, Fluent, etc.)
+    CEFR,    // Common European Framework (A1-C2)
+    NUMERIC  // Numeric scale (percentage or 0.0-1.0)
+}
+
+enum class SizeMode {
+    FIXED,         // Use rowSpan/colSpan for size
+    WRAP_CONTENT   // Auto-size to fit content
 }
 
 /**

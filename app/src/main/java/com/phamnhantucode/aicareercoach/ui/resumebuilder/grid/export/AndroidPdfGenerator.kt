@@ -224,6 +224,21 @@ class AndroidPdfGenerator(
                         skillRenderer.render(canvas, element, bounds, mapper, renderContext)
                     }
 
+                    is ResumeElement.ProjectElement -> {
+                        // TODO: Implement PDF renderer for ProjectElement
+                        // For now, skip rendering
+                    }
+
+                    is ResumeElement.CertificationElement -> {
+                        // TODO: Implement PDF renderer for CertificationElement
+                        // For now, skip rendering
+                    }
+
+                    is ResumeElement.LanguageElement -> {
+                        // TODO: Implement PDF renderer for LanguageElement
+                        // For now, skip rendering
+                    }
+
                     is ResumeElement.ContainerElement -> {
                         // Containers are just layout helpers, skip rendering
                         // Their children are rendered separately

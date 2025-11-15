@@ -188,6 +188,30 @@ fun PropertyPanel(
                         onUpdateElement = onUpdateElement
                     )
                 }
+                is ResumeElement.SkillElement -> {
+                    SkillElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
+                is ResumeElement.ProjectElement -> {
+                    ProjectElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
+                is ResumeElement.CertificationElement -> {
+                    CertificationElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
+                is ResumeElement.LanguageElement -> {
+                    LanguageElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement
+                    )
+                }
                 else -> {
                     Text("Properties not yet implemented for this element type")
                 }
@@ -284,28 +308,67 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Size
+        // Size Mode Toggles
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            NumberField(
-                label = "Height",
-                value = element.position.rowSpan,
-                onValueChange = { newHeight ->
-                    val newPosition = element.position.copy(rowSpan = newHeight.coerceAtLeast(1))
+            Text("Wrap Width", style = MaterialTheme.typography.bodyMedium)
+            Switch(
+                checked = element.position.widthMode == SizeMode.WRAP_CONTENT,
+                onCheckedChange = { wrapWidth ->
+                    val newMode = if (wrapWidth) SizeMode.WRAP_CONTENT else SizeMode.FIXED
+                    val newPosition = element.position.copy(widthMode = newMode)
                     onUpdateElement(updateElementPosition(element, newPosition))
-                },
-                modifier = Modifier.weight(1f)
+                }
             )
-            NumberField(
-                label = "Width",
-                value = element.position.colSpan,
-                onValueChange = { newWidth ->
-                    val newPosition = element.position.copy(colSpan = newWidth.coerceAtLeast(1))
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Wrap Height", style = MaterialTheme.typography.bodyMedium)
+            Switch(
+                checked = element.position.heightMode == SizeMode.WRAP_CONTENT,
+                onCheckedChange = { wrapHeight ->
+                    val newMode = if (wrapHeight) SizeMode.WRAP_CONTENT else SizeMode.FIXED
+                    val newPosition = element.position.copy(heightMode = newMode)
                     onUpdateElement(updateElementPosition(element, newPosition))
-                },
-                modifier = Modifier.weight(1f)
+                }
             )
+        }
+
+        // Size (only show when not wrap content)
+        if (element.position.widthMode == SizeMode.FIXED || element.position.heightMode == SizeMode.FIXED) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (element.position.heightMode == SizeMode.FIXED) {
+                    NumberField(
+                        label = "Height",
+                        value = element.position.rowSpan,
+                        onValueChange = { newHeight ->
+                            val newPosition = element.position.copy(rowSpan = newHeight.coerceAtLeast(1))
+                            onUpdateElement(updateElementPosition(element, newPosition))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (element.position.widthMode == SizeMode.FIXED) {
+                    NumberField(
+                        label = "Width",
+                        value = element.position.colSpan,
+                        onValueChange = { newWidth ->
+                            val newPosition = element.position.copy(colSpan = newWidth.coerceAtLeast(1))
+                            onUpdateElement(updateElementPosition(element, newPosition))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         // Z-Index
@@ -2552,6 +2615,783 @@ private fun AchievementItemEditor(
     }
 }
 
+/**
+ * Skill element properties
+ */
+@Composable
+private fun SkillElementProperties(
+    element: ResumeElement.SkillElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Skill Items") {
+        // Skill items list
+        element.items.forEachIndexed { index, item ->
+            SkillItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add skill item button
+        Button(
+            onClick = {
+                val newItem = SkillItem(
+                    name = "New Skill",
+                    category = "",
+                    proficiency = 0.5f,
+                    proficiencyLabel = ""
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Skill")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            SkillDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Spacing
+        SliderField(
+            label = "Spacing",
+            value = element.spacing,
+            valueRange = 0f..32f,
+            onValueChange = { onUpdateElement(element.copy(spacing = it)) }
+        )
+    }
+}
+
+/**
+ * Editor for a single skill item
+ */
+@Composable
+private fun SkillItemEditor(
+    item: SkillItem,
+    onUpdate: (SkillItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header with skill name and delete button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.name.ifEmpty { "Skill" },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // Skill name
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = { onUpdate(item.copy(name = it)) },
+                label = { Text("Skill Name", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Category
+            OutlinedTextField(
+                value = item.category,
+                onValueChange = { onUpdate(item.copy(category = it)) },
+                label = { Text("Category (for grouped style)", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Proficiency label
+            OutlinedTextField(
+                value = item.proficiencyLabel,
+                onValueChange = { onUpdate(item.copy(proficiencyLabel = it)) },
+                label = { Text("Proficiency Label (e.g., 'Expert')", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Proficiency slider
+            Text("Proficiency: ${(item.proficiency ?: 0.5f) * 100}%", fontSize = 12.sp)
+            Slider(
+                value = item.proficiency ?: 0.5f,
+                onValueChange = { onUpdate(item.copy(proficiency = it)) },
+                valueRange = 0f..1f
+            )
+        }
+    }
+}
+
+/**
+ * Project element properties
+ */
+@Composable
+private fun ProjectElementProperties(
+    element: ResumeElement.ProjectElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Project Items") {
+        // Project items list
+        element.items.forEachIndexed { index, item ->
+            ProjectItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add project item button
+        Button(
+            onClick = {
+                val newItem = ProjectItem(
+                    name = "New Project",
+                    description = "",
+                    startDate = "",
+                    endDate = "",
+                    isOngoing = false,
+                    technologies = "",
+                    link = "",
+                    highlights = emptyList()
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Project")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ProjectDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name) }
+                )
+            }
+        }
+
+        // Show/Hide options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Dates", fontSize = 12.sp)
+            Switch(
+                checked = element.showDates,
+                onCheckedChange = { onUpdateElement(element.copy(showDates = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Technologies", fontSize = 12.sp)
+            Switch(
+                checked = element.showTechnologies,
+                onCheckedChange = { onUpdateElement(element.copy(showTechnologies = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Link", fontSize = 12.sp)
+            Switch(
+                checked = element.showLink,
+                onCheckedChange = { onUpdateElement(element.copy(showLink = it)) }
+            )
+        }
+    }
+}
+
+/**
+ * Editor for a single project item
+ */
+@Composable
+private fun ProjectItemEditor(
+    item: ProjectItem,
+    onUpdate: (ProjectItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.name.ifEmpty { "Project" },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // Project name
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = { onUpdate(item.copy(name = it)) },
+                label = { Text("Project Name", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Description
+            OutlinedTextField(
+                value = item.description,
+                onValueChange = { onUpdate(item.copy(description = it)) },
+                label = { Text("Description", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Technologies
+            OutlinedTextField(
+                value = item.technologies,
+                onValueChange = { onUpdate(item.copy(technologies = it)) },
+                label = { Text("Technologies (comma-separated)", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Link
+            OutlinedTextField(
+                value = item.link,
+                onValueChange = { onUpdate(item.copy(link = it)) },
+                label = { Text("Project Link/URL", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Dates
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = item.startDate,
+                    onValueChange = { onUpdate(item.copy(startDate = it)) },
+                    label = { Text("Start Date", fontSize = 10.sp) },
+                    placeholder = { Text("yyyy-MM-dd", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = item.endDate,
+                    onValueChange = { onUpdate(item.copy(endDate = it)) },
+                    label = { Text("End Date", fontSize = 10.sp) },
+                    placeholder = { Text("yyyy-MM-dd", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Ongoing", fontSize = 12.sp)
+                Switch(
+                    checked = item.isOngoing,
+                    onCheckedChange = { onUpdate(item.copy(isOngoing = it)) }
+                )
+            }
+
+            // Highlights
+            Text("Highlights", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            item.highlights.forEachIndexed { highlightIndex, highlight ->
+                ProjectHighlightEditor(
+                    highlight = highlight,
+                    onUpdate = { updatedHighlight ->
+                        val updatedHighlights = item.highlights.toMutableList()
+                        updatedHighlights[highlightIndex] = updatedHighlight
+                        onUpdate(item.copy(highlights = updatedHighlights))
+                    },
+                    onRemove = {
+                        val updatedHighlights = item.highlights.toMutableList()
+                        updatedHighlights.removeAt(highlightIndex)
+                        onUpdate(item.copy(highlights = updatedHighlights))
+                    }
+                )
+            }
+
+            Button(
+                onClick = {
+                    val newHighlight = ProjectHighlight(text = "")
+                    onUpdate(item.copy(highlights = item.highlights + newHighlight))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("Add Highlight")
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single project highlight
+ */
+@Composable
+private fun ProjectHighlightEditor(
+    highlight: ProjectHighlight,
+    onUpdate: (ProjectHighlight) -> Unit,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = highlight.text,
+            onValueChange = { onUpdate(highlight.copy(text = it)) },
+            modifier = Modifier.weight(1f),
+            singleLine = false,
+            maxLines = 3,
+            placeholder = { Text("Highlight description", fontSize = 12.sp) }
+        )
+        IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/**
+ * Certification element properties
+ */
+@Composable
+private fun CertificationElementProperties(
+    element: ResumeElement.CertificationElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Certification Items") {
+        // Certification items list
+        element.items.forEachIndexed { index, item ->
+            CertificationItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add certification item button
+        Button(
+            onClick = {
+                val newItem = CertificationItem(
+                    name = "New Certification",
+                    issuer = "",
+                    issueDate = "",
+                    expiryDate = "",
+                    credentialId = "",
+                    verificationLink = ""
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Certification")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            CertificationDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name) }
+                )
+            }
+        }
+
+        // Show/Hide options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Issue Date", fontSize = 12.sp)
+            Switch(
+                checked = element.showIssueDate,
+                onCheckedChange = { onUpdateElement(element.copy(showIssueDate = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Expiry Date", fontSize = 12.sp)
+            Switch(
+                checked = element.showExpiryDate,
+                onCheckedChange = { onUpdateElement(element.copy(showExpiryDate = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Credential ID", fontSize = 12.sp)
+            Switch(
+                checked = element.showCredentialId,
+                onCheckedChange = { onUpdateElement(element.copy(showCredentialId = it)) }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Show Expiry Status Badge", fontSize = 12.sp)
+            Switch(
+                checked = element.showExpiryStatus,
+                onCheckedChange = { onUpdateElement(element.copy(showExpiryStatus = it)) }
+            )
+        }
+    }
+}
+
+/**
+ * Editor for a single certification item
+ */
+@Composable
+private fun CertificationItemEditor(
+    item: CertificationItem,
+    onUpdate: (CertificationItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.name.ifEmpty { "Certification" },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // Certification name
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = { onUpdate(item.copy(name = it)) },
+                label = { Text("Certification Name", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Issuer
+            OutlinedTextField(
+                value = item.issuer,
+                onValueChange = { onUpdate(item.copy(issuer = it)) },
+                label = { Text("Issuer/Organization", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Dates
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = item.issueDate,
+                    onValueChange = { onUpdate(item.copy(issueDate = it)) },
+                    label = { Text("Issue Date", fontSize = 10.sp) },
+                    placeholder = { Text("yyyy-MM-dd", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = item.expiryDate,
+                    onValueChange = { onUpdate(item.copy(expiryDate = it)) },
+                    label = { Text("Expiry (optional)", fontSize = 10.sp) },
+                    placeholder = { Text("yyyy-MM-dd", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Credential ID
+            OutlinedTextField(
+                value = item.credentialId,
+                onValueChange = { onUpdate(item.copy(credentialId = it)) },
+                label = { Text("Credential ID", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Verification Link
+            OutlinedTextField(
+                value = item.verificationLink,
+                onValueChange = { onUpdate(item.copy(verificationLink = it)) },
+                label = { Text("Verification Link", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+/**
+ * Language element properties
+ */
+@Composable
+private fun LanguageElementProperties(
+    element: ResumeElement.LanguageElement,
+    onUpdateElement: (ResumeElement) -> Unit
+) {
+    PropertySection(title = "Language Items") {
+        // Language items list
+        element.items.forEachIndexed { index, item ->
+            LanguageItemEditor(
+                item = item,
+                onUpdate = { updatedItem ->
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems[index] = updatedItem
+                    onUpdateElement(element.copy(items = updatedItems))
+                },
+                onRemove = {
+                    val updatedItems = element.items.toMutableList()
+                    updatedItems.removeAt(index)
+                    onUpdateElement(element.copy(items = updatedItems))
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Add language item button
+        Button(
+            onClick = {
+                val newItem = LanguageItem(
+                    name = "New Language",
+                    proficiency = 0.5f,
+                    proficiencyLabel = "",
+                    cefrLevel = null
+                )
+                onUpdateElement(element.copy(items = element.items + newItem))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(Modifier.width(4.dp))
+            Text("Add Language")
+        }
+    }
+
+    PropertySection(title = "Display Settings") {
+        // Display style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            LanguageDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = element.displayStyle == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Proficiency type
+        Text("Proficiency Type", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            LanguageProficiencyType.entries.forEach { type ->
+                FilterChip(
+                    selected = element.proficiencyType == type,
+                    onClick = {
+                        onUpdateElement(element.copy(proficiencyType = type))
+                    },
+                    label = { Text(type.name) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single language item
+ */
+@Composable
+private fun LanguageItemEditor(
+    item: LanguageItem,
+    onUpdate: (LanguageItem) -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.name.ifEmpty { "Language" },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            // Language name
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = { onUpdate(item.copy(name = it)) },
+                label = { Text("Language Name", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Proficiency label
+            OutlinedTextField(
+                value = item.proficiencyLabel,
+                onValueChange = { onUpdate(item.copy(proficiencyLabel = it)) },
+                label = { Text("Proficiency Label (e.g., 'Native', 'Fluent')", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // CEFR Level
+            OutlinedTextField(
+                value = item.cefrLevel ?: "",
+                onValueChange = { onUpdate(item.copy(cefrLevel = it.ifEmpty { null })) },
+                label = { Text("CEFR Level (e.g., 'C2', 'B2')", fontSize = 12.sp) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Proficiency slider
+            Text("Proficiency: ${(item.proficiency * 100).toInt()}%", fontSize = 12.sp)
+            Slider(
+                value = item.proficiency,
+                onValueChange = { onUpdate(item.copy(proficiency = it)) },
+                valueRange = 0f..1f
+            )
+        }
+    }
+}
+
 // Helper functions to update elements immutably
 private fun updateElementPosition(element: ResumeElement, newPosition: GridPosition): ResumeElement {
     return when (element) {
@@ -2565,6 +3405,9 @@ private fun updateElementPosition(element: ResumeElement, newPosition: GridPosit
         is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
         is ResumeElement.EducationElement -> element.copy(position = newPosition)
         is ResumeElement.SkillElement -> element.copy(position = newPosition)
+        is ResumeElement.ProjectElement -> element.copy(position = newPosition)
+        is ResumeElement.CertificationElement -> element.copy(position = newPosition)
+        is ResumeElement.LanguageElement -> element.copy(position = newPosition)
     }
 }
 
@@ -2580,6 +3423,9 @@ private fun updateElementZIndex(element: ResumeElement, newZIndex: Int): ResumeE
         is ResumeElement.WorkExperienceElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.EducationElement -> element.copy(zIndex = newZIndex)
         is ResumeElement.SkillElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.ProjectElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.CertificationElement -> element.copy(zIndex = newZIndex)
+        is ResumeElement.LanguageElement -> element.copy(zIndex = newZIndex)
     }
 }
 
@@ -2595,6 +3441,9 @@ private fun updateElementLocked(element: ResumeElement, locked: Boolean): Resume
         is ResumeElement.WorkExperienceElement -> element.copy(locked = locked)
         is ResumeElement.EducationElement -> element.copy(locked = locked)
         is ResumeElement.SkillElement -> element.copy(locked = locked)
+        is ResumeElement.ProjectElement -> element.copy(locked = locked)
+        is ResumeElement.CertificationElement -> element.copy(locked = locked)
+        is ResumeElement.LanguageElement -> element.copy(locked = locked)
     }
 }
 
@@ -2610,6 +3459,9 @@ private fun updateElementStyle(element: ResumeElement, newStyle: ElementStyle): 
         is ResumeElement.WorkExperienceElement -> element.copy(style = newStyle)
         is ResumeElement.EducationElement -> element.copy(style = newStyle)
         is ResumeElement.SkillElement -> element.copy(style = newStyle)
+        is ResumeElement.ProjectElement -> element.copy(style = newStyle)
+        is ResumeElement.CertificationElement -> element.copy(style = newStyle)
+        is ResumeElement.LanguageElement -> element.copy(style = newStyle)
     }
 }
 
@@ -2625,5 +3477,8 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.WorkExperienceElement -> element.copy(userInfoTag = tag)
         is ResumeElement.EducationElement -> element.copy(userInfoTag = tag)
         is ResumeElement.SkillElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.ProjectElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.CertificationElement -> element.copy(userInfoTag = tag)
+        is ResumeElement.LanguageElement -> element.copy(userInfoTag = tag)
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -31,9 +32,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.CertificationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.EducationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.LanguageElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ProjectElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.SkillElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
@@ -177,6 +181,9 @@ fun GridEditorScreen(
                             is ResumeElement.WorkExperienceElement -> element.copy(position = clampedPosition)
                             is ResumeElement.EducationElement -> element.copy(position = clampedPosition)
                             is ResumeElement.SkillElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.ProjectElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.CertificationElement -> element.copy(position = clampedPosition)
+                            is ResumeElement.LanguageElement -> element.copy(position = clampedPosition)
                         }
                         viewModel.updateElement(updatedElement)
                     },
@@ -619,6 +626,24 @@ private fun GridCanvas(
                                     zoomLevel = zoomLevel
                                 )
                             }
+                            is ResumeElement.ProjectElement -> {
+                                ProjectElementRenderer(
+                                    element = element,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
+                            is ResumeElement.CertificationElement -> {
+                                CertificationElementRenderer(
+                                    element = element,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
+                            is ResumeElement.LanguageElement -> {
+                                LanguageElementRenderer(
+                                    element = element,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
                             else -> {
                                 // Placeholder for other element types
                                 Box(
@@ -661,54 +686,94 @@ private fun ElementPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Element") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.heightIn(max = 400.dp)
             ) {
-                ElementTypeButton(
-                    icon = IconAliases.TextFields,
-                    label = "Text",
-                    onClick = { onElementTypeSelected(ElementType.TEXT) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.Image,
-                    label = "Image",
-                    onClick = { onElementTypeSelected(ElementType.IMAGE) }
-                )
-                ElementTypeButton(
-                    icon = IconAliases.RectangleFilled,
-                    label = "Shape",
-                    onClick = { onElementTypeSelected(ElementType.SHAPE) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.HorizontalRule,
-                    label = "Divider",
-                    onClick = { onElementTypeSelected(ElementType.DIVIDER) }
-                )
-                ElementTypeButton(
-                    icon = IconAliases.BarChart,
-                    label = "Chart",
-                    onClick = { onElementTypeSelected(ElementType.CHART) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.Contacts,
-                    label = "Contact Info",
-                    onClick = { onElementTypeSelected(ElementType.CONTACT) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.Work,
-                    label = "Work Experience",
-                    onClick = { onElementTypeSelected(ElementType.WORK_EXPERIENCE) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.School,
-                    label = "Education",
-                    onClick = { onElementTypeSelected(ElementType.EDUCATION) }
-                )
-                ElementTypeButton(
-                    icon = Icons.Default.Stars,
-                    label = "Skills",
-                    onClick = { onElementTypeSelected(ElementType.SKILL) }
-                )
+                item {
+                    ElementTypeButton(
+                        icon = IconAliases.TextFields,
+                        label = "Text",
+                        onClick = { onElementTypeSelected(ElementType.TEXT) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Image,
+                        label = "Image",
+                        onClick = { onElementTypeSelected(ElementType.IMAGE) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = IconAliases.RectangleFilled,
+                        label = "Shape",
+                        onClick = { onElementTypeSelected(ElementType.SHAPE) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.HorizontalRule,
+                        label = "Divider",
+                        onClick = { onElementTypeSelected(ElementType.DIVIDER) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = IconAliases.BarChart,
+                        label = "Chart",
+                        onClick = { onElementTypeSelected(ElementType.CHART) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Contacts,
+                        label = "Contact Info",
+                        onClick = { onElementTypeSelected(ElementType.CONTACT) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Work,
+                        label = "Work Experience",
+                        onClick = { onElementTypeSelected(ElementType.WORK_EXPERIENCE) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.School,
+                        label = "Education",
+                        onClick = { onElementTypeSelected(ElementType.EDUCATION) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Stars,
+                        label = "Skills",
+                        onClick = { onElementTypeSelected(ElementType.SKILL) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Code,
+                        label = "Projects",
+                        onClick = { onElementTypeSelected(ElementType.PROJECT) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.EmojiEvents,
+                        label = "Certifications",
+                        onClick = { onElementTypeSelected(ElementType.CERTIFICATION) }
+                    )
+                }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Translate,
+                        label = "Languages",
+                        onClick = { onElementTypeSelected(ElementType.LANGUAGE) }
+                    )
+                }
             }
         },
         confirmButton = {},
@@ -889,7 +954,10 @@ enum class ElementType {
     CONTACT,
     WORK_EXPERIENCE,
     EDUCATION,
-    SKILL
+    SKILL,
+    PROJECT,
+    CERTIFICATION,
+    LANGUAGE
 }
 
 // Icon aliases for missing icons (using available Material Icons)

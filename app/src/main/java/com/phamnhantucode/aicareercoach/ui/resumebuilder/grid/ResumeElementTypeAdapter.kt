@@ -30,6 +30,9 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             is ResumeElement.WorkExperienceElement -> "WorkExperienceElement"
             is ResumeElement.EducationElement -> "EducationElement"
             is ResumeElement.SkillElement -> "SkillElement"
+            is ResumeElement.ProjectElement -> "ProjectElement"
+            is ResumeElement.CertificationElement -> "CertificationElement"
+            is ResumeElement.LanguageElement -> "LanguageElement"
         }
         jsonObject.addProperty("elementType", type)
 

@@ -82,12 +82,18 @@ fun DraggableElement(
     // For ShapeElements with custom dimensions, use those instead of grid-based sizing
     val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
         element.customWidthDp * density * zoomLevel
+    } else if (element.position.widthMode == SizeMode.WRAP_CONTENT) {
+        // For wrap content, we'll use a placeholder width that will be adjusted by the content
+        element.position.colSpan * cellSizePx // Use colSpan as max width
     } else {
         element.position.colSpan * cellSizePx
     }
 
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
+    } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
+        // For wrap content, we'll use a placeholder height that will be adjusted by the content
+        element.position.rowSpan * cellSizePx // Use rowSpan as max height
     } else {
         element.position.rowSpan * cellSizePx
     }
@@ -111,9 +117,23 @@ fun DraggableElement(
                     y = (baseY + offsetY).roundToInt()
                 )
             }
-            .size(
-                width = GridUtils.pxToDp(width, density),
-                height = GridUtils.pxToDp(interactionHeight, density)
+            .then(
+                if (element.position.widthMode == SizeMode.WRAP_CONTENT && element.position.heightMode == SizeMode.WRAP_CONTENT) {
+                    Modifier.wrapContentSize()
+                } else if (element.position.widthMode == SizeMode.WRAP_CONTENT) {
+                    Modifier
+                        .wrapContentWidth()
+                        .height(GridUtils.pxToDp(interactionHeight, density))
+                } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
+                    Modifier
+                        .width(GridUtils.pxToDp(width, density))
+                        .wrapContentHeight()
+                } else {
+                    Modifier.size(
+                        width = GridUtils.pxToDp(width, density),
+                        height = GridUtils.pxToDp(interactionHeight, density)
+                    )
+                }
             )
             .graphicsLayer {
                 // Scale up slightly when dragging for visual feedback

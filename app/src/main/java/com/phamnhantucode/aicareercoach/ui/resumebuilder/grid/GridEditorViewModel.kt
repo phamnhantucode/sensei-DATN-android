@@ -830,6 +830,66 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     displayStyle = SkillDisplayStyle.LIST
                 )
             }
+
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.PROJECT -> {
+                ResumeElement.ProjectElement(
+                    position = position,
+                    items = listOf(
+                        ProjectItem(
+                            name = "AI Career Coach App",
+                            description = "Android application for AI-powered career coaching and resume building",
+                            startDate = "2024-01-01",
+                            endDate = "",
+                            isOngoing = true,
+                            technologies = "Kotlin, Jetpack Compose, Android, AI/ML",
+                            link = "https://github.com/example/ai-career-coach",
+                            highlights = listOf(
+                                ProjectHighlight(text = "Built complete resume builder with grid-based editor"),
+                                ProjectHighlight(text = "Integrated AI features for interview preparation"),
+                                ProjectHighlight(text = "Designed modern UI with Material Design 3")
+                            )
+                        )
+                    ),
+                    displayStyle = ProjectDisplayStyle.STANDARD
+                )
+            }
+
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CERTIFICATION -> {
+                ResumeElement.CertificationElement(
+                    position = position,
+                    items = listOf(
+                        CertificationItem(
+                            name = "Android Associate Developer",
+                            issuer = "Google",
+                            issueDate = "2023-06-01",
+                            expiryDate = "2026-06-01",
+                            credentialId = "ABC123XYZ",
+                            verificationLink = "https://developers.google.com/certification/verify"
+                        ),
+                        CertificationItem(
+                            name = "AWS Certified Developer",
+                            issuer = "Amazon Web Services",
+                            issueDate = "2023-03-15",
+                            expiryDate = "2026-03-15",
+                            credentialId = "DEF456UVW",
+                            verificationLink = "https://aws.amazon.com/certification/verify"
+                        )
+                    ),
+                    displayStyle = CertificationDisplayStyle.STANDARD
+                )
+            }
+
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.LANGUAGE -> {
+                ResumeElement.LanguageElement(
+                    position = position,
+                    items = listOf(
+                        LanguageItem(name = "English", proficiency = 1.0f, proficiencyLabel = "Native", cefrLevel = "C2"),
+                        LanguageItem(name = "Spanish", proficiency = 0.7f, proficiencyLabel = "Intermediate", cefrLevel = "B2"),
+                        LanguageItem(name = "French", proficiency = 0.5f, proficiencyLabel = "Basic", cefrLevel = "A2")
+                    ),
+                    displayStyle = LanguageDisplayStyle.TEXT_LABELS
+                )
+            }
         }
     }
 
@@ -846,6 +906,9 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             ElementType.WORK_EXPERIENCE -> Pair(20, 48) // Full width with multiple work items
             ElementType.EDUCATION -> Pair(20, 48) // Full width with multiple education items
             ElementType.SKILL -> Pair(16, 48) // Full width with skills list
+            ElementType.PROJECT -> Pair(24, 48) // Full width with project details and highlights
+            ElementType.CERTIFICATION -> Pair(18, 48) // Full width with certification entries
+            ElementType.LANGUAGE -> Pair(12, 48) // Full width with language list
         }
     }
 
@@ -861,6 +924,9 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             is ResumeElement.WorkExperienceElement -> element.copy(position = position)
             is ResumeElement.EducationElement -> element.copy(position = position)
             is ResumeElement.SkillElement -> element.copy(position = position)
+            is ResumeElement.ProjectElement -> element.copy(position = position)
+            is ResumeElement.CertificationElement -> element.copy(position = position)
+            is ResumeElement.LanguageElement -> element.copy(position = position)
         }
     }
 
