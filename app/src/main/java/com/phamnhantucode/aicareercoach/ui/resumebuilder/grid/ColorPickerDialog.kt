@@ -126,20 +126,22 @@ fun ColorPickerDialog(
                     Tab(
                         selected = activeTab == 0,
                         onClick = { activeTab = 0 },
-                        text = { Text("Wheel") },
-                        icon = { Icon(Icons.Default.Star, contentDescription = null) }
+                        text = { Text("Wheel") }
                     )
                     Tab(
                         selected = activeTab == 1,
                         onClick = { activeTab = 1 },
-                        text = { Text("Sliders") },
-                        icon = { Icon(Icons.Default.List, contentDescription = null) }
+                        text = { Text("Sliders") }
                     )
                     Tab(
                         selected = activeTab == 2,
                         onClick = { activeTab = 2 },
-                        text = { Text("Palette") },
-                        icon = { Icon(Icons.Default.Face, contentDescription = null) }
+                        text = { Text("Palette") }
+                    )
+                    Tab(
+                        selected = activeTab == 3,
+                        onClick = { activeTab = 3 },
+                        text = { Text("Recent") }
                     )
                 }
 
@@ -150,6 +152,7 @@ fun ColorPickerDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
                 ) {
                     when (activeTab) {
                         0 -> {
@@ -174,15 +177,16 @@ fun ColorPickerDialog(
                                 onColorSelected = { selectedColor = it }
                             )
                         }
+                        3 -> {
+                            // Recent Colors
+                            if (config.showColorHistory) {
+                                ColorHistoryTab(
+                                    colorHistory = colorHistory,
+                                    onColorSelected = { selectedColor = it }
+                                )
+                            }
+                        }
                     }
-                }
-
-                // Color history
-                if (config.showColorHistory) {
-                    ColorHistorySection(
-                        colorHistory = colorHistory,
-                        onColorSelected = { selectedColor = it }
-                    )
                 }
 
                 // Color preview and info
@@ -249,6 +253,7 @@ private fun OptimizedHsvColorWheel(
 
     Canvas(
         modifier = modifier
+            .fillMaxWidth()
             .aspectRatio(1f)
             .pointerInput(Unit) {
                 detectDragGestures(
@@ -923,43 +928,77 @@ private fun ColorPalettePanel(
 }
 
 /**
- * Color history section
+ * Color history tab - displays recent colors in a grid layout
  */
 @Composable
-private fun ColorHistorySection(
+private fun ColorHistoryTab(
     colorHistory: ColorHistory,
     onColorSelected: (Color) -> Unit
 ) {
     val colors = colorHistory.getColors()
 
     if (colors.isNotEmpty()) {
-        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(
-                text = "Recent Colors",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(colors.size) { index ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(80.dp),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(colors.size) { index ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(colors[index])
                             .border(
                                 width = 2.dp,
                                 color = Color.Gray.copy(alpha = 0.3f),
-                                shape = CircleShape
+                                shape = RoundedCornerShape(12.dp)
                             )
                             .clickable {
                                 onColorSelected(colors[index])
                             }
                     )
+
+                    Text(
+                        text = String.format("#%06X", colors[index].toArgb() and 0xFFFFFF),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = "No recent colors",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Colors you select will appear here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
         }
     }

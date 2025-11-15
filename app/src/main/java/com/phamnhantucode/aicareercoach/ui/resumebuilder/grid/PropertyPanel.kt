@@ -1846,6 +1846,11 @@ private fun WorkExperienceItemEditor(
             item.responsibilities.forEachIndexed { index, responsibility ->
                 ResponsibilityItemEditor(
                     responsibility = responsibility,
+                    jobTitle = item.jobTitle,
+                    company = item.company,
+                    otherResponsibilities = item.responsibilities
+                        .filterIndexed { i, _ -> i != index }
+                        .map { it.text },
                     onUpdate = { updated ->
                         val updatedResponsibilities = item.responsibilities.toMutableList()
                         updatedResponsibilities[index] = updated
@@ -1885,25 +1890,65 @@ private fun WorkExperienceItemEditor(
 @Composable
 private fun ResponsibilityItemEditor(
     responsibility: ResponsibilityItem,
+    jobTitle: String = "",
+    company: String = "",
+    otherResponsibilities: List<String> = emptyList(),
     onUpdate: (ResponsibilityItem) -> Unit,
     onRemove: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = responsibility.text,
-            onValueChange = { onUpdate(responsibility.copy(text = it)) },
-            modifier = Modifier.weight(1f),
-            singleLine = false,
-            maxLines = 3,
-            placeholder = { Text("Responsibility description", fontSize = 12.sp) }
-        )
-        IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+    var showAIDialog by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = responsibility.text,
+                onValueChange = { onUpdate(responsibility.copy(text = it)) },
+                modifier = Modifier.weight(1f),
+                singleLine = false,
+                maxLines = 3,
+                placeholder = { Text("Responsibility description", fontSize = 12.sp) }
+            )
+
+            // Improve with AI button
+            IconButton(
+                onClick = { showAIDialog = true },
+                modifier = Modifier.size(32.dp),
+                enabled = responsibility.text.isNotBlank() && jobTitle.isNotBlank() && company.isNotBlank()
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = "Improve with AI",
+                    modifier = Modifier.size(18.dp),
+                    tint = if (responsibility.text.isNotBlank() && jobTitle.isNotBlank() && company.isNotBlank()) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    }
+                )
+            }
+
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+            }
         }
+    }
+
+    // AI Improvement Dialog
+    if (showAIDialog) {
+        ResponsibilityAIDialog(
+            currentText = responsibility.text,
+            jobTitle = jobTitle,
+            company = company,
+            otherResponsibilities = otherResponsibilities,
+            onDismiss = { showAIDialog = false },
+            onSelectSuggestion = { improvedText ->
+                onUpdate(responsibility.copy(text = improvedText))
+            }
+        )
     }
 }
 

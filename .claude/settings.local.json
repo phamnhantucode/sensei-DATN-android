@@ -11,7 +11,9 @@
       "Bash(find:*)",
       "WebFetch(domain:clerk.com)",
       "Bash(dir /s \"D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\\com\\phamnhantucode\\aicareercoach\\ui\\resumebuilder\\grid\")",
-      "Bash(.gradlew.bat assembleDebug)"
+      "Bash(.gradlew.bat assembleDebug)",
+      "Bash(powershell -Command \"Get-Content ''D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\\com\\phamnhantucode\\aicareercoach\\ui\\resumebuilder\\grid\\GridResumeModels.kt'' | Measure-Object -Line\")",
+      "Bash(Select-String -Pattern \"(error|ERROR|Exception|FAILED)\" -Context 2,2)"
     ],
     "deny": [],
     "ask": []

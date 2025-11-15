@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
@@ -622,20 +623,20 @@ private fun ResumeSectionCard(
                 ) {
                     // Visibility toggle
                     if (canToggleVisibility && onToggleVisibility != null) {
-                        Switch(
-                            checked = isVisible,
-                            onCheckedChange = { onToggleVisibility() },
-                            modifier = Modifier.clickable(onClick = onToggleVisibility)
-                        )
+//                        Switch(
+//                            checked = isVisible,
+//                            onCheckedChange = { onToggleVisibility() },
+//                            modifier = Modifier.clickable(onClick = onToggleVisibility)
+//                        )
                     }
 
                     if (isComplete) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = "Complete",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+//                        Icon(
+//                            imageVector = Icons.Filled.CheckCircle,
+//                            contentDescription = "Complete",
+//                            tint = MaterialTheme.colorScheme.primary,
+//                            modifier = Modifier.size(20.dp)
+//                        )
                     }
                     Icon(
                         imageVector = if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -817,6 +818,7 @@ private fun WorkExperienceItem(
     val context = LocalContext.current
     var editedExperience by remember(experience) { mutableStateOf(experience) }
     var showDatePicker by remember { mutableStateOf<DatePickerType?>(null) }
+    var showAIDialog by remember { mutableStateOf(false) }
     var responsibilitiesText by remember(experience) {
         mutableStateOf(experience.responsibilities.joinToString("\n"))
     }
@@ -955,18 +957,16 @@ private fun WorkExperienceItem(
                     )
                     Button(
                         onClick = {
-                            // TODO: Implement AI improvement
-                            Toast.makeText(
-                                context,
-                                "AI Improvement coming soon!",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            showAIDialog = true
                         },
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(36.dp)
+                        modifier = Modifier.height(36.dp),
+                        enabled = responsibilitiesText.isNotBlank() &&
+                                 editedExperience.jobTitle.isNotBlank() &&
+                                 editedExperience.company.isNotBlank()
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Language,
+                            imageVector = Icons.Default.AutoAwesome,    
                             contentDescription = "Improve with AI",
                             modifier = Modifier.size(16.dp)
                         )
@@ -1037,6 +1037,22 @@ private fun WorkExperienceItem(
             DatePicker(state = datePickerState)
         }
     }
+
+    // AI Improvement Dialog
+    if (showAIDialog) {
+        ResponsibilitiesAIDialog(
+            currentText = responsibilitiesText,
+            jobTitle = editedExperience.jobTitle,
+            company = editedExperience.company,
+            onDismiss = { showAIDialog = false },
+            onSelectText = { improvedText ->
+                responsibilitiesText = improvedText
+                val responsibilities = improvedText.split("\n").filter { line -> line.isNotBlank() }
+                editedExperience = editedExperience.copy(responsibilities = responsibilities)
+                onUpdate(editedExperience)
+            }
+        )
+    }
 }
 
 private enum class DatePickerType {
@@ -1084,6 +1100,7 @@ private fun EducationItem(
     onRemove: () -> Unit
 ) {
     var editedEducation by remember(education) { mutableStateOf(education) }
+    var showDatePicker by remember { mutableStateOf<DatePickerType?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1152,6 +1169,41 @@ private fun EducationItem(
                 singleLine = true
             )
 
+            // Date fields
+            val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = editedEducation.startDate?.format(dateFormatter) ?: "",
+                    onValueChange = { },
+                    label = { Text("Start Date") },
+                    modifier = Modifier.weight(1f),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = DatePickerType.START }) {
+                            Icon(Icons.Filled.Edit, "Select date")
+                        }
+                    },
+                    placeholder = { Text("Click to select") }
+                )
+
+                OutlinedTextField(
+                    value = editedEducation.endDate?.format(dateFormatter) ?: "",
+                    onValueChange = { },
+                    label = { Text("End Date") },
+                    modifier = Modifier.weight(1f),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = DatePickerType.END }) {
+                            Icon(Icons.Filled.Edit, "Select date")
+                        }
+                    },
+                    placeholder = { Text("Click to select") }
+                )
+            }
+
             OutlinedTextField(
                 value = editedEducation.gpa,
                 onValueChange = {
@@ -1162,6 +1214,50 @@ private fun EducationItem(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+        }
+    }
+
+    // Date Picker Dialog
+    if (showDatePicker != null) {
+        val initialDate = when (showDatePicker) {
+            DatePickerType.START -> editedEducation.startDate
+            DatePickerType.END -> editedEducation.endDate
+            else -> null
+        }
+
+        val initialMillis = initialDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = null },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+
+                            editedEducation = when (showDatePicker) {
+                                DatePickerType.START -> editedEducation.copy(startDate = selectedDate)
+                                DatePickerType.END -> editedEducation.copy(endDate = selectedDate)
+                                else -> editedEducation
+                            }
+                            onUpdate(editedEducation)
+                        }
+                        showDatePicker = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDatePicker = null }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
