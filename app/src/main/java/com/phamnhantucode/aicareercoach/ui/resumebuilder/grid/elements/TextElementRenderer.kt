@@ -74,7 +74,7 @@ fun TextElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp),
+            .padding((8 * zoomLevel).dp),
         contentAlignment = (element.verticalAlignment ?: VerticalTextAlignment.CENTER).toAlignment()
     ) {
         if (isEditing) {
@@ -82,6 +82,7 @@ fun TextElementRenderer(
                 text = element.content,
                 textStyle = element.textStyle.toComposeTextStyle(zoomLevel),
                 alignment = element.alignment,
+                zoomLevel = zoomLevel,
                 onContentChange = onContentChange
             )
         } else {
@@ -123,6 +124,7 @@ private fun EditableText(
     text: String,
     textStyle: TextStyle,
     alignment: TextAlignment,
+    zoomLevel: Float = 1f,
     onContentChange: (String) -> Unit
 ) {
     var textValue by remember { mutableStateOf(text) }
@@ -147,9 +149,9 @@ private fun EditableText(
             .fillMaxWidth()
             .background(
                 color = Color.White.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape((4 * zoomLevel).dp)
             )
-            .padding(4.dp)
+            .padding((4 * zoomLevel).dp)
     )
 }
 

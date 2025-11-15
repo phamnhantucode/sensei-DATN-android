@@ -68,6 +68,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -95,6 +97,7 @@ fun ResumeBuilderScreen(
 ) {
     val context = LocalContext.current
     val viewModel: ResumeBuilderViewModel = viewModel { ResumeBuilderViewModel(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     val resume by viewModel.resume.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
@@ -354,7 +357,11 @@ fun ResumeBuilderScreen(
                         PersonalInfoForm(
                             personalInfo = resume.personalInfo,
                             onUpdate = viewModel::updatePersonalInfo,
-                            onAutofillFromProfile = viewModel::autofillFromUserProfile
+                            onAutofillFromProfile = {
+                                coroutineScope.launch {
+                                    viewModel.autofillFromUserProfile()
+                                }
+                            }
                         )
                     }
 

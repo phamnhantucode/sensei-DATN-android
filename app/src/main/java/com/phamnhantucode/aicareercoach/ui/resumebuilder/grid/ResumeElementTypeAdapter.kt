@@ -49,8 +49,21 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
         context: JsonDeserializationContext
     ): ResumeElement {
         val jsonObject = json.asJsonObject
-        val type = jsonObject.get("elementType").asString
-        val data = jsonObject.get("data")
+        
+        // Check if this is new format (with elementType and data) or old format (direct object)
+        val elementTypeField = jsonObject.get("elementType")
+        val type: String
+        val data: JsonElement
+        
+        if (elementTypeField != null) {
+            // New format with type discriminator
+            type = elementTypeField.asString
+            data = jsonObject.get("data")
+        } else {
+            // Old format - infer type from JSON structure
+            type = inferElementType(jsonObject)
+            data = jsonObject
+        }
 
         return when (type) {
             "TextElement" -> context.deserialize(data, ResumeElement.TextElement::class.java)
@@ -67,6 +80,52 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             "CertificationElement" -> context.deserialize(data, ResumeElement.CertificationElement::class.java)
             "LanguageElement" -> context.deserialize(data, ResumeElement.LanguageElement::class.java)
             else -> throw JsonParseException("Unknown element type: $type")
+        }
+    }
+    
+    /**
+     * Infer element type from JSON structure for backward compatibility with old data
+     */
+    private fun inferElementType(jsonObject: JsonObject): String {
+        return when {
+            jsonObject.has("content") && jsonObject.has("textStyle") -> "TextElement"
+            jsonObject.has("imageUrl") -> "ImageElement"
+            jsonObject.has("shapeType") -> "ShapeElement"
+            jsonObject.has("chartType") -> "ChartElement"
+            jsonObject.has("children") && jsonObject.get("children").isJsonArray -> "ContainerElement"
+            jsonObject.has("iconName") && jsonObject.has("iconType") -> "IconElement"
+            jsonObject.has("items") -> {
+                // Need to check items structure to distinguish between different collection elements
+                val items = jsonObject.getAsJsonArray("items")
+                if (items.size() > 0) {
+                    val firstItem = items[0].asJsonObject
+                    when {
+                        firstItem.has("jobTitle") && firstItem.has("company") -> "WorkExperienceElement"
+                        firstItem.has("degree") && firstItem.has("institution") -> "EducationElement"
+                        firstItem.has("issuer") && firstItem.has("credentialId") -> "CertificationElement"
+                        firstItem.has("proficiency") && firstItem.has("cefrLevel") -> "LanguageElement"
+                        firstItem.has("technologies") && firstItem.has("highlights") -> "ProjectElement"
+                        firstItem.has("type") && firstItem.has("value") -> "ContactElement"
+                        firstItem.has("name") && firstItem.has("category") -> "SkillElement"
+                        else -> "TextElement" // Default fallback
+                    }
+                } else {
+                    // Empty items - check for other distinguishing fields
+                    when {
+                        jsonObject.has("iconStyle") -> "ContactElement"
+                        jsonObject.has("displayStyle") && jsonObject.has("dateStyle") -> {
+                            if (jsonObject.has("companyStyle")) "WorkExperienceElement"
+                            else if (jsonObject.has("institutionStyle")) "EducationElement"
+                            else if (jsonObject.has("issuerStyle")) "CertificationElement"
+                            else if (jsonObject.has("technologyStyle")) "ProjectElement"
+                            else "SkillElement"
+                        }
+                        jsonObject.has("proficiencyType") -> "LanguageElement"
+                        else -> "SkillElement" // Default for collection-type elements
+                    }
+                }
+            }
+            else -> "TextElement" // Default fallback
         }
     }
 }

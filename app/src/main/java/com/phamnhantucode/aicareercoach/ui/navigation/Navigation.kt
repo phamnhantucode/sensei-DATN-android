@@ -8,7 +8,32 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object IndustryInsights : Screen("industry_insights")
     object ResumeBuilder : Screen("resume_builder")
-    object GridEditor : Screen("grid_editor")
+    object ResumeDesignScreen : Screen("resume_design_screen")
+    object GridEditor : Screen("grid_editor") {
+        private const val DesignIdArg = "designId"
+        private const val TemplateArg = "template"
+
+        val routeWithArgs: String =
+            "$route?$DesignIdArg={$DesignIdArg}&$TemplateArg={$TemplateArg}"
+
+        fun buildRoute(designId: String? = null, template: String? = null): String {
+            val params = mutableListOf<String>()
+            if (designId != null) {
+                params.add("$DesignIdArg=${Uri.encode(designId)}")
+            }
+            if (template != null) {
+                params.add("$TemplateArg=${Uri.encode(template)}")
+            }
+            return if (params.isNotEmpty()) {
+                "$route?${params.joinToString("&")}"
+            } else {
+                route
+            }
+        }
+
+        fun designIdKey(): String = DesignIdArg
+        fun templateKey(): String = TemplateArg
+    }
     object InterviewPrep : Screen("interview_prep")
     object CoverLetter : Screen("cover_letter")
     object AccountSettings : Screen("account_settings")

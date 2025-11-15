@@ -62,11 +62,26 @@ data class ResumePage(
 data class GridConfig(
     val columns: Int = 48,
     val rows: Int = 68,  // 48 × √2 ≈ 67.9, rounded to 68 for A4 aspect ratio
-    val cellSizeDp: Float = 12f,
+    val cellSizeDp: Float = CELL_SIZE_FOR_A4,  // Calculated to match A4 dimensions exactly
     val showGrid: Boolean = true,
     val snapToGrid: Boolean = true,
     val snapThreshold: Float = 0.3f // 30% of cell size
-)
+) {
+    companion object {
+        /**
+         * Optimal cell size calculated to make a 48x68 grid match A4 paper dimensions exactly.
+         *
+         * A4 at 72 DPI = 595 x 842 points
+         * For 48 columns: 595 / 48 = 12.3958 points per column
+         * For 68 rows: 842 / 68 = 12.3824 points per row
+         * Average: 12.389 points (rounded to 12.39 for precision)
+         *
+         * This eliminates the ~3.2% scaling factor that was causing position discrepancies
+         * between the editor and exported PDF.
+         */
+        const val CELL_SIZE_FOR_A4 = 12.39f
+    }
+}
 
 /**
  * Global styling defaults

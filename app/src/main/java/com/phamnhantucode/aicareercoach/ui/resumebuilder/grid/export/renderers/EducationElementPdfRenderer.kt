@@ -31,6 +31,15 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
+        // Apply 8dp content padding (matching canvas editor behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
+
         // Create text paints for different styles
         val degreePaint = createTextPaint(element.degreeStyle, element.style.opacity, mapper, context)
         val institutionPaint = createTextPaint(element.institutionStyle, element.style.opacity, mapper, context)
@@ -40,8 +49,8 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         val achievementPaint = createTextPaint(element.achievementStyle, element.style.opacity, mapper, context)
 
         canvas.save()
-        canvas.translate(bounds.left, bounds.top)
-        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+        canvas.translate(contentBounds.left, contentBounds.top)
+        canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
         // Calculate layout based on orientation
         when (element.orientation) {
@@ -49,7 +58,7 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
                 renderVerticalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     degreePaint,
                     institutionPaint,
                     datePaint,
@@ -64,7 +73,7 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
                 renderHorizontalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     degreePaint,
                     institutionPaint,
                     datePaint,

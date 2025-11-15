@@ -250,23 +250,49 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
     ): Float {
         return when (element.iconStyle) {
             ContactIconStyle.ICON -> {
-                // Draw simple circle as icon placeholder
                 val iconSize = mapper.borderWidthToPdfPoints(element.iconSize)
-                val iconPaint = Paint().apply {
-                    color = context.colorConverter.toIntColorWithOpacity(
+                
+                // Try to load and render SVG icon
+                val svg = SvgIconLoader.loadSvgSync(context.context, item.iconName)
+                
+                if (svg != null) {
+                    // Render SVG icon
+                    val iconColor = context.colorConverter.toIntColorWithOpacity(
                         element.textStyle.color,
                         element.style.opacity
                     )
-                    style = Paint.Style.FILL
-                    isAntiAlias = true
+                    
+                    canvas.save()
+                    canvas.translate(x, y + (textPaint.textSize - iconSize) / 2f)
+                    
+                    SvgIconLoader.renderToCanvas(
+                        svg,
+                        canvas,
+                        iconSize,
+                        iconSize,
+                        iconColor
+                    )
+                    
+                    canvas.restore()
+                } else {
+                    // Fallback: Draw placeholder circle
+                    val iconPaint = Paint().apply {
+                        color = context.colorConverter.toIntColorWithOpacity(
+                            element.textStyle.color,
+                            element.style.opacity
+                        )
+                        style = Paint.Style.STROKE
+                        strokeWidth = 1.5f
+                        isAntiAlias = true
+                    }
+                    
+                    canvas.drawCircle(
+                        x + iconSize / 2f,
+                        y + textPaint.textSize / 2f,
+                        iconSize / 3f,
+                        iconPaint
+                    )
                 }
-
-                canvas.drawCircle(
-                    x + iconSize / 2f,
-                    y + textPaint.textSize / 2f,
-                    iconSize / 3f,
-                    iconPaint
-                )
                 iconSize + mapper.borderWidthToPdfPoints(4f)
             }
             ContactIconStyle.BOLD_LABEL -> {
@@ -421,4 +447,5 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
             }
         }
     }
+
 }

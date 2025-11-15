@@ -8,18 +8,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
 
 /**
@@ -70,7 +72,7 @@ fun ContactElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         // Map alignment enums to Compose alignment values (with null safety for backward compatibility)
         val horizontalArrangement = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -160,7 +162,7 @@ private fun ContactItemRow(
     }
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp),
         verticalAlignment = rowVerticalAlignment
     ) {
         // Render icon/label before text (default)
@@ -198,11 +200,9 @@ private fun RenderIconOrLabel(
         ContactIconStyle.ICON -> {
             // Show icon prefix
             if (item.iconName.isNotEmpty()) {
-                val icon = getContactIcon(item.type, item.iconName)
-                Icon(
-                    imageVector = icon,
-                    contentDescription = item.label.ifEmpty { item.type.name },
-                    modifier = Modifier.size((iconSize * zoomLevel).dp),
+                SvgIcon(
+                    iconName = item.iconName,
+                    size = (iconSize * zoomLevel).dp,
                     tint = Color(textStyle.color)
                 )
             }
@@ -225,19 +225,52 @@ private fun RenderIconOrLabel(
 }
 
 /**
- * Gets the appropriate Material Icon for a contact type
+ * SVG Icon Composable
  */
-private fun getContactIcon(type: ContactType, customIconName: String): ImageVector {
-    // If custom icon name is provided, try to use it
-    // For now, we'll use default icons based on type
-    return when (type) {
-        ContactType.PHONE -> Icons.Default.Phone
-        ContactType.EMAIL -> Icons.Default.Email
-        ContactType.ADDRESS -> Icons.Default.LocationOn
-        ContactType.LINKEDIN -> Icons.Default.Work // LinkedIn icon approximation
-        ContactType.GITHUB -> Icons.Default.Code // GitHub icon approximation
-        ContactType.WEBSITE -> Icons.Default.Language
-        ContactType.CUSTOM -> Icons.Default.Info
+@Composable
+private fun SvgIcon(
+    iconName: String,
+    size: androidx.compose.ui.unit.Dp,
+    tint: Color
+) {
+    val context = LocalContext.current
+    var svg by remember { mutableStateOf<com.caverock.androidsvg.SVG?>(null) }
+    
+    LaunchedEffect(iconName) {
+        svg = SvgIconLoader.loadSvg(context, iconName)
+    }
+    
+    svg?.let { svgInstance ->
+        AndroidView(
+            factory = { ctx ->
+                android.widget.ImageView(ctx).apply {
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = Modifier.size(size),
+            update = { imageView ->
+                val sizePx = (size.value * context.resources.displayMetrics.density).toInt()
+                
+                // Convert Compose Color to Android color int
+                val colorInt = android.graphics.Color.argb(
+                    (tint.alpha * 255).toInt(),
+                    (tint.red * 255).toInt(),
+                    (tint.green * 255).toInt(),
+                    (tint.blue * 255).toInt()
+                )
+                
+                val bitmap = SvgIconLoader.renderToBitmap(
+                    svgInstance,
+                    sizePx,
+                    sizePx,
+                    colorInt
+                )
+                imageView.setImageBitmap(bitmap)
+            }
+        )
     }
 }
 

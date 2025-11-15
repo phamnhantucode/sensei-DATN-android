@@ -27,6 +27,7 @@ import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeBuilderScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorViewModel
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeDesignScreen
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 @Composable
@@ -127,17 +128,43 @@ fun AppNavigation() {
             ResumeBuilderScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToGridEditor = {
-                    navController.navigate(Screen.GridEditor.route)
+                    navController.navigate(Screen.ResumeDesignScreen.route)
                 }
             )
         }
 
-        composable(Screen.GridEditor.route) {
+        composable(Screen.ResumeDesignScreen.route) {
+            ResumeDesignScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToGridEditor = { designId, template ->
+                    navController.navigate(Screen.GridEditor.buildRoute(designId, template))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.GridEditor.routeWithArgs,
+            arguments = listOf(
+                navArgument(Screen.GridEditor.designIdKey()) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument(Screen.GridEditor.templateKey()) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val designId = backStackEntry.arguments?.getString(Screen.GridEditor.designIdKey())
+            val template = backStackEntry.arguments?.getString(Screen.GridEditor.templateKey())
+
             val viewModel: GridEditorViewModel = viewModel(
                 factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return GridEditorViewModel(context) as T
+                        return GridEditorViewModel(context, designId, template) as T
                     }
                 }
             )

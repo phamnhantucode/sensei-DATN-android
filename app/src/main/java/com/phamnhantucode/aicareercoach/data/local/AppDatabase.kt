@@ -13,9 +13,10 @@ import androidx.room.RoomDatabase
         TipsCacheEntity::class,
         LiveInterviewCacheEntity::class,
         LiveInterviewQuestionCacheEntity::class,
-        ResumeEntity::class
+        ResumeEntity::class,
+        GridResumeEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,6 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tipsCacheDao(): TipsCacheDao
     abstract fun liveInterviewCacheDao(): LiveInterviewCacheDao
     abstract fun resumeDao(): ResumeDao
+    abstract fun gridResumeDao(): GridResumeDao
 
     companion object {
         @Volatile

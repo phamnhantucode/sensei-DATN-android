@@ -166,7 +166,9 @@ class GridCoordinateMapper(
         - Grid: ${gridConfig.columns}x${gridConfig.rows} cells
         - Total Grid: ${totalGridWidth}x${totalGridHeight} pts
         - PDF Page: ${pdfConfig.pageWidth}x${pdfConfig.pageHeight} pts
-        - Scale: $scale
+        - Scale: $scale (scaleX: $scaleX, scaleY: $scaleY)
+        - Scaling %: ${(scale - 1.0f) * 100}%
         - Offset: ($offsetX, $offsetY)
+        - Note: Scale should be ~1.0 for perfect alignment. Values >1.03 or <0.97 indicate mismatch.
     """.trimIndent()
 }

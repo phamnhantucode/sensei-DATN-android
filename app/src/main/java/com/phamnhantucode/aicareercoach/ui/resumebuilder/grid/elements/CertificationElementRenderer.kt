@@ -68,7 +68,7 @@ fun CertificationElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         // Map alignment enums to Compose alignment values
         val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -349,9 +349,9 @@ private fun ExpiryStatusBadge(
         modifier = Modifier
             .background(
                 color = statusColor.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape((12 * zoomLevel).dp)
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = (8 * zoomLevel).dp, vertical = (4 * zoomLevel).dp)
     ) {
         Text(
             text = statusText,

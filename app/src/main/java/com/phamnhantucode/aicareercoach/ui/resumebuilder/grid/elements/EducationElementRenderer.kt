@@ -68,7 +68,7 @@ fun EducationElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         // Map alignment enums to Compose alignment values (with null safety for backward compatibility)
         val horizontalArrangement = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -387,7 +387,7 @@ private fun AchievementList(
         achievements.forEachIndexed { index, achievement ->
             if (achievement.text.isNotEmpty()) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // Bullet

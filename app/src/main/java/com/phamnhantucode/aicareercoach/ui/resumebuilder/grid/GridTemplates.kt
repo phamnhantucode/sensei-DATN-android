@@ -376,7 +376,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
 /**
  * Template information
  */
-private data class TemplateInfo(
+internal data class TemplateInfo(
     val name: String,
     val description: String
 )
@@ -384,7 +384,7 @@ private data class TemplateInfo(
 /**
  * Gets information for a template type
  */
-private fun getTemplateInfo(template: GridTemplateType): TemplateInfo {
+internal fun getTemplateInfo(template: GridTemplateType): TemplateInfo {
     return when (template) {
         GridTemplateType.PROFESSIONAL -> TemplateInfo(
             name = "Professional",

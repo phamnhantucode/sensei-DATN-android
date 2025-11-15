@@ -31,6 +31,15 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
+        // Apply 8dp content padding (matching canvas editor behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
+
         // Create text paints for different styles
         val titlePaint = createTextPaint(element.titleStyle, element.style.opacity, mapper, context)
         val companyPaint = createTextPaint(element.companyStyle, element.style.opacity, mapper, context)
@@ -39,8 +48,8 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         val responsibilityPaint = createTextPaint(element.responsibilityStyle, element.style.opacity, mapper, context)
 
         canvas.save()
-        canvas.translate(bounds.left, bounds.top)
-        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+        canvas.translate(contentBounds.left, contentBounds.top)
+        canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
         // Calculate layout based on orientation
         when (element.orientation) {
@@ -48,7 +57,7 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
                 renderVerticalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     titlePaint,
                     companyPaint,
                     datePaint,
@@ -62,7 +71,7 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
                 renderHorizontalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     titlePaint,
                     companyPaint,
                     datePaint,

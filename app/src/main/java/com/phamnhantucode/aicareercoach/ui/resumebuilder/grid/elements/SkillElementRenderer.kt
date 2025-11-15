@@ -69,7 +69,7 @@ fun SkillElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         when (element.displayStyle) {
             SkillDisplayStyle.LIST -> {
@@ -119,9 +119,9 @@ private fun SkillListLayout(
         element.items.forEach { item ->
             if (item.name.isNotEmpty()) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = (element.spacing / 2).dp)
+                    modifier = Modifier.padding(vertical = (element.spacing / 2 * zoomLevel).dp)
                 ) {
                     // Bullet
                     if (element.showBullets) {
@@ -224,7 +224,7 @@ private fun SkillTag(
                     Modifier
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = (12 * zoomLevel).dp, vertical = (6 * zoomLevel).dp)
     ) {
         Text(
             text = item.name,
@@ -261,7 +261,7 @@ private fun SkillProgressBarsLayout(
                     Text(
                         text = item.name,
                         style = element.skillStyle.toComposeTextStyle(zoomLevel),
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        modifier = Modifier.padding(bottom = (4 * zoomLevel).dp)
                     )
 
                     // Progress bar
@@ -291,7 +291,7 @@ private fun SkillProgressBarsLayout(
                         Text(
                             text = item.proficiencyLabel,
                             style = element.proficiencyLabelStyle.toComposeTextStyle(zoomLevel),
-                            modifier = Modifier.padding(top = 2.dp)
+                            modifier = Modifier.padding(top = (2 * zoomLevel).dp)
                         )
                     }
                 }
@@ -335,7 +335,7 @@ private fun SkillDotsLayout(
 
                     // Dots
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp)
                     ) {
                         val proficiency = item.proficiency?.coerceIn(0f, 1f) ?: 0.5f
                         val filledDots = (proficiency * element.maxDots).toInt()
@@ -388,7 +388,7 @@ private fun SkillGroupedLayout(
                     Text(
                         text = category,
                         style = element.categoryStyle.toComposeTextStyle(zoomLevel),
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        modifier = Modifier.padding(bottom = (4 * zoomLevel).dp)
                     )
                 }
 
@@ -396,9 +396,9 @@ private fun SkillGroupedLayout(
                 skills.forEach { item ->
                     if (item.name.isNotEmpty()) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = (element.spacing / 2).dp)
+                            modifier = Modifier.padding(vertical = (element.spacing / 2 * zoomLevel).dp)
                         ) {
                             if (element.showBullets) {
                                 Text(

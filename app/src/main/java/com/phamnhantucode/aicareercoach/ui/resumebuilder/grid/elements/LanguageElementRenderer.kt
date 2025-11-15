@@ -70,7 +70,7 @@ fun LanguageElementRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         when (element.displayStyle) {
             LanguageDisplayStyle.TEXT_LABELS -> {
@@ -176,7 +176,7 @@ private fun ProgressBarsLanguageLayout(
             if (item.name.isNotEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy((2 * zoomLevel).dp)
                 ) {
                     // Language name and proficiency label
                     Row(
@@ -273,7 +273,7 @@ private fun DotsLanguageLayout(
                     val progressBarBackgroundColor = element.progressBarBackgroundColor?.let { Color(it) } ?: Color.LightGray
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp)
                     ) {
                         repeat(element.maxDots) { dotIndex ->
                             Box(
@@ -345,7 +345,7 @@ private fun TagsLanguageLayout(
                             color = bgColor,
                             shape = RoundedCornerShape(element.tagCornerRadius.dp)
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                        .padding(horizontal = (12 * zoomLevel).dp, vertical = (6 * zoomLevel).dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Language name

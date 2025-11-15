@@ -10,6 +10,7 @@ import android.text.TextPaint
 import androidx.compose.ui.text.font.FontWeight
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextAlignment
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.VerticalTextAlignment
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ElementPdfRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordinateMapper
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfRenderContext
@@ -33,32 +34,42 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
+        // Apply 8dp content padding (matching canvas editor behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
+
         // Create text paint
         val textPaint = createTextPaint(element, mapper, context)
 
-        // Create layout for text
+        // Create layout for text with padded width
         val layout = createTextLayout(
             element.content,
             textPaint,
-            bounds.width().toInt(),
+            contentBounds.width().toInt(),
             element.alignment,
             element.maxLines
         )
 
-        // Calculate vertical alignment
+        // Calculate vertical alignment within content bounds
         val textHeight = layout.height.toFloat()
-        val availableHeight = bounds.height()
-        val yOffset = when (element.alignment) {
-            // Could add vertical alignment in future
-            else -> 0f // Top alignment for now
+        val availableHeight = contentBounds.height()
+        val yOffset = when (element.verticalAlignment ?: VerticalTextAlignment.CENTER) {
+            VerticalTextAlignment.TOP -> 0f
+            VerticalTextAlignment.CENTER -> (availableHeight - textHeight) / 2f
+            VerticalTextAlignment.BOTTOM -> availableHeight - textHeight
         }
 
-        // Draw text
+        // Draw text within content bounds
         canvas.save()
-        canvas.translate(bounds.left, bounds.top + yOffset)
+        canvas.translate(contentBounds.left, contentBounds.top + yOffset)
 
-        // Clip to bounds
-        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+        // Clip to content bounds
+        canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
         layout.draw(canvas)
         canvas.restore()

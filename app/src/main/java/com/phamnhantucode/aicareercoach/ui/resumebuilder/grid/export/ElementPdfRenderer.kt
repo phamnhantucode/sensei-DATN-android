@@ -31,6 +31,7 @@ interface ElementPdfRenderer<T : ResumeElement> {
  * Contains shared resources and utilities for rendering
  */
 data class PdfRenderContext(
+    val context: android.content.Context,
     val config: PdfExportConfig,
     val imageCache: ImageCache,
     val colorConverter: ColorConverter

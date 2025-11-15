@@ -29,26 +29,35 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
+        // Apply 8dp content padding (matching canvas editor behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
+
         canvas.save()
-        canvas.translate(bounds.left, bounds.top)
-        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+        canvas.translate(contentBounds.left, contentBounds.top)
+        canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
         // Render based on display style
         when (element.displayStyle) {
             SkillDisplayStyle.LIST -> {
-                renderListLayout(canvas, element, bounds, mapper, context)
+                renderListLayout(canvas, element, contentBounds, mapper, context)
             }
             SkillDisplayStyle.TAGS -> {
-                renderTagsLayout(canvas, element, bounds, mapper, context)
+                renderTagsLayout(canvas, element, contentBounds, mapper, context)
             }
             SkillDisplayStyle.PROGRESS_BARS -> {
-                renderProgressBarsLayout(canvas, element, bounds, mapper, context)
+                renderProgressBarsLayout(canvas, element, contentBounds, mapper, context)
             }
             SkillDisplayStyle.DOTS -> {
-                renderDotsLayout(canvas, element, bounds, mapper, context)
+                renderDotsLayout(canvas, element, contentBounds, mapper, context)
             }
             SkillDisplayStyle.GROUPED -> {
-                renderGroupedLayout(canvas, element, bounds, mapper, context)
+                renderGroupedLayout(canvas, element, contentBounds, mapper, context)
             }
         }
 
@@ -67,14 +76,31 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
     ) {
         val textPaint = createSkillTextPaint(element, mapper, context)
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
-        var currentY = spacing / 2
+
+        // Calculate total content height
+        val totalHeight = element.items.count { it.name.isNotEmpty() } * (textPaint.textSize + spacing) - spacing
+
+        // Apply vertical alignment
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
 
         element.items.forEach { item ->
             if (item.name.isNotEmpty()) {
                 val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
                 val text = bullet + item.name
+                val textWidth = textPaint.measureText(text)
 
-                canvas.drawText(text, 0f, currentY + textPaint.textSize, textPaint)
+                // Apply horizontal alignment
+                val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                    HorizontalAlignment.START -> 0f
+                    HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
+                    HorizontalAlignment.END -> bounds.width() - textWidth
+                }
+
+                canvas.drawText(text, xPosition, currentY + textPaint.textSize, textPaint)
                 currentY += textPaint.textSize + spacing
             }
         }
@@ -94,16 +120,39 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val tagPadding = mapper.borderWidthToPdfPoints(12f)
         val tagRadius = mapper.borderWidthToPdfPoints(element.tagCornerRadius)
-        
+        val rowHeight = textPaint.textSize + tagPadding * 2
+
         val tagBackgroundPaint = Paint().apply {
             color = element.tagBackgroundColor?.toInt() ?: 0xFFE3F2FD.toInt()
             style = Paint.Style.FILL
             isAntiAlias = true
         }
 
+        // First pass: calculate total height needed for vertical alignment
+        var simulateX = 0f
+        var numRows = 1
+        element.items.forEach { item ->
+            if (item.name.isEmpty()) return@forEach
+            val textWidth = textPaint.measureText(item.name)
+            val tagWidth = textWidth + tagPadding * 2
+            if (simulateX + tagWidth > bounds.width() && simulateX > 0) {
+                simulateX = 0f
+                numRows++
+            }
+            simulateX += tagWidth + spacing
+        }
+        val totalHeight = (rowHeight * numRows) + (spacing * (numRows - 1))
+
+        // Apply vertical alignment
+        val startY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
+
+        // Second pass: actually render tags
         var currentX = 0f
-        var currentY = 0f
-        val rowHeight = textPaint.textSize + tagPadding * 2
+        var currentY = startY
 
         element.items.forEach { item ->
             if (item.name.isEmpty()) return@forEach
@@ -158,7 +207,17 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val barHeight = mapper.borderWidthToPdfPoints(element.progressBarHeight)
         val barRadius = mapper.borderWidthToPdfPoints(element.progressBarCornerRadius)
-        var currentY = 0f
+
+        // Calculate total height for vertical alignment
+        val itemCount = element.items.count { it.name.isNotEmpty() }
+        val totalHeight = itemCount * (textPaint.textSize + 4f + barHeight + spacing) - spacing
+
+        // Apply vertical alignment
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
 
         val backgroundPaint = Paint().apply {
             color = element.progressBarBackgroundColor?.toInt() ?: 0xFFE0E0E0.toInt()
@@ -175,11 +234,20 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         element.items.forEach { item ->
             if (item.name.isEmpty()) return@forEach
 
+            val textWidth = textPaint.measureText(item.name)
+
+            // Apply horizontal alignment for text
+            val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                HorizontalAlignment.START -> 0f
+                HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - textWidth
+            }
+
             // Draw skill name
-            canvas.drawText(item.name, 0f, currentY + textPaint.textSize, textPaint)
+            canvas.drawText(item.name, xPosition, currentY + textPaint.textSize, textPaint)
             currentY += textPaint.textSize + 4f
 
-            // Draw progress bar background
+            // Draw progress bar background (full width, not affected by text alignment)
             val barRect = RectF(0f, currentY, bounds.width(), currentY + barHeight)
             canvas.drawRoundRect(barRect, barRadius, barRadius, backgroundPaint)
 
@@ -209,7 +277,17 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val dotSize = mapper.borderWidthToPdfPoints(element.dotSize)
         val dotSpacing = mapper.borderWidthToPdfPoints(4f)
-        var currentY = textPaint.textSize / 2
+
+        // Calculate total height for vertical alignment
+        val itemCount = element.items.count { it.name.isNotEmpty() }
+        val totalHeight = itemCount * (textPaint.textSize + spacing) - spacing
+
+        // Apply vertical alignment
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
 
         val filledPaint = Paint().apply {
             color = element.progressBarColor?.toInt() ?: 0xFF2196F3.toInt()
@@ -226,8 +304,17 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         element.items.forEach { item ->
             if (item.name.isEmpty()) return@forEach
 
+            val textWidth = textPaint.measureText(item.name)
+
+            // Apply horizontal alignment for text (dots stay on right side)
+            val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                HorizontalAlignment.START -> 0f
+                HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - textWidth
+            }
+
             // Draw skill name
-            canvas.drawText(item.name, 0f, currentY + textPaint.textSize, textPaint)
+            canvas.drawText(item.name, xPosition, currentY + textPaint.textSize, textPaint)
 
             // Calculate dot starting position (right side)
             val dotsWidth = (dotSize * element.maxDots) + (dotSpacing * (element.maxDots - 1))
@@ -266,12 +353,36 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val categoryTextPaint = createCategoryTextPaint(element, mapper, context)
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val groupSpacing = mapper.borderWidthToPdfPoints(element.groupSpacing)
-        var currentY = 0f
 
-        element.items.groupBy { it.category }.forEach { (category, skills) ->
+        // Calculate total height for vertical alignment
+        val groups = element.items.groupBy { it.category }
+        var totalHeight = 0f
+        groups.forEach { (category, skills) ->
+            if (category.isNotEmpty()) {
+                totalHeight += categoryTextPaint.textSize + 4f
+            }
+            totalHeight += skills.count { it.name.isNotEmpty() } * (skillTextPaint.textSize + spacing)
+            totalHeight += groupSpacing
+        }
+        totalHeight -= groupSpacing // Remove last group spacing
+
+        // Apply vertical alignment
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
+
+        groups.forEach { (category, skills) ->
             // Draw category header
             if (category.isNotEmpty()) {
-                canvas.drawText(category, 0f, currentY + categoryTextPaint.textSize, categoryTextPaint)
+                val categoryWidth = categoryTextPaint.measureText(category)
+                val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                    HorizontalAlignment.START -> 0f
+                    HorizontalAlignment.CENTER -> (bounds.width() - categoryWidth) / 2f
+                    HorizontalAlignment.END -> bounds.width() - categoryWidth
+                }
+                canvas.drawText(category, xPosition, currentY + categoryTextPaint.textSize, categoryTextPaint)
                 currentY += categoryTextPaint.textSize + 4f
             }
 
@@ -280,8 +391,15 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
                 if (item.name.isNotEmpty()) {
                     val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
                     val text = bullet + item.name
+                    val textWidth = skillTextPaint.measureText(text)
 
-                    canvas.drawText(text, 0f, currentY + skillTextPaint.textSize, skillTextPaint)
+                    val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                        HorizontalAlignment.START -> 0f
+                        HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
+                        HorizontalAlignment.END -> bounds.width() - textWidth
+                    }
+
+                    canvas.drawText(text, xPosition, currentY + skillTextPaint.textSize, skillTextPaint)
                     currentY += skillTextPaint.textSize + spacing
                 }
             }
