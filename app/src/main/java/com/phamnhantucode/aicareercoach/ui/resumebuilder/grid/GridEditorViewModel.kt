@@ -68,6 +68,9 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
     private var autoSaveJob: Job? = null
     private var isAutoSaveEnabled = true
 
+    // Resume ID tracking - links GridResume to database Resume record
+    private var linkedResumeId: String? = null
+
     // Events
     private val _events = MutableSharedFlow<GridEditorEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<GridEditorEvent> = _events.asSharedFlow()
@@ -89,7 +92,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             val gridResumeJson = gson.toJson(_gridResume.value)
             sharedPreferences.edit()
                 .putString("latest_grid_resume", gridResumeJson)
-                .apply()
+                .commit() // Using commit() instead of apply() to ensure synchronous save before destruction
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -108,16 +111,33 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
             try {
                 // First, try to load the GridResume from SharedPreferences
                 val savedGridResumeJson = sharedPreferences.getString("latest_grid_resume", null)
+                val savedResumeId = sharedPreferences.getString("linked_resume_id", null)
 
                 if (savedGridResumeJson != null) {
                     // Load from SharedPreferences
                     try {
                         val savedGridResume = gson.fromJson(savedGridResumeJson, GridResume::class.java)
                         _gridResume.value = savedGridResume
+                        // Restore the linked resume ID
+                        linkedResumeId = savedResumeId
                     } catch (e: Exception) {
-                        e.printStackTrace()
-                        // If parsing fails, fall back to creating default
-                        _gridResume.value = createDefaultResume()
+                        // If parsing fails, try loading from repository database before falling back to empty resume
+                        android.util.Log.e("GridEditorViewModel", "Failed to deserialize GridResume from SharedPreferences", e)
+
+                        val result = repository.getLatestResume()
+                        val formResume = result.getOrNull()
+
+                        if (formResume != null) {
+                            // Convert form resume to grid resume - this preserves user data
+                            android.util.Log.d("GridEditorViewModel", "Recovered resume from database after SharedPreferences parse failure")
+                            _gridResume.value = formResume.toGridResume()
+                            linkedResumeId = formResume.id
+                        } else {
+                            // Only fall back to empty resume if repository also has no data
+                            android.util.Log.w("GridEditorViewModel", "No resume found in database, creating default empty resume")
+                            _gridResume.value = createDefaultResume()
+                            linkedResumeId = null
+                        }
                     }
                 } else {
                     // No saved GridResume, try to load from form resume
@@ -127,9 +147,12 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                     if (formResume != null) {
                         // Convert form resume to grid resume
                         _gridResume.value = formResume.toGridResume()
+                        // Store the resume ID so we update this record instead of creating new ones
+                        linkedResumeId = formResume.id
                     } else {
                         // Create new resume with default template
                         _gridResume.value = createDefaultResume()
+                        linkedResumeId = null
                     }
                 }
 
@@ -152,6 +175,8 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             saveToUndoStack()
             _gridResume.value = formResume.toGridResume()
+            // Link to this resume's ID for future updates
+            linkedResumeId = formResume.id
             syncUserDataOnLoad()
             _events.tryEmit(GridEditorEvent.ResumeLoaded)
         }
@@ -180,13 +205,28 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                 val gridResumeJson = gson.toJson(_gridResume.value)
                 sharedPreferences.edit()
                     .putString("latest_grid_resume", gridResumeJson)
-                    .apply()
+                    .putString("linked_resume_id", linkedResumeId) // Save the linked resume ID
+                    .commit() // Using commit() for reliable synchronous save
 
                 // Also convert to form resume for compatibility with other parts of the app
-                val formResume = _gridResume.value.toFormResume()
-                val result = repository.saveResume(formResume, syncToRemote = true)
+                val formResume = _gridResume.value.toFormResume(linkedResumeId)
+
+                // Use UPDATE if we have a linked resume ID, otherwise INSERT (new resume)
+                val result = if (linkedResumeId != null) {
+                    repository.updateResume(formResume, syncToRemote = true)
+                } else {
+                    repository.saveResume(formResume, syncToRemote = true)
+                }
 
                 if (result.isSuccess) {
+                    // If this was a new resume (no linked ID), store the ID for future updates
+                    if (linkedResumeId == null) {
+                        linkedResumeId = formResume.id
+                        // Save the linked ID immediately
+                        sharedPreferences.edit()
+                            .putString("linked_resume_id", linkedResumeId)
+                            .apply()
+                    }
                     _events.emit(GridEditorEvent.SaveSuccess("Resume saved successfully"))
                 } else {
                     _events.emit(GridEditorEvent.SaveError("Failed to save resume"))
@@ -201,6 +241,28 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
     }
 
     /**
+     * Saves immediately without debouncing (for critical operations like navigation away)
+     * This is a fire-and-forget operation that doesn't emit events
+     */
+    fun saveImmediately() {
+        try {
+            // Cancel pending auto-save to avoid duplicate saves
+            autoSaveJob?.cancel()
+
+            // Save GridResume to SharedPreferences synchronously
+            val gridResumeJson = gson.toJson(_gridResume.value)
+            sharedPreferences.edit()
+                .putString("latest_grid_resume", gridResumeJson)
+                .commit() // Synchronous save ensures completion
+
+            // Note: We don't save to repository here as it requires coroutine
+            // The SharedPreferences save is the critical one for data preservation
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
      * Triggers auto-save after a delay
      */
     private fun triggerAutoSave() {
@@ -208,7 +270,7 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
 
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(1500) // 1.5 second debounce - faster saves, less data loss risk
+            delay(500) // 500ms debounce - faster saves, minimal data loss risk
             save()
         }
     }
@@ -583,6 +645,105 @@ class GridEditorViewModel(private val context: Context) : ViewModel() {
                                 )
                             }
                             element.copy(items = workExperienceItems)
+                        } else {
+                            element
+                        }
+                    }
+                    is ResumeElement.EducationElement -> {
+                        if (tag == UserInfoTag.EDUCATION && resume.education.isNotEmpty()) {
+                            val educationItems = resume.education.map { edu ->
+                                EducationItem(
+                                    degree = edu.degree,
+                                    institution = edu.institution,
+                                    location = edu.location,
+                                    startDate = edu.startDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    endDate = edu.endDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    gpa = edu.gpa,
+                                    achievements = edu.achievements.map { ach ->
+                                        AchievementItem(text = ach)
+                                    }
+                                )
+                            }
+                            element.copy(items = educationItems)
+                        } else {
+                            element
+                        }
+                    }
+                    is ResumeElement.SkillElement -> {
+                        if (resume.skills.isNotEmpty()) {
+                            val skillItems = resume.skills.map { skill ->
+                                SkillItem(name = skill)
+                            }
+                            element.copy(items = skillItems)
+                        } else {
+                            element
+                        }
+                    }
+                    is ResumeElement.ProjectElement -> {
+                        if (resume.projects.isNotEmpty()) {
+                            val projectItems = resume.projects.map { proj ->
+                                ProjectItem(
+                                    name = proj.title,
+                                    description = proj.description,
+                                    startDate = proj.startDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    endDate = proj.endDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    isOngoing = false,
+                                    technologies = proj.technologies.joinToString(", "),
+                                    link = proj.link,
+                                    highlights = emptyList()
+                                )
+                            }
+                            element.copy(items = projectItems)
+                        } else {
+                            element
+                        }
+                    }
+                    is ResumeElement.CertificationElement -> {
+                        if (resume.certifications.isNotEmpty()) {
+                            val certificationItems = resume.certifications.map { cert ->
+                                CertificationItem(
+                                    name = cert.name,
+                                    issuer = cert.issuer,
+                                    issueDate = cert.issueDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    expiryDate = cert.expiryDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: "",
+                                    credentialId = cert.credentialId,
+                                    verificationLink = ""
+                                )
+                            }
+                            element.copy(items = certificationItems)
+                        } else {
+                            element
+                        }
+                    }
+                    is ResumeElement.LanguageElement -> {
+                        if (resume.languages.isNotEmpty()) {
+                            val languageItems = resume.languages.map { lang ->
+                                val proficiencyValue = when (lang.proficiency) {
+                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.NATIVE -> 1.0f
+                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.FLUENT -> 0.9f
+                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.PROFICIENT -> 0.7f
+                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.INTERMEDIATE -> 0.5f
+                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.ELEMENTARY -> 0.3f
+                                }
+                                LanguageItem(
+                                    name = lang.name,
+                                    proficiency = proficiencyValue,
+                                    proficiencyLabel = lang.proficiency.displayName
+                                )
+                            }
+                            element.copy(items = languageItems)
                         } else {
                             element
                         }

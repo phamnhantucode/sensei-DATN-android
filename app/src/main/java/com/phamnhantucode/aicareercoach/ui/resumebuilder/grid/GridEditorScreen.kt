@@ -97,6 +97,15 @@ fun GridEditorScreen(
         viewModel.setZoomLevel(optimalZoom)
     }
 
+    // Save data when leaving the screen (lifecycle-aware save)
+    DisposableEffect(viewModel) {
+        onDispose {
+            // Save immediately and synchronously when screen is disposed
+            // This ensures data is persisted even if app is killed during navigation
+            viewModel.saveImmediately()
+        }
+    }
+
     Scaffold(
         topBar = {
             GridEditorTopBar(

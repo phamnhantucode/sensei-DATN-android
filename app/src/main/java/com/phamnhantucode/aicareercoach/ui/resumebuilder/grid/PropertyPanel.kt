@@ -61,13 +61,21 @@ fun PropertyPanel(
         }
     }
 
+    // Track previous tag to detect changes
+    var previousTag by remember { mutableStateOf(element.userInfoTag) }
+    
     // Auto-update text elements with user data when personalInfo loads and element has a tag
     LaunchedEffect(personalInfo, element.userInfoTag) {
+        // Update content if:
+        // 1. Content is empty (initial fill), OR
+        // 2. Tag has changed (user changed the tag)
+        val tagChanged = previousTag != element.userInfoTag
+        previousTag = element.userInfoTag
+        
         if (personalInfo != null && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
             when (element) {
                 is ResumeElement.TextElement -> {
-                    // Only auto-fill if content is empty to avoid overwriting user edits
-                    if (element.content.isEmpty()) {
+                    if (element.content.isEmpty() || tagChanged) {
                         val content = when (element.userInfoTag) {
                             UserInfoTag.NAME -> personalInfo?.fullName ?: ""
                             UserInfoTag.EMAIL -> personalInfo?.email ?: ""
@@ -84,8 +92,7 @@ fun PropertyPanel(
                     }
                 }
                 is ResumeElement.ImageElement -> {
-                    // Only auto-fill if imageUrl is empty
-                    if (element.imageUrl.isEmpty() && element.userInfoTag == UserInfoTag.AVATAR) {
+                    if ((element.imageUrl.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.AVATAR) {
                         val avatar = personalInfo?.avatar ?: ""
                         if (avatar.isNotEmpty()) {
                             onUpdateElement(element.copy(imageUrl = avatar))
@@ -139,7 +146,17 @@ fun PropertyPanel(
                 element = element,
                 onUpdateElement = onUpdateElement,
                 personalInfo = personalInfo,
-                resume = resume
+                resume = resume,
+                onRefreshUserData = {
+                    // Reload resume data
+                    scope.launch {
+                        val result = repository.getLatestResume()
+                        result.onSuccess { formResume ->
+                            resume = formResume
+                            personalInfo = formResume?.personalInfo
+                        }
+                    }
+                }
             )
 
             Divider()
@@ -281,7 +298,8 @@ private fun CommonPropertiesSection(
     element: ResumeElement,
     onUpdateElement: (ResumeElement) -> Unit,
     personalInfo: PersonalInfo?,
-    resume: Resume?
+    resume: Resume?,
+    onRefreshUserData: () -> Unit = {}
 ) {
     PropertySection(title = "Position & Size") {
         // Position
@@ -527,7 +545,9 @@ private fun CommonPropertiesSection(
                                                                     java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
                                                                 ) ?: "",
                                                                 gpa = edu.gpa,
-                                                                achievements = emptyList() // Form-based resume doesn't have achievements yet
+                                                                achievements = edu.achievements.map { ach ->
+                                                                    AchievementItem(text = ach)
+                                                                }
                                                             )
                                                         }
                                                         updatedElement.copy(items = educationItems)
@@ -568,7 +588,10 @@ private fun CommonPropertiesSection(
                     if (personalInfo != null) {
                         OutlinedButton(
                             onClick = {
-                                // Manually refresh content from personalInfo based on current tag
+                                // Trigger refresh first, then apply data
+                                onRefreshUserData()
+                                
+                                // Apply tag data immediately with current data (will update once refresh completes)
                                 val updatedElement = when (element) {
                                     is ResumeElement.TextElement -> {
                                         val content = when (element.userInfoTag) {
@@ -592,7 +615,6 @@ private fun CommonPropertiesSection(
                                     }
                                     is ResumeElement.WorkExperienceElement -> {
                                         if (element.userInfoTag == UserInfoTag.WORK_EXPERIENCE && resume != null && resume.workExperiences.isNotEmpty()) {
-                                            // Convert form WorkExperience to grid WorkExperienceItem
                                             val workExperienceItems = resume.workExperiences.map { work ->
                                                 WorkExperienceItem(
                                                     jobTitle = work.jobTitle,
@@ -621,7 +643,6 @@ private fun CommonPropertiesSection(
                                     }
                                     is ResumeElement.EducationElement -> {
                                         if (element.userInfoTag == UserInfoTag.EDUCATION && resume != null && resume.education.isNotEmpty()) {
-                                            // Convert form Education to grid EducationItem
                                             val educationItems = resume.education.map { edu ->
                                                 EducationItem(
                                                     degree = edu.degree,
@@ -634,7 +655,9 @@ private fun CommonPropertiesSection(
                                                         java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
                                                     ) ?: "",
                                                     gpa = edu.gpa,
-                                                    achievements = emptyList()
+                                                    achievements = edu.achievements.map { ach ->
+                                                        AchievementItem(text = ach)
+                                                    }
                                                 )
                                             }
                                             element.copy(items = educationItems)
@@ -1045,11 +1068,27 @@ private fun ContactElementProperties(
     element: ResumeElement.ContactElement,
     onUpdateElement: (ResumeElement) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repository = remember { ResumeRepository.getInstance(context) }
+    var personalInfo by remember { mutableStateOf<PersonalInfo?>(null) }
+
+    // Load personal info when panel opens
+    LaunchedEffect(Unit) {
+        scope.launch {
+            val result = repository.getLatestResume()
+            result.onSuccess { formResume ->
+                personalInfo = formResume?.personalInfo
+            }
+        }
+    }
+
     PropertySection(title = "Contact Items") {
         // Contact items list
         element.items.forEachIndexed { index, item ->
             ContactItemEditor(
                 item = item,
+                personalInfo = personalInfo,
                 onUpdate = { updatedItem ->
                     val updatedItems = element.items.toMutableList()
                     updatedItems[index] = updatedItem
@@ -1263,9 +1302,40 @@ private fun ContactElementProperties(
 @Composable
 private fun ContactItemEditor(
     item: ContactItem,
+    personalInfo: PersonalInfo?,
     onUpdate: (ContactItem) -> Unit,
     onRemove: () -> Unit
 ) {
+    // Track previous tag to detect changes
+    var previousTag by remember { mutableStateOf(item.userInfoTag) }
+    
+    // Auto-update value when personalInfo loads and item has a tag
+    LaunchedEffect(personalInfo, item.userInfoTag) {
+        val tagChanged = previousTag != item.userInfoTag
+        previousTag = item.userInfoTag
+        
+        if (personalInfo != null && item.userInfoTag != null && item.userInfoTag != UserInfoTag.NONE) {
+            // Update value if:
+            // 1. Value is empty (initial fill), OR
+            // 2. Tag has changed (user changed the tag)
+            if (item.value.isEmpty() || tagChanged) {
+                val value = when (item.userInfoTag) {
+                    UserInfoTag.NAME -> personalInfo.fullName
+                    UserInfoTag.EMAIL -> personalInfo.email
+                    UserInfoTag.PHONE -> personalInfo.phone
+                    UserInfoTag.LOCATION -> personalInfo.location
+                    UserInfoTag.GITHUB -> personalInfo.github
+                    UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                    UserInfoTag.WEBSITE -> personalInfo.portfolio
+                    else -> item.value
+                }
+                if (value.isNotEmpty()) {
+                    onUpdate(item.copy(value = value))
+                }
+            }
+        }
+    }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -1374,12 +1444,47 @@ private fun ContactItemEditor(
                         DropdownMenuItem(
                             text = { Text(tag?.name ?: "None") },
                             onClick = {
-                                onUpdate(item.copy(userInfoTag = tag))
+                                var updatedItem = item.copy(userInfoTag = tag)
+                                
+                                // Auto-apply user data if personalInfo is available and tag is not None
+                                if (tag != null && tag != UserInfoTag.NONE && personalInfo != null) {
+                                    val value = when (tag) {
+                                        UserInfoTag.NAME -> personalInfo.fullName
+                                        UserInfoTag.EMAIL -> personalInfo.email
+                                        UserInfoTag.PHONE -> personalInfo.phone
+                                        UserInfoTag.LOCATION -> personalInfo.location
+                                        UserInfoTag.GITHUB -> personalInfo.github
+                                        UserInfoTag.LINKEDIN -> personalInfo.linkedIn
+                                        UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                        else -> updatedItem.value
+                                    }
+                                    updatedItem = updatedItem.copy(value = value)
+                                }
+                                
+                                onUpdate(updatedItem)
                                 showTagMenu = false
                             }
                         )
                     }
                 }
+            }
+            
+            // Show status message if tag is set
+            if (item.userInfoTag != null && item.userInfoTag != UserInfoTag.NONE) {
+                Text(
+                    text = if (personalInfo != null) {
+                        "✓ Auto-updated with user data"
+                    } else {
+                        "⏳ Waiting for user data..."
+                    },
+                    fontSize = 11.sp,
+                    color = if (personalInfo != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
     }

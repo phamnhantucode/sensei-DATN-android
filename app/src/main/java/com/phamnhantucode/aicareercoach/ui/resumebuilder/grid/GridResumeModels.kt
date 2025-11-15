@@ -1041,31 +1041,152 @@ fun Resume.toGridResume(templateType: GridTemplateType = GridTemplateType.PROFES
 /**
  * Converts a grid-based GridResume back to form-based Resume
  * This is a best-effort conversion that may lose some layout information
+ *
+ * @param existingResumeId The existing resume ID to preserve (if updating existing resume)
+ *                         If null, a new ID will be generated
  */
-fun GridResume.toFormResume(): Resume {
-    val textElements = pages.firstOrNull()?.elements
-        ?.filterIsInstance<ResumeElement.TextElement>()
-        ?.sortedWith(compareBy({ it.position.row }, { it.position.col }))
-        ?: emptyList()
+fun GridResume.toFormResume(existingResumeId: String? = null): Resume {
+    val page = pages.firstOrNull()
 
-    // Basic extraction - this is simplified
-    // In a real implementation, you'd use pattern matching or metadata
+    // Extract data from tagged elements instead of guessing
+    val textElements = page?.elements?.filterIsInstance<ResumeElement.TextElement>() ?: emptyList()
+    val contactElements = page?.elements?.filterIsInstance<ResumeElement.ContactElement>() ?: emptyList()
+    val workExperienceElements = page?.elements?.filterIsInstance<ResumeElement.WorkExperienceElement>() ?: emptyList()
+    val educationElements = page?.elements?.filterIsInstance<ResumeElement.EducationElement>() ?: emptyList()
+    val skillElements = page?.elements?.filterIsInstance<ResumeElement.SkillElement>() ?: emptyList()
+    val projectElements = page?.elements?.filterIsInstance<ResumeElement.ProjectElement>() ?: emptyList()
+    val certificationElements = page?.elements?.filterIsInstance<ResumeElement.CertificationElement>() ?: emptyList()
+    val languageElements = page?.elements?.filterIsInstance<ResumeElement.LanguageElement>() ?: emptyList()
+    val imageElements = page?.elements?.filterIsInstance<ResumeElement.ImageElement>() ?: emptyList()
+
+    // Extract personal info from tagged elements
+    val nameText = textElements.find { it.userInfoTag == UserInfoTag.NAME }?.content ?: ""
+    val emailFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.EMAIL }?.value ?: ""
+    val phoneFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.PHONE }?.value ?: ""
+    val locationFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.LOCATION }?.value ?: ""
+    val linkedInFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.LINKEDIN }?.value ?: ""
+    val githubFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.GITHUB }?.value ?: ""
+    val websiteFromContact = contactElements.flatMap { it.items }.find { it.userInfoTag == UserInfoTag.WEBSITE }?.value ?: ""
+    val avatarImage = imageElements.find { it.userInfoTag == UserInfoTag.AVATAR }?.imageUrl ?: ""
+
+    // Extract work experiences from WorkExperienceElement
+    val workExperiences = workExperienceElements
+        .flatMap { element -> element.items }
+        .map { item ->
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.WorkExperience(
+                jobTitle = item.jobTitle,
+                company = item.company,
+                location = item.location,
+                startDate = parseDate(item.startDate),
+                endDate = if (item.isCurrentRole) null else parseDate(item.endDate),
+                isCurrentRole = item.isCurrentRole,
+                responsibilities = item.responsibilities.map { it.text }
+            )
+        }
+
+    // Extract education from EducationElement
+    val education = educationElements
+        .flatMap { element -> element.items }
+        .map { item ->
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.Education(
+                degree = item.degree,
+                institution = item.institution,
+                location = item.location,
+                startDate = parseDate(item.startDate),
+                endDate = parseDate(item.endDate),
+                gpa = item.gpa,
+                achievements = item.achievements.map { it.text }
+            )
+        }
+
+    // Extract skills from SkillElement
+    val skills = skillElements.flatMap { element -> element.items.map { it.name } }
+
+    // Extract projects from ProjectElement
+    val projects = projectElements
+        .flatMap { element -> element.items }
+        .map { item ->
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.Project(
+                title = item.name,
+                description = item.description,
+                technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                link = item.link,
+                startDate = parseDate(item.startDate),
+                endDate = parseDate(item.endDate)
+            )
+        }
+
+    // Extract certifications from CertificationElement
+    val certifications = certificationElements
+        .flatMap { element -> element.items }
+        .map { item ->
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.Certification(
+                name = item.name,
+                issuer = item.issuer,
+                issueDate = parseDate(item.issueDate),
+                expiryDate = parseDate(item.expiryDate),
+                credentialId = item.credentialId
+            )
+        }
+
+    // Extract languages from LanguageElement
+    val languages = languageElements
+        .flatMap { element -> element.items }
+        .map { item ->
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.Language(
+                name = item.name,
+                proficiency = proficiencyFloatToEnum(item.proficiency)
+            )
+        }
 
     return Resume(
+        id = existingResumeId ?: java.util.UUID.randomUUID().toString(), // CRITICAL: Use existing ID if provided!
         personalInfo = PersonalInfo(
-            fullName = textElements.firstOrNull()?.content ?: "",
-            email = "", // Would need to parse from combined string
-            phone = "",
-            location = ""
+            fullName = nameText,
+            email = emailFromContact,
+            phone = phoneFromContact,
+            location = locationFromContact,
+            linkedIn = linkedInFromContact,
+            portfolio = websiteFromContact,
+            github = githubFromContact,
+            avatar = avatarImage
         ),
-        professionalSummary = "",
-        workExperiences = emptyList(),
-        education = emptyList(),
-        skills = emptyList(),
-        projects = emptyList(),
-        certifications = emptyList(),
-        languages = emptyList()
+        professionalSummary = "", // Grid editor doesn't have a specific field for this yet
+        workExperiences = workExperiences,
+        education = education,
+        skills = skills,
+        projects = projects,
+        certifications = certifications,
+        languages = languages
     )
+}
+
+/**
+ * Helper function to parse date strings (MMM yyyy format)
+ */
+private fun parseDate(dateString: String): java.time.LocalDate? {
+    if (dateString.isBlank() || dateString == "Present") return null
+    return try {
+        java.time.LocalDate.parse(
+            "01 $dateString",
+            java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy")
+        )
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * Helper function to convert proficiency float to enum
+ */
+private fun proficiencyFloatToEnum(proficiency: Float): com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency {
+    return when {
+        proficiency >= 0.95f -> com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.NATIVE
+        proficiency >= 0.8f -> com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.FLUENT
+        proficiency >= 0.65f -> com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.PROFICIENT
+        proficiency >= 0.4f -> com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.INTERMEDIATE
+        else -> com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.ELEMENTARY
+    }
 }
 
 // ============================================================================

@@ -62,6 +62,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -135,6 +136,14 @@ fun ResumeBuilderScreen(
         }
     }
 
+    // Save data when leaving the screen (lifecycle-aware save)
+    DisposableEffect(viewModel) {
+        onDispose {
+            // Save immediately when screen is disposed (navigating away or app closing)
+            viewModel.saveResume(showToast = false)
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -149,16 +158,16 @@ fun ResumeBuilderScreen(
                     shape = RoundedCornerShape(16.dp),
                     shadowElevation = 4.dp
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(), bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(start = 16.dp, end = 16.dp, top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(), bottom = 12.dp)
                     ) {
+                        // First Row: Back button and Title
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.Start
                         ) {
                             IconButton(
                                 onClick = onBack,
@@ -169,6 +178,7 @@ fun ResumeBuilderScreen(
                                     contentDescription = "Back"
                                 )
                             }
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
                                     text = "Resume Builder",
@@ -182,117 +192,130 @@ fun ResumeBuilderScreen(
                                 )
                             }
                         }
-
+                        
+                        // Second Row: All Action Buttons
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Grid Editor Button
-                            IconButton(
-                                onClick = onNavigateToGridEditor,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.secondaryContainer,
-                                        CircleShape
-                                    )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Dashboard,
-                                    contentDescription = "Grid Editor",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-
-                            // Theme Button
-                            IconButton(
-                                onClick = { showThemeDialog = true },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.tertiaryContainer,
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Palette,
-                                    contentDescription = "Theme",
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            }
-
-                            // Preview Button
-                            if (onNavigateToPreview != null) {
+                                // Grid Editor Button
                                 IconButton(
-                                    onClick = { onNavigateToPreview(resume) },
+                                    onClick = onNavigateToGridEditor,
                                     modifier = Modifier
                                         .size(40.dp)
                                         .background(
-                                            MaterialTheme.colorScheme.primaryContainer,
+                                            MaterialTheme.colorScheme.secondaryContainer,
                                             CircleShape
                                         )
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.Visibility,
-                                        contentDescription = "Preview",
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        imageVector = Icons.Filled.Dashboard,
+                                        contentDescription = "Grid Editor",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
+                                }
+
+                                // Theme Button
+                                IconButton(
+                                    onClick = { showThemeDialog = true },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.tertiaryContainer,
+                                            CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Palette,
+                                        contentDescription = "Theme",
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+
+                                // Preview Button
+                                if (onNavigateToPreview != null) {
+                                    IconButton(
+                                        onClick = { onNavigateToPreview(resume) },
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Visibility,
+                                            contentDescription = "Preview",
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
 
-                            // Save Button
-                            Button(
-                                onClick = { viewModel.saveResume(showToast = true) },
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
-                                ),
-                                enabled = !isSaving
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.CheckCircle,
-                                    contentDescription = "Save",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isSaving) "Saving..." else "Save")
-                            }
-
-                            // Export Button
-                            Box {
+                                // Save Button
                                 Button(
-                                    onClick = { exportMenuExpanded = true },
+                                    onClick = { viewModel.saveResume(showToast = true) },
                                     shape = RoundedCornerShape(24.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.secondary
+                                    ),
+                                    enabled = !isSaving
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.FileDownload,
-                                        contentDescription = "Export",
+                                        imageVector = Icons.Filled.CheckCircle,
+                                        contentDescription = "Save",
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Export")
+                                    Text(if (isSaving) "Saving..." else "Save")
                                 }
-                                DropdownMenu(
-                                    expanded = exportMenuExpanded,
-                                    onDismissRequest = { exportMenuExpanded = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Export as Markdown (.md)") },
-                                        onClick = {
-                                            exportMenuExpanded = false
-                                            viewModel.exportResume(latestContext, ResumeExportFormat.MARKDOWN)
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Export as PDF (.pdf)") },
-                                        onClick = {
-                                            exportMenuExpanded = false
-                                            viewModel.exportResume(latestContext, ResumeExportFormat.PDF)
-                                        }
-                                    )
+
+                                // Export Button
+                                Box {
+                                    Button(
+                                        onClick = { exportMenuExpanded = true },
+                                        shape = RoundedCornerShape(24.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.FileDownload,
+                                            contentDescription = "Export",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Export")
+                                    }
+                                    DropdownMenu(
+                                        expanded = exportMenuExpanded,
+                                        onDismissRequest = { exportMenuExpanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Export as Markdown (.md)") },
+                                            onClick = {
+                                                exportMenuExpanded = false
+                                                viewModel.exportResume(latestContext, ResumeExportFormat.MARKDOWN)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Export as PDF (.pdf)") },
+                                            onClick = {
+                                                exportMenuExpanded = false
+                                                viewModel.exportResume(latestContext, ResumeExportFormat.PDF)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

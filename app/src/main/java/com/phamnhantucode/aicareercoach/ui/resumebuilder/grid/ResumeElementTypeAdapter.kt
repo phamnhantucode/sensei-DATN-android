@@ -63,6 +63,9 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             "WorkExperienceElement" -> context.deserialize(data, ResumeElement.WorkExperienceElement::class.java)
             "EducationElement" -> context.deserialize(data, ResumeElement.EducationElement::class.java)
             "SkillElement" -> context.deserialize(data, ResumeElement.SkillElement::class.java)
+            "ProjectElement" -> context.deserialize(data, ResumeElement.ProjectElement::class.java)
+            "CertificationElement" -> context.deserialize(data, ResumeElement.CertificationElement::class.java)
+            "LanguageElement" -> context.deserialize(data, ResumeElement.LanguageElement::class.java)
             else -> throw JsonParseException("Unknown element type: $type")
         }
     }

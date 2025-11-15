@@ -129,7 +129,7 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
 
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(3000) // Wait 3 seconds after last change
+            delay(500) // Wait 500ms after last change - faster saves, minimal data loss
             saveResume(showToast = false) // Auto-save silently
         }
     }
