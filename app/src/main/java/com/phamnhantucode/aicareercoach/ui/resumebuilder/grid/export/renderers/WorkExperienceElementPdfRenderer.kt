@@ -117,14 +117,26 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
             VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
         }
 
+        // Calculate horizontal starting position based on horizontal alignment
+        val maxContentWidth = calculateMaxContentWidth(
+            element, bounds.width(), titlePaint, companyPaint, datePaint,
+            locationPaint, responsibilityPaint, mapper
+        )
+
+        val startX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (bounds.width() - maxContentWidth) / 2f
+            HorizontalAlignment.END -> bounds.width() - maxContentWidth
+        }
+
         element.items.forEachIndexed { index, item ->
             currentY += renderWorkItem(
                 canvas,
                 item,
                 element,
-                0f,
+                startX,
                 currentY,
-                bounds.width(),
+                maxContentWidth,
                 titlePaint,
                 companyPaint,
                 datePaint,
@@ -529,6 +541,91 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         }
 
         return totalHeight
+    }
+
+    /**
+     * Calculate maximum content width for horizontal alignment
+     */
+    private fun calculateMaxContentWidth(
+        element: ResumeElement.WorkExperienceElement,
+        availableWidth: Float,
+        titlePaint: TextPaint,
+        companyPaint: TextPaint,
+        datePaint: TextPaint,
+        locationPaint: TextPaint,
+        responsibilityPaint: TextPaint,
+        mapper: GridCoordinateMapper
+    ): Float {
+        var maxWidth = 0f
+
+        element.items.forEach { item ->
+            // Measure each field and track the maximum width
+            when (element.displayStyle) {
+                WorkExperienceDisplayStyle.STANDARD, WorkExperienceDisplayStyle.DETAILED -> {
+                    // Job title width
+                    if (item.jobTitle.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, titlePaint.measureText(item.jobTitle))
+                    }
+
+                    // Company width (with or without date)
+                    if (item.company.isNotEmpty()) {
+                        val companyWidth = companyPaint.measureText(item.company)
+                        if (element.showDates) {
+                            val dateText = formatDateRange(item, element)
+                            val dateWidth = datePaint.measureText(dateText)
+                            // Company and date are on same row, add both
+                            maxWidth = maxOf(maxWidth, companyWidth + dateWidth)
+                        } else {
+                            maxWidth = maxOf(maxWidth, companyWidth)
+                        }
+                    } else if (element.showDates) {
+                        val dateText = formatDateRange(item, element)
+                        maxWidth = maxOf(maxWidth, datePaint.measureText(dateText))
+                    }
+
+                    // Location width
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                    }
+                }
+                WorkExperienceDisplayStyle.COMPACT -> {
+                    // Title + company on same line
+                    val titleCompany = buildString {
+                        if (item.jobTitle.isNotEmpty()) append(item.jobTitle)
+                        if (item.jobTitle.isNotEmpty() && item.company.isNotEmpty()) append(" at ")
+                        if (item.company.isNotEmpty()) append(item.company)
+                    }
+                    if (titleCompany.isNotEmpty()) {
+                        val titleCompanyWidth = titlePaint.measureText(titleCompany)
+                        if (element.showDates) {
+                            val dateText = formatDateRange(item, element)
+                            val dateWidth = datePaint.measureText(dateText)
+                            maxWidth = maxOf(maxWidth, titleCompanyWidth + dateWidth)
+                        } else {
+                            maxWidth = maxOf(maxWidth, titleCompanyWidth)
+                        }
+                    }
+
+                    // Location width
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                    }
+                }
+            }
+
+            // Responsibilities width (bullet + text)
+            item.responsibilities.forEach { responsibility ->
+                if (responsibility.text.isNotEmpty()) {
+                    val bullet = getBulletCharacter(element.bulletStyle, 0, responsibility)
+                    val bulletWidth = responsibilityPaint.measureText("$bullet ")
+                    val textWidth = responsibilityPaint.measureText(responsibility.text)
+                    maxWidth = maxOf(maxWidth, bulletWidth + textWidth)
+                }
+            }
+        }
+
+        // Ensure we don't exceed available width
+        return minOf(maxWidth, availableWidth)
     }
 
     /**

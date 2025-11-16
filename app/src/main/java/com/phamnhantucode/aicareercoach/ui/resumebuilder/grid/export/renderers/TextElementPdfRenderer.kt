@@ -52,7 +52,8 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
             textPaint,
             contentBounds.width().toInt(),
             element.alignment,
-            element.maxLines
+            element.maxLines,
+            element.textStyle
         )
 
         // Calculate vertical alignment within content bounds
@@ -118,7 +119,8 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         paint: TextPaint,
         width: Int,
         alignment: TextAlignment,
-        maxLines: Int?
+        maxLines: Int?,
+        textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle
     ): StaticLayout {
         val layoutAlignment = when (alignment) {
             TextAlignment.LEFT -> Layout.Alignment.ALIGN_NORMAL
@@ -127,11 +129,18 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
             TextAlignment.JUSTIFY -> Layout.Alignment.ALIGN_NORMAL // Note: full justify not supported in StaticLayout
         }
 
+        // Calculate line spacing multiplier from lineHeight
+        // If lineHeight is specified, convert it to a multiplier relative to fontSize
+        // Otherwise use default 1.15f (15% line height increase)
+        val lineSpacingMultiplier = textStyle.lineHeight?.let {
+            it / textStyle.fontSize
+        } ?: 1.15f
+
         return StaticLayout.Builder
             .obtain(text, 0, text.length, paint, width.coerceAtLeast(1))
             .setAlignment(layoutAlignment)
-            .setLineSpacing(0f, 1.15f) // 15% line height increase (default)
-            .setIncludePad(false)
+            .setLineSpacing(0f, lineSpacingMultiplier)
+            .setIncludePad(true) // Match Compose behavior
             .setMaxLines(maxLines ?: Int.MAX_VALUE)
             .build()
     }

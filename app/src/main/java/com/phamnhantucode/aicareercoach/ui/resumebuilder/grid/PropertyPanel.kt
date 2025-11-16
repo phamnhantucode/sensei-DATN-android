@@ -79,15 +79,16 @@ fun PropertyPanel(
         if (currentResume != null && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
             when (element) {
                 is ResumeElement.TextElement -> {
-                    if ((element.content.isEmpty() || tagChanged) && currentPersonalInfo != null) {
+                    if (element.content.isEmpty() || tagChanged) {
                         val content = when (element.userInfoTag) {
-                            UserInfoTag.NAME -> currentPersonalInfo.fullName
-                            UserInfoTag.EMAIL -> currentPersonalInfo.email
-                            UserInfoTag.PHONE -> currentPersonalInfo.phone
-                            UserInfoTag.LOCATION -> currentPersonalInfo.location
-                            UserInfoTag.GITHUB -> currentPersonalInfo.github
-                            UserInfoTag.LINKEDIN -> currentPersonalInfo.linkedIn
-                            UserInfoTag.WEBSITE -> currentPersonalInfo.portfolio
+                            UserInfoTag.NAME -> currentPersonalInfo?.fullName ?: element.content
+                            UserInfoTag.EMAIL -> currentPersonalInfo?.email ?: element.content
+                            UserInfoTag.PHONE -> currentPersonalInfo?.phone ?: element.content
+                            UserInfoTag.LOCATION -> currentPersonalInfo?.location ?: element.content
+                            UserInfoTag.GITHUB -> currentPersonalInfo?.github ?: element.content
+                            UserInfoTag.LINKEDIN -> currentPersonalInfo?.linkedIn ?: element.content
+                            UserInfoTag.WEBSITE -> currentPersonalInfo?.portfolio ?: element.content
+                            UserInfoTag.PROFESSIONAL_SUMMARY -> currentResume.professionalSummary
                             else -> element.content
                         }
                         if (content.isNotEmpty()) {
@@ -564,6 +565,7 @@ private fun CommonPropertiesSection(
                                                         UserInfoTag.GITHUB -> personalInfo.github
                                                         UserInfoTag.LINKEDIN -> personalInfo.linkedIn
                                                         UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                                        UserInfoTag.PROFESSIONAL_SUMMARY -> resume?.professionalSummary ?: updatedElement.content
                                                         UserInfoTag.AVATAR -> updatedElement.content
                                                         UserInfoTag.WORK_EXPERIENCE -> updatedElement.content
                                                         UserInfoTag.EDUCATION -> updatedElement.content

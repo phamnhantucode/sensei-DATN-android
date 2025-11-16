@@ -113,21 +113,22 @@ enum class EditorType {
  * Used to mark elements that should be replaced with user data when applying a template
  */
 enum class UserInfoTag {
-    NONE,            // No tag - regular element
-    NAME,            // Full name
-    EMAIL,           // Email address
-    PHONE,           // Phone number
-    LOCATION,        // Location/address
-    GITHUB,          // GitHub URL
-    LINKEDIN,        // LinkedIn URL
-    WEBSITE,         // Portfolio/website URL
-    AVATAR,          // Profile picture
-    WORK_EXPERIENCE, // Work experience data
-    EDUCATION,       // Education data
-    SKILLS,          // Skills data
-    PROJECTS,        // Projects data
-    CERTIFICATIONS,  // Certifications data
-    LANGUAGES        // Languages data
+    NONE,                 // No tag - regular element
+    NAME,                 // Full name
+    EMAIL,                // Email address
+    PHONE,                // Phone number
+    LOCATION,             // Location/address
+    GITHUB,               // GitHub URL
+    LINKEDIN,             // LinkedIn URL
+    WEBSITE,              // Portfolio/website URL
+    AVATAR,               // Profile picture
+    PROFESSIONAL_SUMMARY, // Professional summary/bio
+    WORK_EXPERIENCE,      // Work experience data
+    EDUCATION,            // Education data
+    SKILLS,               // Skills data
+    PROJECTS,             // Projects data
+    CERTIFICATIONS,       // Certifications data
+    LANGUAGES             // Languages data
 }
 
 // ============================================================================

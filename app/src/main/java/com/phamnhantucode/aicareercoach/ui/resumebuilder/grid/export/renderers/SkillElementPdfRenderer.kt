@@ -128,20 +128,32 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             isAntiAlias = true
         }
 
-        // First pass: calculate total height needed for vertical alignment
-        var simulateX = 0f
-        var numRows = 1
+        // First pass: group tags into rows and calculate dimensions
+        data class TagInfo(val name: String, val width: Float)
+        val rows = mutableListOf<MutableList<TagInfo>>()
+        var currentRow = mutableListOf<TagInfo>()
+        var currentRowWidth = 0f
+
         element.items.forEach { item ->
             if (item.name.isEmpty()) return@forEach
             val textWidth = textPaint.measureText(item.name)
             val tagWidth = textWidth + tagPadding * 2
-            if (simulateX + tagWidth > bounds.width() && simulateX > 0) {
-                simulateX = 0f
-                numRows++
+
+            // Check if we need to start a new row
+            if (currentRowWidth + tagWidth > bounds.width() && currentRow.isNotEmpty()) {
+                rows.add(currentRow)
+                currentRow = mutableListOf()
+                currentRowWidth = 0f
             }
-            simulateX += tagWidth + spacing
+
+            currentRow.add(TagInfo(item.name, tagWidth))
+            currentRowWidth += tagWidth + if (currentRow.size > 1) spacing else 0f
         }
-        val totalHeight = (rowHeight * numRows) + (spacing * (numRows - 1))
+        if (currentRow.isNotEmpty()) {
+            rows.add(currentRow)
+        }
+
+        val totalHeight = (rowHeight * rows.size) + (spacing * (rows.size - 1))
 
         // Apply vertical alignment
         val startY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
@@ -150,46 +162,49 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
         }
 
-        // Second pass: actually render tags
-        var currentX = 0f
+        // Second pass: render tags with per-row horizontal alignment
         var currentY = startY
 
-        element.items.forEach { item ->
-            if (item.name.isEmpty()) return@forEach
+        rows.forEach { row ->
+            // Calculate row width
+            val rowWidth = row.sumOf { it.width.toDouble() }.toFloat() + (spacing * (row.size - 1))
 
-            val textWidth = textPaint.measureText(item.name)
-            val tagWidth = textWidth + tagPadding * 2
-
-            // Check if we need to wrap to next row
-            if (currentX + tagWidth > bounds.width() && currentX > 0) {
-                currentX = 0f
-                currentY += rowHeight + spacing
+            // Apply horizontal alignment for this row
+            var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                HorizontalAlignment.START -> 0f
+                HorizontalAlignment.CENTER -> (bounds.width() - rowWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - rowWidth
             }
 
-            // Draw tag background
-            val tagRect = RectF(currentX, currentY, currentX + tagWidth, currentY + rowHeight)
-            canvas.drawRoundRect(tagRect, tagRadius, tagRadius, tagBackgroundPaint)
+            // Render tags in this row
+            row.forEach { tag ->
+                // Draw tag background
+                val tagRect = RectF(currentX, currentY, currentX + tag.width, currentY + rowHeight)
+                canvas.drawRoundRect(tagRect, tagRadius, tagRadius, tagBackgroundPaint)
 
-            // Draw tag border if specified
-            if (element.tagBorderColor != null && element.tagBorderWidth > 0) {
-                val borderPaint = Paint().apply {
-                    color = element.tagBorderColor.toInt()
-                    style = Paint.Style.STROKE
-                    strokeWidth = mapper.borderWidthToPdfPoints(element.tagBorderWidth)
-                    isAntiAlias = true
+                // Draw tag border if specified
+                if (element.tagBorderColor != null && element.tagBorderWidth > 0) {
+                    val borderPaint = Paint().apply {
+                        color = element.tagBorderColor.toInt()
+                        style = Paint.Style.STROKE
+                        strokeWidth = mapper.borderWidthToPdfPoints(element.tagBorderWidth)
+                        isAntiAlias = true
+                    }
+                    canvas.drawRoundRect(tagRect, tagRadius, tagRadius, borderPaint)
                 }
-                canvas.drawRoundRect(tagRect, tagRadius, tagRadius, borderPaint)
+
+                // Draw text
+                canvas.drawText(
+                    tag.name,
+                    currentX + tagPadding,
+                    currentY + tagPadding + textPaint.textSize,
+                    textPaint
+                )
+
+                currentX += tag.width + spacing
             }
 
-            // Draw text
-            canvas.drawText(
-                item.name,
-                currentX + tagPadding,
-                currentY + tagPadding + textPaint.textSize,
-                textPaint
-            )
-
-            currentX += tagWidth + spacing
+            currentY += rowHeight + spacing
         }
     }
 
@@ -208,6 +223,14 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val barHeight = mapper.borderWidthToPdfPoints(element.progressBarHeight)
         val barRadius = mapper.borderWidthToPdfPoints(element.progressBarCornerRadius)
 
+        // Calculate maximum text width for consistent alignment
+        val maxTextWidth = element.items
+            .filter { it.name.isNotEmpty() }
+            .maxOfOrNull { textPaint.measureText(it.name) } ?: 0f
+
+        // Use max text width or available width (whichever is smaller) for bar width
+        val barWidth = minOf(maxTextWidth, bounds.width())
+
         // Calculate total height for vertical alignment
         val itemCount = element.items.count { it.name.isNotEmpty() }
         val totalHeight = itemCount * (textPaint.textSize + 4f + barHeight + spacing) - spacing
@@ -217,6 +240,13 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             VerticalAlignment.TOP -> 0f
             VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
             VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
+
+        // Apply horizontal alignment for the entire column (text + bars together)
+        val columnStartX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (bounds.width() - barWidth) / 2f
+            HorizontalAlignment.END -> bounds.width() - barWidth
         }
 
         val backgroundPaint = Paint().apply {
@@ -234,28 +264,19 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         element.items.forEach { item ->
             if (item.name.isEmpty()) return@forEach
 
-            val textWidth = textPaint.measureText(item.name)
-
-            // Apply horizontal alignment for text
-            val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-                HorizontalAlignment.START -> 0f
-                HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
-                HorizontalAlignment.END -> bounds.width() - textWidth
-            }
-
-            // Draw skill name
-            canvas.drawText(item.name, xPosition, currentY + textPaint.textSize, textPaint)
+            // Draw skill name (left-aligned within the column)
+            canvas.drawText(item.name, columnStartX, currentY + textPaint.textSize, textPaint)
             currentY += textPaint.textSize + 4f
 
-            // Draw progress bar background (full width, not affected by text alignment)
-            val barRect = RectF(0f, currentY, bounds.width(), currentY + barHeight)
+            // Draw progress bar background (same width as text column)
+            val barRect = RectF(columnStartX, currentY, columnStartX + barWidth, currentY + barHeight)
             canvas.drawRoundRect(barRect, barRadius, barRadius, backgroundPaint)
 
             // Draw progress bar fill
             val proficiency = item.proficiency?.coerceIn(0f, 1f) ?: 0.5f
-            val fillWidth = bounds.width() * proficiency
+            val fillWidth = barWidth * proficiency
             if (fillWidth > 0) {
-                val fillRect = RectF(0f, currentY, fillWidth, currentY + barHeight)
+                val fillRect = RectF(columnStartX, currentY, columnStartX + fillWidth, currentY + barHeight)
                 canvas.drawRoundRect(fillRect, barRadius, barRadius, progressPaint)
             }
 
@@ -305,22 +326,22 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             if (item.name.isEmpty()) return@forEach
 
             val textWidth = textPaint.measureText(item.name)
+            val dotsWidth = (dotSize * element.maxDots) + (dotSpacing * (element.maxDots - 1))
+            val textDotSpacing = mapper.borderWidthToPdfPoints(8f) // Space between text and dots
+            val totalItemWidth = textWidth + textDotSpacing + dotsWidth
 
-            // Apply horizontal alignment for text (dots stay on right side)
-            val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            // Apply horizontal alignment to entire item (text + dots together)
+            val itemStartX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
                 HorizontalAlignment.START -> 0f
-                HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
-                HorizontalAlignment.END -> bounds.width() - textWidth
+                HorizontalAlignment.CENTER -> (bounds.width() - totalItemWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - totalItemWidth
             }
 
             // Draw skill name
-            canvas.drawText(item.name, xPosition, currentY + textPaint.textSize, textPaint)
+            canvas.drawText(item.name, itemStartX, currentY + textPaint.textSize, textPaint)
 
-            // Calculate dot starting position (right side)
-            val dotsWidth = (dotSize * element.maxDots) + (dotSpacing * (element.maxDots - 1))
-            var dotX = bounds.width() - dotsWidth
-
-            // Draw dots
+            // Draw dots (positioned after text)
+            var dotX = itemStartX + textWidth + textDotSpacing
             val proficiency = item.proficiency?.coerceIn(0f, 1f) ?: 0.5f
             val filledDots = (proficiency * element.maxDots).toInt()
 

@@ -672,6 +672,7 @@ class GridEditorViewModel(
                             UserInfoTag.GITHUB -> resume.personalInfo.github
                             UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
                             UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
+                            UserInfoTag.PROFESSIONAL_SUMMARY -> resume.professionalSummary
                             UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
                             UserInfoTag.WORK_EXPERIENCE -> element.content // Work experience doesn't apply to text
                             UserInfoTag.EDUCATION -> element.content // Education doesn't apply to text
@@ -702,6 +703,7 @@ class GridEditorViewModel(
                                 UserInfoTag.GITHUB -> resume.personalInfo.github
                                 UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
                                 UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
+                                UserInfoTag.PROFESSIONAL_SUMMARY -> item.value // Professional summary doesn't apply to contact
                                 UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
                                 UserInfoTag.WORK_EXPERIENCE -> item.value // Work experience doesn't apply to contact
                                 UserInfoTag.EDUCATION -> item.value // Education doesn't apply to contact

@@ -121,14 +121,26 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
             VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
         }
 
+        // Calculate horizontal starting position based on horizontal alignment
+        val maxContentWidth = calculateMaxContentWidth(
+            element, bounds.width(), degreePaint, institutionPaint, datePaint,
+            locationPaint, gpaPaint, achievementPaint, mapper
+        )
+
+        val startX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (bounds.width() - maxContentWidth) / 2f
+            HorizontalAlignment.END -> bounds.width() - maxContentWidth
+        }
+
         element.items.forEachIndexed { index, item ->
             currentY += renderEducationItem(
                 canvas,
                 item,
                 element,
-                0f,
+                startX,
                 currentY,
-                bounds.width(),
+                maxContentWidth,
                 degreePaint,
                 institutionPaint,
                 datePaint,
@@ -570,6 +582,104 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         }
 
         return totalHeight
+    }
+
+    /**
+     * Calculate maximum content width for horizontal alignment
+     */
+    private fun calculateMaxContentWidth(
+        element: ResumeElement.EducationElement,
+        availableWidth: Float,
+        degreePaint: TextPaint,
+        institutionPaint: TextPaint,
+        datePaint: TextPaint,
+        locationPaint: TextPaint,
+        gpaPaint: TextPaint,
+        achievementPaint: TextPaint,
+        mapper: GridCoordinateMapper
+    ): Float {
+        var maxWidth = 0f
+
+        element.items.forEach { item ->
+            // Measure each field and track the maximum width
+            when (element.displayStyle) {
+                EducationDisplayStyle.STANDARD, EducationDisplayStyle.DETAILED -> {
+                    // Degree width
+                    if (item.degree.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, degreePaint.measureText(item.degree))
+                    }
+
+                    // Institution width (with or without date)
+                    if (item.institution.isNotEmpty()) {
+                        val institutionWidth = institutionPaint.measureText(item.institution)
+                        if (element.showDates) {
+                            val dateText = formatDateRange(item, element)
+                            val dateWidth = datePaint.measureText(dateText)
+                            // Institution and date are on same row, add both
+                            maxWidth = maxOf(maxWidth, institutionWidth + dateWidth)
+                        } else {
+                            maxWidth = maxOf(maxWidth, institutionWidth)
+                        }
+                    } else if (element.showDates) {
+                        val dateText = formatDateRange(item, element)
+                        maxWidth = maxOf(maxWidth, datePaint.measureText(dateText))
+                    }
+
+                    // Location width
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                    }
+
+                    // GPA width
+                    if (element.showGPA && item.gpa.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, gpaPaint.measureText(item.gpa))
+                    }
+                }
+                EducationDisplayStyle.COMPACT -> {
+                    // Degree + institution on same line
+                    val degreeInstitution = buildString {
+                        if (item.degree.isNotEmpty()) append(item.degree)
+                        if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(" at ")
+                        if (item.institution.isNotEmpty()) append(item.institution)
+                    }
+                    if (degreeInstitution.isNotEmpty()) {
+                        val degreeInstitutionWidth = degreePaint.measureText(degreeInstitution)
+                        if (element.showDates) {
+                            val dateText = formatDateRange(item, element)
+                            val dateWidth = datePaint.measureText(dateText)
+                            maxWidth = maxOf(maxWidth, degreeInstitutionWidth + dateWidth)
+                        } else {
+                            maxWidth = maxOf(maxWidth, degreeInstitutionWidth)
+                        }
+                    }
+
+                    // Location and GPA (can be on same row)
+                    var locationGpaWidth = 0f
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        locationGpaWidth += locationPaint.measureText(item.location)
+                    }
+                    if (element.showGPA && item.gpa.isNotEmpty()) {
+                        locationGpaWidth += gpaPaint.measureText(item.gpa)
+                    }
+                    if (locationGpaWidth > 0f) {
+                        maxWidth = maxOf(maxWidth, locationGpaWidth)
+                    }
+                }
+            }
+
+            // Achievements width (bullet + text)
+            item.achievements.forEach { achievement ->
+                if (achievement.text.isNotEmpty()) {
+                    val bullet = getBulletCharacter(element.bulletStyle, 0, achievement)
+                    val bulletWidth = achievementPaint.measureText("$bullet ")
+                    val textWidth = achievementPaint.measureText(achievement.text)
+                    maxWidth = maxOf(maxWidth, bulletWidth + textWidth)
+                }
+            }
+        }
+
+        // Ensure we don't exceed available width
+        return minOf(maxWidth, availableWidth)
     }
 
     /**

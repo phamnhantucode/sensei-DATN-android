@@ -44,6 +44,8 @@ class AndroidPdfGenerator(
     private val workExperienceRenderer = WorkExperienceElementPdfRenderer()
     private val educationRenderer = EducationElementPdfRenderer()
     private val skillRenderer = SkillElementPdfRenderer()
+    private val projectRenderer = ProjectElementPdfRenderer()
+    private val certificationRenderer = CertificationElementPdfRenderer()
 
     override fun generatePdf(resume: GridResume, outputFile: File): Flow<PdfExportState> = flow {
         try {
@@ -225,13 +227,13 @@ class AndroidPdfGenerator(
                     }
 
                     is ResumeElement.ProjectElement -> {
-                        // TODO: Implement PDF renderer for ProjectElement
-                        // For now, skip rendering
+                        val bounds = mapper.gridToPdfRect(element.position)
+                        projectRenderer.render(canvas, element, bounds, mapper, renderContext)
                     }
 
                     is ResumeElement.CertificationElement -> {
-                        // TODO: Implement PDF renderer for CertificationElement
-                        // For now, skip rendering
+                        val bounds = mapper.gridToPdfRect(element.position)
+                        certificationRenderer.render(canvas, element, bounds, mapper, renderContext)
                     }
 
                     is ResumeElement.LanguageElement -> {
