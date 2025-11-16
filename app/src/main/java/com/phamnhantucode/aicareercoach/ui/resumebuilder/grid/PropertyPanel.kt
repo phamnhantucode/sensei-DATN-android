@@ -29,6 +29,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency
 import kotlinx.coroutines.launch
 
 /**
@@ -72,18 +73,21 @@ fun PropertyPanel(
         val tagChanged = previousTag != element.userInfoTag
         previousTag = element.userInfoTag
         
-        if (personalInfo != null && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
+        val currentResume = resume
+        val currentPersonalInfo = personalInfo
+        
+        if (currentResume != null && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
             when (element) {
                 is ResumeElement.TextElement -> {
-                    if (element.content.isEmpty() || tagChanged) {
+                    if ((element.content.isEmpty() || tagChanged) && currentPersonalInfo != null) {
                         val content = when (element.userInfoTag) {
-                            UserInfoTag.NAME -> personalInfo?.fullName ?: ""
-                            UserInfoTag.EMAIL -> personalInfo?.email ?: ""
-                            UserInfoTag.PHONE -> personalInfo?.phone ?: ""
-                            UserInfoTag.LOCATION -> personalInfo?.location ?: ""
-                            UserInfoTag.GITHUB -> personalInfo?.github ?: ""
-                            UserInfoTag.LINKEDIN -> personalInfo?.linkedIn ?: ""
-                            UserInfoTag.WEBSITE -> personalInfo?.portfolio ?: ""
+                            UserInfoTag.NAME -> currentPersonalInfo.fullName
+                            UserInfoTag.EMAIL -> currentPersonalInfo.email
+                            UserInfoTag.PHONE -> currentPersonalInfo.phone
+                            UserInfoTag.LOCATION -> currentPersonalInfo.location
+                            UserInfoTag.GITHUB -> currentPersonalInfo.github
+                            UserInfoTag.LINKEDIN -> currentPersonalInfo.linkedIn
+                            UserInfoTag.WEBSITE -> currentPersonalInfo.portfolio
                             else -> element.content
                         }
                         if (content.isNotEmpty()) {
@@ -92,11 +96,76 @@ fun PropertyPanel(
                     }
                 }
                 is ResumeElement.ImageElement -> {
-                    if ((element.imageUrl.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.AVATAR) {
-                        val avatar = personalInfo?.avatar ?: ""
+                    if ((element.imageUrl.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.AVATAR && currentPersonalInfo != null) {
+                        val avatar = currentPersonalInfo.avatar
                         if (avatar.isNotEmpty()) {
                             onUpdateElement(element.copy(imageUrl = avatar))
                         }
+                    }
+                }
+                is ResumeElement.SkillElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.SKILLS && currentResume.skills.isNotEmpty()) {
+                        val skillItems = currentResume.skills.map { skill ->
+                            SkillItem(
+                                name = skill,
+                                category = "",
+                                proficiency = 0.7f,
+                                proficiencyLabel = ""
+                            )
+                        }
+                        onUpdateElement(element.copy(items = skillItems))
+                    }
+                }
+                is ResumeElement.ProjectElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.PROJECTS && currentResume.projects.isNotEmpty()) {
+                        val projectItems = currentResume.projects.map { proj ->
+                            ProjectItem(
+                                name = proj.title,
+                                description = proj.description,
+                                technologies = proj.technologies.joinToString(", "),
+                                startDate = proj.startDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                endDate = proj.endDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                link = proj.link
+                            )
+                        }
+                        onUpdateElement(element.copy(items = projectItems))
+                    }
+                }
+                is ResumeElement.CertificationElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.CERTIFICATIONS && currentResume.certifications.isNotEmpty()) {
+                        val certificationItems = currentResume.certifications.map { cert ->
+                            CertificationItem(
+                                name = cert.name,
+                                issuer = cert.issuer,
+                                issueDate = cert.issueDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                credentialId = cert.credentialId
+                            )
+                        }
+                        onUpdateElement(element.copy(items = certificationItems))
+                    }
+                }
+                is ResumeElement.LanguageElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.LANGUAGES && currentResume.languages.isNotEmpty()) {
+                        val languageItems = currentResume.languages.map { lang ->
+                            LanguageItem(
+                                name = lang.name,
+                                proficiency = when (lang.proficiency) {
+                                    LanguageProficiency.NATIVE -> 1.0f
+                                    LanguageProficiency.FLUENT -> 0.9f
+                                    LanguageProficiency.PROFICIENT -> 0.7f
+                                    LanguageProficiency.INTERMEDIATE -> 0.5f
+                                    LanguageProficiency.ELEMENTARY -> 0.3f
+                                },
+                                proficiencyLabel = lang.proficiency.displayName
+                            )
+                        }
+                        onUpdateElement(element.copy(items = languageItems))
                     }
                 }
                 else -> { /* No auto-fill for other element types */ }
@@ -414,11 +483,15 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Template Mode Tag (for TextElement, ImageElement, WorkExperienceElement, and EducationElement)
+        // Template Mode Tag (for TextElement, ImageElement, and data elements)
         if (element is ResumeElement.TextElement ||
             element is ResumeElement.ImageElement ||
             element is ResumeElement.WorkExperienceElement ||
-            element is ResumeElement.EducationElement) {
+            element is ResumeElement.EducationElement ||
+            element is ResumeElement.SkillElement ||
+            element is ResumeElement.ProjectElement ||
+            element is ResumeElement.CertificationElement ||
+            element is ResumeElement.LanguageElement) {
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
             var showTagMenu by remember { mutableStateOf(false) }
@@ -454,10 +527,14 @@ private fun CommonPropertiesSection(
                             // Filter tags based on element type
                             val isApplicable = when (element) {
                                 is ResumeElement.ImageElement -> tag == UserInfoTag.AVATAR || tag == UserInfoTag.NONE
-                                is ResumeElement.TextElement -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE && tag != UserInfoTag.EDUCATION
+                                is ResumeElement.TextElement -> tag !in listOf(UserInfoTag.AVATAR, UserInfoTag.WORK_EXPERIENCE, UserInfoTag.EDUCATION, UserInfoTag.SKILLS, UserInfoTag.PROJECTS, UserInfoTag.CERTIFICATIONS, UserInfoTag.LANGUAGES)
                                 is ResumeElement.WorkExperienceElement -> tag == UserInfoTag.WORK_EXPERIENCE || tag == UserInfoTag.NONE
                                 is ResumeElement.EducationElement -> tag == UserInfoTag.EDUCATION || tag == UserInfoTag.NONE
-                                else -> tag != UserInfoTag.AVATAR && tag != UserInfoTag.WORK_EXPERIENCE && tag != UserInfoTag.EDUCATION
+                                is ResumeElement.SkillElement -> tag == UserInfoTag.SKILLS || tag == UserInfoTag.NONE
+                                is ResumeElement.ProjectElement -> tag == UserInfoTag.PROJECTS || tag == UserInfoTag.NONE
+                                is ResumeElement.CertificationElement -> tag == UserInfoTag.CERTIFICATIONS || tag == UserInfoTag.NONE
+                                is ResumeElement.LanguageElement -> tag == UserInfoTag.LANGUAGES || tag == UserInfoTag.NONE
+                                else -> tag !in listOf(UserInfoTag.AVATAR, UserInfoTag.WORK_EXPERIENCE, UserInfoTag.EDUCATION, UserInfoTag.SKILLS, UserInfoTag.PROJECTS, UserInfoTag.CERTIFICATIONS, UserInfoTag.LANGUAGES)
                             }
 
                             if (isApplicable) {
@@ -490,6 +567,10 @@ private fun CommonPropertiesSection(
                                                         UserInfoTag.AVATAR -> updatedElement.content
                                                         UserInfoTag.WORK_EXPERIENCE -> updatedElement.content
                                                         UserInfoTag.EDUCATION -> updatedElement.content
+                                                        UserInfoTag.SKILLS -> updatedElement.content
+                                                        UserInfoTag.PROJECTS -> updatedElement.content
+                                                        UserInfoTag.CERTIFICATIONS -> updatedElement.content
+                                                        UserInfoTag.LANGUAGES -> updatedElement.content
                                                         UserInfoTag.NONE -> updatedElement.content
                                                     }
                                                     updatedElement.copy(content = content)
@@ -551,6 +632,83 @@ private fun CommonPropertiesSection(
                                                             )
                                                         }
                                                         updatedElement.copy(items = educationItems)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.SkillElement -> {
+                                                    if (newTag == UserInfoTag.SKILLS && resume != null && resume.skills.isNotEmpty()) {
+                                                        // Convert form Skills to grid SkillItem
+                                                        val skillItems = resume.skills.map { skill ->
+                                                            SkillItem(
+                                                                name = skill,
+                                                                category = "",
+                                                                proficiency = 0.7f,
+                                                                proficiencyLabel = ""
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = skillItems)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.ProjectElement -> {
+                                                    if (newTag == UserInfoTag.PROJECTS && resume != null && resume.projects.isNotEmpty()) {
+                                                        // Convert form Projects to grid ProjectItem
+                                                        val projectItems = resume.projects.map { proj ->
+                                                            ProjectItem(
+                                                                name = proj.title,
+                                                                description = proj.description,
+                                                                technologies = proj.technologies.joinToString(", "),
+                                                                startDate = proj.startDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                endDate = proj.endDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                link = proj.link
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = projectItems)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.CertificationElement -> {
+                                                    if (newTag == UserInfoTag.CERTIFICATIONS && resume != null && resume.certifications.isNotEmpty()) {
+                                                        // Convert form Certifications to grid CertificationItem
+                                                        val certificationItems = resume.certifications.map { cert ->
+                                                            CertificationItem(
+                                                                name = cert.name,
+                                                                issuer = cert.issuer,
+                                                                issueDate = cert.issueDate?.format(
+                                                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                                                ) ?: "",
+                                                                credentialId = cert.credentialId
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = certificationItems)
+                                                    } else {
+                                                        updatedElement
+                                                    }
+                                                }
+                                                is ResumeElement.LanguageElement -> {
+                                                    if (newTag == UserInfoTag.LANGUAGES && resume != null && resume.languages.isNotEmpty()) {
+                                                        // Convert form Languages to grid LanguageItem
+                                                        val languageItems = resume.languages.map { lang ->
+                                                            LanguageItem(
+                                                                name = lang.name,
+                                                                proficiency = when (lang.proficiency) {
+                                                                    LanguageProficiency.NATIVE -> 1.0f
+                                                                    LanguageProficiency.FLUENT -> 0.9f
+                                                                    LanguageProficiency.PROFICIENT -> 0.7f
+                                                                    LanguageProficiency.INTERMEDIATE -> 0.5f
+                                                                    LanguageProficiency.ELEMENTARY -> 0.3f
+                                                                },
+                                                                proficiencyLabel = lang.proficiency.displayName
+                                                            )
+                                                        }
+                                                        updatedElement.copy(items = languageItems)
                                                     } else {
                                                         updatedElement
                                                     }

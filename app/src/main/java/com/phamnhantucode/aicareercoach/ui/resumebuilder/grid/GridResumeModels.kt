@@ -123,7 +123,11 @@ enum class UserInfoTag {
     WEBSITE,         // Portfolio/website URL
     AVATAR,          // Profile picture
     WORK_EXPERIENCE, // Work experience data
-    EDUCATION        // Education data
+    EDUCATION,       // Education data
+    SKILLS,          // Skills data
+    PROJECTS,        // Projects data
+    CERTIFICATIONS,  // Certifications data
+    LANGUAGES        // Languages data
 }
 
 // ============================================================================

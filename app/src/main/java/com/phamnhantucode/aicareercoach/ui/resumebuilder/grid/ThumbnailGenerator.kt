@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Base64
@@ -15,42 +16,105 @@ import java.io.ByteArrayOutputStream
 /**
  * Generates small thumbnail previews of resume designs
  * Used for displaying design previews in the Resume Design screen
+ *
+ * This generator uses full-quality PNG rendering and scales it down to thumbnail size
+ * for much better quality compared to simplified element rendering.
  */
 class ThumbnailGenerator(private val context: Context) {
 
     private val colorConverter = ColorConverter()
-    
+    private val pageRenderer = ResumePageRenderer(context)
+
     // Thumbnail dimensions (keep aspect ratio of A4: 210x297mm or roughly 1:1.41)
     private val thumbnailWidth = 300 // pixels
     private val thumbnailHeight = 420 // pixels
+
+    // Full-size render dimensions (A4 at 72 DPI)
+    private val fullWidth = 595 // points
+    private val fullHeight = 842 // points
     
     /**
      * Generates a thumbnail for a GridResume and returns it as a Base64 encoded string
+     *
+     * This method now uses a two-step process for superior quality:
+     * 1. Render the full-quality first page at A4 resolution (595x842)
+     * 2. Scale down to thumbnail size (300x420) using high-quality filtering
+     *
      * @param gridResume The resume to generate thumbnail for
      * @return Base64 encoded PNG image string, or empty string if generation fails
      */
     suspend fun generateThumbnail(gridResume: GridResume): String = withContext(Dispatchers.Default) {
         try {
-            val bitmap = createThumbnailBitmap(gridResume)
-            val base64String = bitmapToBase64(bitmap)
-            bitmap.recycle()
+            val thumbnail = createThumbnailBitmap(gridResume)
+            if (thumbnail == null) {
+                android.util.Log.e("ThumbnailGenerator", "Failed to create thumbnail bitmap")
+                return@withContext ""
+            }
+
+            val base64String = bitmapToBase64(thumbnail)
+            thumbnail.recycle()
             base64String
         } catch (e: Exception) {
             android.util.Log.e("ThumbnailGenerator", "Failed to generate thumbnail", e)
             ""
         }
     }
-    
+
     /**
-     * Creates a bitmap thumbnail of the resume
+     * Creates a bitmap thumbnail of the resume using full-quality rendering
+     *
+     * Process:
+     * 1. Render first page at full A4 resolution using ResumePageRenderer
+     * 2. Scale down to thumbnail size with high-quality bilinear filtering
+     * 3. Recycle full-size bitmap to free memory
+     *
+     * @return Thumbnail bitmap, or null if rendering fails
      */
-    private fun createThumbnailBitmap(gridResume: GridResume): Bitmap {
+    private suspend fun createThumbnailBitmap(gridResume: GridResume): Bitmap? {
+        // Step 1: Render full-quality page
+        val fullSizeBitmap = pageRenderer.renderFirstPage(
+            gridResume,
+            width = fullWidth,
+            height = fullHeight
+        ) ?: return createFallbackThumbnail(gridResume)
+
+        try {
+            // Step 2: Scale down to thumbnail size with high quality
+            val thumbnail = scaleBitmapHighQuality(
+                fullSizeBitmap,
+                thumbnailWidth,
+                thumbnailHeight
+            )
+
+            // Step 3: Clean up full-size bitmap
+            fullSizeBitmap.recycle()
+
+            return thumbnail
+        } catch (e: Exception) {
+            android.util.Log.e("ThumbnailGenerator", "Failed to scale bitmap", e)
+            fullSizeBitmap.recycle()
+            return createFallbackThumbnail(gridResume)
+        }
+    }
+
+    /**
+     * Scales a bitmap to target dimensions using high-quality bilinear filtering
+     */
+    private fun scaleBitmapHighQuality(source: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+    }
+
+    /**
+     * Creates a fallback thumbnail using simplified rendering if full rendering fails
+     * This maintains backward compatibility with the old approach
+     */
+    private fun createFallbackThumbnail(gridResume: GridResume): Bitmap {
         val bitmap = Bitmap.createBitmap(thumbnailWidth, thumbnailHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        
-        // Get first page (most resumes are single page, or first page is most important)
+
+        // Get first page
         val page = gridResume.pages.firstOrNull() ?: return bitmap
-        
+
         // Draw background
         val bgColor = try {
             colorConverter.toIntColor(page.backgroundColor)
@@ -58,26 +122,23 @@ class ThumbnailGenerator(private val context: Context) {
             Color.WHITE
         }
         canvas.drawColor(bgColor)
-        
-        // Calculate scale factor to fit A4 page into thumbnail
-        // A4 is 595x842 points in PDF (at 72 DPI)
-        val pageWidthPoints = 595f
-        val pageHeightPoints = 842f
-        val scaleX = thumbnailWidth / pageWidthPoints
-        val scaleY = thumbnailHeight / pageHeightPoints
+
+        // Calculate scale factor
+        val scaleX = thumbnailWidth / fullWidth.toFloat()
+        val scaleY = thumbnailHeight / fullHeight.toFloat()
         val scale = minOf(scaleX, scaleY)
-        
-        // Calculate grid cell size in thumbnail
+
+        // Calculate grid cell size
         val gridConfig = gridResume.gridConfig
-        val cellWidth = (pageWidthPoints / gridConfig.columns) * scale
-        val cellHeight = (pageHeightPoints / gridConfig.rows) * scale
-        
+        val cellWidth = (fullWidth / gridConfig.columns) * scale
+        val cellHeight = (fullHeight / gridConfig.rows) * scale
+
         // Draw simplified elements
         val sortedElements = page.elements.sortedBy { it.zIndex }
         for (element in sortedElements) {
             drawElementThumbnail(canvas, element, cellWidth, cellHeight, scale)
         }
-        
+
         return bitmap
     }
     

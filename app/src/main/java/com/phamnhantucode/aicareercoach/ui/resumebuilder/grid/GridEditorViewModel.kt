@@ -675,6 +675,10 @@ class GridEditorViewModel(
                             UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
                             UserInfoTag.WORK_EXPERIENCE -> element.content // Work experience doesn't apply to text
                             UserInfoTag.EDUCATION -> element.content // Education doesn't apply to text
+                            UserInfoTag.SKILLS -> element.content // Skills doesn't apply to text
+                            UserInfoTag.PROJECTS -> element.content // Projects doesn't apply to text
+                            UserInfoTag.CERTIFICATIONS -> element.content // Certifications doesn't apply to text
+                            UserInfoTag.LANGUAGES -> element.content // Languages doesn't apply to text
                             UserInfoTag.NONE -> element.content
                         }
                         element.copy(content = content)
@@ -701,6 +705,10 @@ class GridEditorViewModel(
                                 UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
                                 UserInfoTag.WORK_EXPERIENCE -> item.value // Work experience doesn't apply to contact
                                 UserInfoTag.EDUCATION -> item.value // Education doesn't apply to contact
+                                UserInfoTag.SKILLS -> item.value // Skills doesn't apply to contact
+                                UserInfoTag.PROJECTS -> item.value // Projects doesn't apply to contact
+                                UserInfoTag.CERTIFICATIONS -> item.value // Certifications doesn't apply to contact
+                                UserInfoTag.LANGUAGES -> item.value // Languages doesn't apply to contact
                                 UserInfoTag.NONE -> item.value
                             }
                             item.copy(value = value)

@@ -327,44 +327,7 @@ private fun GridEditorTopBar(
             }
         },
         actions = {
-            // Apply Template Data (debug only)
-            if (BuildConfig.DEBUG) {
-                IconButton(
-                    onClick = onApplyTemplateData,
-                    enabled = !isApplyingData
-                ) {
-                    if (isApplyingData) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(Icons.Default.PersonAdd, contentDescription = "Apply User Data")
-                    }
-                }
-            }
-
-            // Switch to form editor
-            IconButton(onClick = onSwitchMode) {
-                Icon(Icons.Default.Edit, contentDescription = "Switch to Form Editor")
-            }
-
-            // Templates
-            IconButton(onClick = onShowTemplates) {
-                Icon(Icons.Default.Dashboard, contentDescription = "Templates")
-            }
-
-            // Preview
-            IconButton(onClick = onPreview) {
-                Icon(Icons.Default.Visibility, contentDescription = "Preview")
-            }
-
-            // Export PDF
-            IconButton(onClick = onExport) {
-                Icon(Icons.Default.FileDownload, contentDescription = "Export PDF")
-            }
-
-            // Save
+            // Save indicator (shows status, manual save on click)
             IconButton(
                 onClick = onSave,
                 enabled = !isSaving
@@ -376,6 +339,72 @@ private fun GridEditorTopBar(
                     )
                 } else {
                     Icon(Icons.Default.Save, contentDescription = "Save")
+                }
+            }
+
+            // Preview
+            IconButton(onClick = onPreview) {
+                Icon(Icons.Default.Visibility, contentDescription = "Preview")
+            }
+
+            // More options menu
+            var showMenu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    // Apply Template Data (debug only)
+                    if (BuildConfig.DEBUG) {
+                        DropdownMenuItem(
+                            text = { Text("Apply User Data") },
+                            onClick = {
+                                showMenu = false
+                                onApplyTemplateData()
+                            },
+                            enabled = !isApplyingData,
+                            leadingIcon = {
+                                if (isApplyingData) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Default.PersonAdd, null)
+                                }
+                            }
+                        )
+                    }
+
+                    DropdownMenuItem(
+                        text = { Text("Switch to Form Editor") },
+                        onClick = {
+                            showMenu = false
+                            onSwitchMode()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Edit, null) }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Templates") },
+                        onClick = {
+                            showMenu = false
+                            onShowTemplates()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Dashboard, null) }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Export as PDF") },
+                        onClick = {
+                            showMenu = false
+                            onExport()
+                        },
+                        leadingIcon = { Icon(Icons.Default.FileDownload, null) }
+                    )
                 }
             }
         }

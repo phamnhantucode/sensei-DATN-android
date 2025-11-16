@@ -364,6 +364,7 @@ private fun EmptyDesignsPlaceholder() {
 
 /**
  * Design Card Component
+ * Matches thumbnail aspect ratio (300x420 = 1:1.4) for better visual fit
  */
 @Composable
 private fun DesignCard(
@@ -374,7 +375,7 @@ private fun DesignCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .aspectRatio(0.714f) // Width:Height ratio matching thumbnail (300/420 = 0.714)
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp)
@@ -386,11 +387,11 @@ private fun DesignCard(
                     .padding(12.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Thumbnail
+                // Thumbnail - maintains A4 aspect ratio (1:1.4)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
+                        .aspectRatio(0.707f) // A4 aspect ratio (595/842 = 0.707)
                         .background(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(8.dp)
@@ -407,7 +408,7 @@ private fun DesignCard(
                         val thumbnailBitmap = remember(design.thumbnail) {
                             decodeBase64Thumbnail(design.thumbnail)
                         }
-                        
+
                         if (thumbnailBitmap != null) {
                             Image(
                                 bitmap = thumbnailBitmap.asImageBitmap(),
