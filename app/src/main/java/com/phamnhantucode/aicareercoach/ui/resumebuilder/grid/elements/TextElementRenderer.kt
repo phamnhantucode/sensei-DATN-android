@@ -61,47 +61,57 @@ fun TextElementRenderer(
             drawIntoCanvas { canvas ->
                 val nativeCanvas = canvas.nativeCanvas
                 val bounds = RectF(0f, 0f, size.width, size.height)
-                
+
                 // Draw background and borders
                 drawElementStyle(nativeCanvas, element.style, bounds, zoomLevel)
-                
-                // Apply 8dp content padding (matching PDF behavior)
-                val contentPadding = 8f * zoomLevel
-                val contentBounds = RectF(
-                    bounds.left + contentPadding,
-                    bounds.top + contentPadding,
-                    bounds.right - contentPadding,
-                    bounds.bottom - contentPadding
-                )
-                
-                // Create text paint
-                val textPaint = createTextPaint(element, zoomLevel, context)
-                
-                // Create layout for text with padded width
+
+                // Calculate base dimensions (unscaled) for text layout
+                // This ensures consistent line breaks regardless of zoom level
+                val density = context.resources.displayMetrics.density
+                val basePadding = 8f * density // 8dp in pixels
+                val baseWidth = (size.width / zoomLevel) - (basePadding * 2)
+                val baseHeight = (size.height / zoomLevel) - (basePadding * 2)
+
+                // Create text paint with base text size (no zoom)
+                val textPaint = createTextPaint(element, 1f, context)
+
+                // Create layout for text with base width
+                // This layout is calculated at zoom 1.0x to ensure consistent line breaks
                 val layout = createTextLayout(
                     element.content,
                     textPaint,
-                    contentBounds.width().toInt().coerceAtLeast(1),
+                    baseWidth.toInt().coerceAtLeast(1),
                     element.alignment,
                     element.maxLines,
                     element.textStyle
                 )
-                
-                // Calculate vertical alignment within content bounds
+
+                // Calculate vertical alignment within base dimensions
                 val topPadding = layout.getLineTop(0).toFloat()
                 val textHeight = layout.height.toFloat() - topPadding
-                val availableHeight = contentBounds.height()
+                val availableHeight = baseHeight
                 val yOffset = when (element.verticalAlignment ?: VerticalTextAlignment.CENTER) {
                     VerticalTextAlignment.TOP -> -topPadding
                     VerticalTextAlignment.CENTER -> (availableHeight - textHeight) / 2f - topPadding
                     VerticalTextAlignment.BOTTOM -> availableHeight - textHeight - topPadding
                 }
-                
-                // Draw text within content bounds
+
+                // Apply zoom via Canvas scaling before drawing
+                // This scales the already-laid-out text instead of re-laying it out
                 nativeCanvas.save()
-                nativeCanvas.translate(contentBounds.left, contentBounds.top + yOffset)
-                nativeCanvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
+
+                // Scale the canvas to apply zoom
+                nativeCanvas.scale(zoomLevel, zoomLevel)
+
+                // Translate to position with base padding
+                nativeCanvas.translate(basePadding, basePadding + yOffset)
+
+                // Clip to base content bounds
+                nativeCanvas.clipRect(0f, 0f, baseWidth, baseHeight)
+
+                // Draw the text layout (already calculated at zoom 1.0x)
                 layout.draw(nativeCanvas)
+
                 nativeCanvas.restore()
             }
         }

@@ -34,8 +34,14 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
-        // No content padding - render directly to bounds
-        val contentBounds = RectF(bounds)
+        // Apply 8dp content padding (matching screen renderer behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
 
         // Create text paint
         val textPaint = createTextPaint(element, mapper, context)
@@ -44,7 +50,7 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         val layout = createTextLayout(
             element.content,
             textPaint,
-            contentBounds.width().toInt(),
+            contentBounds.width().toInt().coerceAtLeast(1),
             element.alignment,
             element.maxLines,
             element.textStyle
