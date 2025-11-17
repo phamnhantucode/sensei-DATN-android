@@ -140,7 +140,7 @@ private fun TextLabelsLanguageLayout(
 
                 // Add spacing between items (but not after last item)
                 if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height(element.spacing.dp))
+                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
                 }
             }
         }
@@ -221,7 +221,7 @@ private fun ProgressBarsLanguageLayout(
 
                 // Add spacing between items (but not after last item)
                 if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height(element.spacing.dp))
+                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
                 }
             }
         }
@@ -291,7 +291,7 @@ private fun DotsLanguageLayout(
 
                 // Add spacing between items (but not after last item)
                 if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height(element.spacing.dp))
+                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
                 }
             }
         }
@@ -320,8 +320,8 @@ private fun TagsLanguageLayout(
 
     FlowRow(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(element.spacing.dp),
-        verticalArrangement = Arrangement.spacedBy((element.spacing / 2).dp)
+        horizontalArrangement = Arrangement.spacedBy((element.spacing * zoomLevel).dp),
+        verticalArrangement = Arrangement.spacedBy((element.spacing / 2 * zoomLevel).dp)
     ) {
         element.items.forEach { item ->
             if (item.name.isNotEmpty()) {
