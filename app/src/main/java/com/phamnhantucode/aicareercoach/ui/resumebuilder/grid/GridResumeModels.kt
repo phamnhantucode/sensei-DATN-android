@@ -72,14 +72,17 @@ data class GridConfig(
          * Optimal cell size calculated to make a 48x68 grid match A4 paper dimensions exactly.
          *
          * A4 at 72 DPI = 595 x 842 points
-         * For 48 columns: 595 / 48 = 12.3958 points per column
-         * For 68 rows: 842 / 68 = 12.3824 points per row
-         * Average: 12.389 points (rounded to 12.39 for precision)
+         * For 68 rows: 842 / 68 = 12.382353 points per row (height-based)
          *
-         * This eliminates the ~3.2% scaling factor that was causing position discrepancies
-         * between the editor and exported PDF.
+         * Using height-based calculation ensures:
+         * - Grid height = 68 * 12.382353 = 842 points (exact match)
+         * - Grid width = 48 * 12.382353 = 594.35 points (fits within 595 with minimal centering)
+         * - Uniform scale factor = 1.0 (no distortion, perfect 1:1 rendering)
+         *
+         * This eliminates scaling artifacts and ensures pixel-perfect consistency
+         * between the editor canvas and exported PDF.
          */
-        const val CELL_SIZE_FOR_A4 = 12.39f
+        const val CELL_SIZE_FOR_A4 = 12.382353f
     }
 }
 

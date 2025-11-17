@@ -281,6 +281,7 @@ private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toC
     return TextStyle(
         fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
+        fontFamily = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.poppinsFontFamily,
         color = Color(color),
         lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
         letterSpacing = (letterSpacing * zoomLevel).sp,

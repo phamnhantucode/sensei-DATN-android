@@ -324,20 +324,18 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
     ): TextPaint {
         return TextPaint().apply {
             isAntiAlias = true
-            textSize = mapper.spToPdfPoints(element.textStyle.fontSize)
+            textSize = mapper.fontSizeToPdfPoints(element.textStyle.fontSize)
             color = context.colorConverter.toIntColorWithOpacity(
                 element.textStyle.color,
                 element.style.opacity
             )
 
-            // Font weight and style
-            val typefaceStyle = when {
-                element.textStyle.isBold && element.textStyle.isItalic -> Typeface.BOLD_ITALIC
-                element.textStyle.isBold -> Typeface.BOLD
-                element.textStyle.isItalic -> Typeface.ITALIC
-                else -> Typeface.NORMAL
-            }
-            typeface = Typeface.create(Typeface.DEFAULT, typefaceStyle)
+            // Use Poppins font with proper weight mapping
+            typeface = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.getPoppinsTypeface(
+                context.context,
+                element.textStyle.fontWeight,
+                element.textStyle.isItalic
+            )
 
             // Underline
             isUnderlineText = element.textStyle.isUnderlined
@@ -359,12 +357,17 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
     ): TextPaint {
         return TextPaint().apply {
             isAntiAlias = true
-            textSize = mapper.spToPdfPoints(element.textStyle.fontSize)
+            textSize = mapper.fontSizeToPdfPoints(element.textStyle.fontSize)
             color = context.colorConverter.toIntColorWithOpacity(
                 element.textStyle.color,
                 element.style.opacity
             )
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            // Use Poppins Bold font
+            typeface = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.getPoppinsTypeface(
+                context.context,
+                androidx.compose.ui.text.font.FontWeight.Bold,
+                false
+            )
             isUnderlineText = element.textStyle.isUnderlined
 
             // Letter spacing (in EM units)

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(./gradlew assembleDebug:*)",
       "Bash(./gradlew clean:*)",
-      "Bash(./gradlew compileDebugKotlin:*)"
+      "Bash(./gradlew compileDebugKotlin:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

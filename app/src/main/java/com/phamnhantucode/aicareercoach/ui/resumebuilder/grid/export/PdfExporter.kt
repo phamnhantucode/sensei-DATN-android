@@ -10,7 +10,7 @@ import java.io.File
 /**
  * PDF Export Interface
  *
- * This interface allows for different PDF generation implementations
+ * This interface allows for differ ent PDF generation implementations
  * (e.g., Android PdfDocument, Apache PDFBox, iText, etc.)
  */
 interface PdfExporter {

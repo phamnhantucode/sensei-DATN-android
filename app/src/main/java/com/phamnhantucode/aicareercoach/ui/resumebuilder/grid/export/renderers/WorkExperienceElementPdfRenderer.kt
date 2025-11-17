@@ -699,22 +699,15 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
     ): TextPaint {
         return TextPaint().apply {
             isAntiAlias = true
-            textSize = mapper.spToPdfPoints(textStyle.fontSize)
+            textSize = mapper.fontSizeToPdfPoints(textStyle.fontSize)
             color = context.colorConverter.toIntColorWithOpacity(textStyle.color, opacity)
 
-            // Font weight and style
-            val typefaceStyle = when {
-                textStyle.isBold && textStyle.isItalic -> Typeface.BOLD_ITALIC
-                textStyle.isBold -> Typeface.BOLD
-                textStyle.isItalic -> Typeface.ITALIC
-                else -> when (textStyle.fontWeight) {
-                    androidx.compose.ui.text.font.FontWeight.Bold,
-                    androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    androidx.compose.ui.text.font.FontWeight.ExtraBold -> Typeface.BOLD
-                    else -> Typeface.NORMAL
-                }
-            }
-            typeface = Typeface.create(Typeface.DEFAULT, typefaceStyle)
+            // Use Poppins font with proper weight mapping
+            typeface = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.getPoppinsTypeface(
+                context.context,
+                textStyle.fontWeight,
+                textStyle.isItalic
+            )
 
             // Underline
             isUnderlineText = textStyle.isUnderlined

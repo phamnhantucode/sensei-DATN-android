@@ -90,23 +90,23 @@ class GridCoordinateMapper(
     }
 
     /**
-     * Convert font size (sp) to PDF points
+     * Convert font size (float) to PDF points
      *
-     * Uses 1:1 base conversion (like DP conversion), treating SP at absolute values.
+     * Uses 1:1 base conversion, treating font size values as density-independent.
      * Then applies the grid scale factor to maintain proportional sizing on PDF page.
      *
      * This ensures text scales proportionally with the grid layout, independent of
      * device density or zoom levels.
      *
-     * Formula: fontSizeSp * 1.0 * scale
-     * Example: 14sp * 1.0 * 1.03 = 14.42 points in PDF
+     * Formula: fontSize * DP_TO_POINTS * scale
+     * Example: 14f * 1.0 * 1.03 = 14.42 points in PDF
      *
-     * @param fontSizeSp Font size in scale-independent pixels
+     * @param fontSize Font size as plain float value
      * @return Font size in PDF points
      */
-    fun spToPdfPoints(fontSizeSp: Float): Float {
-        val result = fontSizeSp * DP_TO_POINTS * scale
-        android.util.Log.d("PDF_FontSize", "Input: ${fontSizeSp}sp, Scale: $scale, Output: ${result}pts (DP_TO_POINTS=$DP_TO_POINTS)")
+    fun fontSizeToPdfPoints(fontSize: Float): Float {
+            val result = fontSize * DP_TO_POINTS * scale
+        android.util.Log.d("PDF_FontSize", "Input: ${fontSize}, Scale: $scale, Output: ${result}pts (DP_TO_POINTS=$DP_TO_POINTS)")
         return result
     }
 

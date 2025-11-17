@@ -34,14 +34,8 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
-        // Apply 8dp content padding (matching canvas editor behavior)
-        val contentPadding = mapper.borderWidthToPdfPoints(8f)
-        val contentBounds = RectF(
-            bounds.left + contentPadding,
-            bounds.top + contentPadding,
-            bounds.right - contentPadding,
-            bounds.bottom - contentPadding
-        )
+        // No content padding - render directly to bounds
+        val contentBounds = RectF(bounds)
 
         // Create text paint
         val textPaint = createTextPaint(element, mapper, context)
@@ -57,12 +51,14 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
         )
 
         // Calculate vertical alignment within content bounds
-        val textHeight = layout.height.toFloat()
+        // Account for StaticLayout's internal top padding (from font metrics)
+        val topPadding = layout.getLineTop(0).toFloat()
+        val textHeight = layout.height.toFloat() - topPadding
         val availableHeight = contentBounds.height()
         val yOffset = when (element.verticalAlignment ?: VerticalTextAlignment.CENTER) {
-            VerticalTextAlignment.TOP -> 0f
-            VerticalTextAlignment.CENTER -> (availableHeight - textHeight) / 2f
-            VerticalTextAlignment.BOTTOM -> availableHeight - textHeight
+            VerticalTextAlignment.TOP -> -topPadding  // Remove top padding for proper alignment
+            VerticalTextAlignment.CENTER -> (availableHeight - textHeight) / 2f - topPadding
+            VerticalTextAlignment.BOTTOM -> availableHeight - textHeight - topPadding
         }
 
         // Draw text within content bounds
@@ -86,28 +82,24 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
     ): TextPaint {
         return TextPaint().apply {
             isAntiAlias = true
-            textSize = mapper.spToPdfPoints(element.textStyle.fontSize)
+            textSize = mapper.fontSizeToPdfPoints(element.textStyle.fontSize)
             color = context.colorConverter.toIntColorWithOpacity(
                 element.textStyle.color,
                 element.style.opacity
             )
 
-            // Font weight and style
-            val typefaceStyle = when {
-                element.textStyle.isBold && element.textStyle.isItalic -> Typeface.BOLD_ITALIC
-                element.textStyle.isBold -> Typeface.BOLD
-                element.textStyle.isItalic -> Typeface.ITALIC
-                else -> Typeface.NORMAL
-            }
-            typeface = Typeface.create(Typeface.DEFAULT, typefaceStyle)
+            // Use Poppins font with proper weight mapping
+            typeface = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.getPoppinsTypeface(
+                context.context,
+                element.textStyle.fontWeight,
+                element.textStyle.isItalic
+            )
 
             // Underline
             isUnderlineText = element.textStyle.isUnderlined
 
-            // Letter spacing (in EM units)
-            if (element.textStyle.letterSpacing != 0f) {
-                letterSpacing = element.textStyle.letterSpacing / element.textStyle.fontSize
-            }
+            // Letter spacing (match Compose - no conversion needed, already in proper units)
+            letterSpacing = element.textStyle.letterSpacing
         }
     }
 
@@ -131,18 +123,27 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
 
         // Calculate line spacing multiplier from lineHeight
         // If lineHeight is specified, convert it to a multiplier relative to fontSize
-        // Otherwise use default 1.15f (15% line height increase)
+        // Otherwise use default 1.0f (no extra spacing - match Compose default)
         val lineSpacingMultiplier = textStyle.lineHeight?.let {
             it / textStyle.fontSize
-        } ?: 1.15f
+        } ?: 1.0f
 
-        return StaticLayout.Builder
+        val builder = StaticLayout.Builder
             .obtain(text, 0, text.length, paint, width.coerceAtLeast(1))
             .setAlignment(layoutAlignment)
             .setLineSpacing(0f, lineSpacingMultiplier)
-            .setIncludePad(true) // Match Compose behavior
+            .setIncludePad(false) // Match Compose behavior - no extra padding
             .setMaxLines(maxLines ?: Int.MAX_VALUE)
-            .build()
+        
+        // For justify alignment, use inter-word justification (API 23+)
+        if (alignment == TextAlignment.JUSTIFY && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            builder.setJustificationMode(android.text.Layout.JUSTIFICATION_MODE_INTER_WORD)
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            // For non-justify text, explicitly set no justification to match Compose
+            builder.setJustificationMode(android.text.Layout.JUSTIFICATION_MODE_NONE)
+        }
+        
+        return builder.build()
     }
 
     /**
