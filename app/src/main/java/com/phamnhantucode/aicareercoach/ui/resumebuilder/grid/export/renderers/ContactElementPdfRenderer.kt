@@ -29,13 +29,22 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
+        // Apply 8dp content padding (matching canvas editor behavior)
+        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        val contentBounds = RectF(
+            bounds.left + contentPadding,
+            bounds.top + contentPadding,
+            bounds.right - contentPadding,
+            bounds.bottom - contentPadding
+        )
+
         // Create text paint
         val textPaint = createTextPaint(element, mapper, context)
         val boldTextPaint = createBoldTextPaint(element, mapper, context)
 
         canvas.save()
-        canvas.translate(bounds.left, bounds.top)
-        canvas.clipRect(0f, 0f, bounds.width(), bounds.height())
+        canvas.translate(contentBounds.left, contentBounds.top)
+        canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
         // Calculate layout based on orientation
         when (element.orientation) {
@@ -43,7 +52,7 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                 renderVerticalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     textPaint,
                     boldTextPaint,
                     mapper,
@@ -54,7 +63,7 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                 renderHorizontalLayout(
                     canvas,
                     element,
-                    bounds,
+                    contentBounds,
                     textPaint,
                     boldTextPaint,
                     mapper,
