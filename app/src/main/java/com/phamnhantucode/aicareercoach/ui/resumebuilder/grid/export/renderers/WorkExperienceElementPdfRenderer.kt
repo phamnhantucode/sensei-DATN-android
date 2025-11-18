@@ -273,46 +273,100 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         responsibilitySpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Job Title
         if (item.jobTitle.isNotEmpty()) {
-            canvas.drawText(item.jobTitle, x, currentY + titlePaint.textSize, titlePaint)
-            currentY += titlePaint.textSize + itemSpacing
+            val layout = android.text.StaticLayout.Builder
+                .obtain(item.jobTitle, 0, item.jobTitle.length, titlePaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            layout.draw(canvas)
+            canvas.restore()
+            
+            currentY += layout.height.toFloat()
+            partCount++
         }
 
         // Company and Date Row
         if (item.company.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableCompanyWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.company, x, currentY + companyPaint.textSize, companyPaint)
+            val companyLayout = android.text.StaticLayout.Builder
+                .obtain(item.company, 0, item.company.length, companyPaint, availableCompanyWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            companyLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(companyPaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += companyLayout.height.toFloat()
+            partCount++
         } else if (element.showDates) {
             val dateText = formatDateRange(item, element)
             if (dateText.isNotEmpty()) {
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
                 val dateWidth = datePaint.measureText(dateText)
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
-                currentY += datePaint.textSize + itemSpacing
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
+                
+                val dateHeight = dateMetrics.descent - dateMetrics.ascent
+                currentY += dateHeight
+                partCount++
             }
         }
 
         // Location
         if (element.showLocation && item.location.isNotEmpty()) {
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
-            currentY += locationPaint.textSize + itemSpacing
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += locationLayout.height.toFloat()
+            partCount++
         }
 
         // Responsibilities
         if (item.responsibilities.isNotEmpty()) {
+            // Add spacing before responsibilities if there's content above
+            if (partCount > 0) {
+                currentY += itemSpacing
+            }
+            
             currentY += renderResponsibilities(
                 canvas, item.responsibilities, element, x, currentY, width,
                 responsibilityPaint, responsibilitySpacing
             )
+        } else {
+            // Remove trailing spacing if responsibilities is the last part
+            if (partCount > 0) {
+                currentY -= itemSpacing
+            }
         }
 
         return currentY - y
@@ -337,6 +391,7 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         responsibilitySpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Title + Company + Date Row
         val titleCompany = buildString {
@@ -348,28 +403,64 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         if (titleCompany.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableTitleWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(titleCompany, x, currentY + titlePaint.textSize, titlePaint)
+            val titleLayout = android.text.StaticLayout.Builder
+                .obtain(titleCompany, 0, titleCompany.length, titlePaint, availableTitleWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            titleLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(titlePaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += titleLayout.height.toFloat()
+            partCount++
         }
 
         // Location
         if (element.showLocation && item.location.isNotEmpty()) {
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
-            currentY += locationPaint.textSize + itemSpacing
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += locationLayout.height.toFloat()
+            partCount++
         }
 
         // Responsibilities
         if (item.responsibilities.isNotEmpty()) {
+            // Add spacing before responsibilities if there's content above
+            if (partCount > 0) {
+                currentY += itemSpacing
+            }
+            
             currentY += renderResponsibilities(
                 canvas, item.responsibilities, element, x, currentY, width,
                 responsibilityPaint, responsibilitySpacing
             )
+        } else {
+            // Remove trailing spacing if responsibilities is the last part
+            if (partCount > 0) {
+                currentY -= itemSpacing
+            }
         }
 
         return currentY - y
@@ -394,46 +485,100 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         responsibilitySpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Job Title
         if (item.jobTitle.isNotEmpty()) {
-            canvas.drawText(item.jobTitle, x, currentY + titlePaint.textSize, titlePaint)
-            currentY += titlePaint.textSize + itemSpacing
+            val layout = android.text.StaticLayout.Builder
+                .obtain(item.jobTitle, 0, item.jobTitle.length, titlePaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            layout.draw(canvas)
+            canvas.restore()
+            
+            currentY += layout.height.toFloat()
+            partCount++
         }
 
         // Company
         if (item.company.isNotEmpty()) {
-            canvas.drawText(item.company, x, currentY + companyPaint.textSize, companyPaint)
-            currentY += companyPaint.textSize + itemSpacing
+            val companyLayout = android.text.StaticLayout.Builder
+                .obtain(item.company, 0, item.company.length, companyPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            companyLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += companyLayout.height.toFloat()
+            partCount++
         }
 
         // Location and Dates Row
         if (element.showLocation && item.location.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableLocationWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(locationPaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += locationLayout.height.toFloat()
+            partCount++
         } else if (element.showDates) {
             val dateText = formatDateRange(item, element)
             if (dateText.isNotEmpty()) {
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
                 val dateWidth = datePaint.measureText(dateText)
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
-                currentY += datePaint.textSize + itemSpacing
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
+                
+                val dateHeight = dateMetrics.descent - dateMetrics.ascent
+                currentY += dateHeight
+                partCount++
             }
         }
 
         // Responsibilities
         if (item.responsibilities.isNotEmpty()) {
+            // Add spacing before responsibilities if there's content above
+            if (partCount > 0) {
+                currentY += itemSpacing
+            }
+            
             currentY += renderResponsibilities(
                 canvas, item.responsibilities, element, x, currentY, width,
                 responsibilityPaint, responsibilitySpacing
             )
+        } else {
+            // Remove trailing spacing if responsibilities is the last part
+            if (partCount > 0) {
+                currentY -= itemSpacing
+            }
         }
 
         return currentY - y
@@ -458,19 +603,32 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
             if (responsibility.text.isNotEmpty()) {
                 val bullet = getBulletCharacter(element.bulletStyle, index, responsibility)
                 val bulletWidth = responsibilityPaint.measureText("$bullet ")
+                val textWidth = width - bulletWidth
 
                 // Draw bullet
-                canvas.drawText(bullet, x, currentY + responsibilityPaint.textSize, responsibilityPaint)
+                val bulletMetrics = responsibilityPaint.fontMetrics
+                val bulletBaseline = currentY - bulletMetrics.ascent
+                canvas.drawText(bullet, x, bulletBaseline, responsibilityPaint)
 
-                // Draw responsibility text (may need word wrapping for long text)
-                canvas.drawText(
-                    responsibility.text,
-                    x + bulletWidth,
-                    currentY + responsibilityPaint.textSize,
-                    responsibilityPaint
-                )
+                // Draw responsibility text with wrapping using StaticLayout
+                val textLayout = android.text.StaticLayout.Builder
+                    .obtain(responsibility.text, 0, responsibility.text.length, responsibilityPaint, textWidth.toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                
+                canvas.save()
+                canvas.translate(x + bulletWidth, currentY)
+                textLayout.draw(canvas)
+                canvas.restore()
 
-                currentY += responsibilityPaint.textSize + responsibilitySpacing
+                currentY += textLayout.height.toFloat()
+                
+                // Add spacing only if not the last responsibility
+                if (index < responsibilities.size - 1) {
+                    currentY += responsibilitySpacing
+                }
             }
         }
 
@@ -497,39 +655,151 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         var totalHeight = 0f
 
         element.items.forEachIndexed { index, item ->
-            // Estimate height for this item
             var itemHeight = 0f
+            var partCount = 0
 
             when (element.displayStyle) {
                 WorkExperienceDisplayStyle.STANDARD -> {
-                    if (item.jobTitle.isNotEmpty()) itemHeight += titlePaint.textSize + itemSpacing
-                    if (item.company.isNotEmpty() || element.showDates) {
-                        itemHeight += maxOf(companyPaint.textSize, datePaint.textSize) + itemSpacing
+                    if (item.jobTitle.isNotEmpty()) {
+                        val layout = android.text.StaticLayout.Builder
+                            .obtain(item.jobTitle, 0, item.jobTitle.length, titlePaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += layout.height.toFloat()
+                        partCount++
+                    }
+                    if (item.company.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableCompanyWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val companyLayout = android.text.StaticLayout.Builder
+                            .obtain(item.company, 0, item.company.length, companyPaint, availableCompanyWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += companyLayout.height.toFloat()
+                        partCount++
+                    } else if (element.showDates) {
+                        val dateMetrics = datePaint.fontMetrics
+                        itemHeight += dateMetrics.descent - dateMetrics.ascent
+                        partCount++
                     }
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        itemHeight += locationPaint.textSize + itemSpacing
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
                     }
                 }
                 WorkExperienceDisplayStyle.COMPACT -> {
-                    if (item.jobTitle.isNotEmpty() || item.company.isNotEmpty()) {
-                        itemHeight += maxOf(titlePaint.textSize, datePaint.textSize) + itemSpacing
+                    val titleCompany = buildString {
+                        if (item.jobTitle.isNotEmpty()) append(item.jobTitle)
+                        if (item.jobTitle.isNotEmpty() && item.company.isNotEmpty()) append(" at ")
+                        if (item.company.isNotEmpty()) append(item.company)
+                    }
+                    if (titleCompany.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableTitleWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val titleLayout = android.text.StaticLayout.Builder
+                            .obtain(titleCompany, 0, titleCompany.length, titlePaint, availableTitleWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += titleLayout.height.toFloat()
+                        partCount++
                     }
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        itemHeight += locationPaint.textSize + itemSpacing
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
                     }
                 }
                 WorkExperienceDisplayStyle.DETAILED -> {
-                    if (item.jobTitle.isNotEmpty()) itemHeight += titlePaint.textSize + itemSpacing
-                    if (item.company.isNotEmpty()) itemHeight += companyPaint.textSize + itemSpacing
-                    if (element.showLocation && item.location.isNotEmpty() || element.showDates) {
-                        itemHeight += maxOf(locationPaint.textSize, datePaint.textSize) + itemSpacing
+                    if (item.jobTitle.isNotEmpty()) {
+                        val layout = android.text.StaticLayout.Builder
+                            .obtain(item.jobTitle, 0, item.jobTitle.length, titlePaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += layout.height.toFloat()
+                        partCount++
+                    }
+                    if (item.company.isNotEmpty()) {
+                        val companyLayout = android.text.StaticLayout.Builder
+                            .obtain(item.company, 0, item.company.length, companyPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += companyLayout.height.toFloat()
+                        partCount++
+                    }
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableLocationWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
+                    } else if (element.showDates) {
+                        val dateMetrics = datePaint.fontMetrics
+                        itemHeight += dateMetrics.descent - dateMetrics.ascent
+                        partCount++
                     }
                 }
             }
 
             // Add responsibilities height
             if (item.responsibilities.isNotEmpty()) {
-                itemHeight += (responsibilityPaint.textSize + responsibilitySpacing) * item.responsibilities.size
+                item.responsibilities.forEachIndexed { respIndex, responsibility ->
+                    if (responsibility.text.isNotEmpty()) {
+                        val bullet = getBulletCharacter(element.bulletStyle, respIndex, responsibility)
+                        val bulletWidth = responsibilityPaint.measureText("$bullet ")
+                        val textWidth = bounds.width() - bulletWidth
+                        
+                        val textLayout = android.text.StaticLayout.Builder
+                            .obtain(responsibility.text, 0, responsibility.text.length, responsibilityPaint, textWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        
+                        itemHeight += textLayout.height.toFloat()
+                        
+                        // Add spacing between responsibilities (not after last)
+                        if (respIndex < item.responsibilities.size - 1) {
+                            itemHeight += responsibilitySpacing
+                        }
+                    }
+                }
+                
+                // Add spacing before responsibilities if there's content above
+                if (partCount > 0) {
+                    itemHeight += itemSpacing
+                }
             }
 
             totalHeight += itemHeight
@@ -557,6 +827,7 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
         mapper: GridCoordinateMapper
     ): Float {
         var maxWidth = 0f
+        var hasRightAlignedDate = false
 
         element.items.forEach { item ->
             // Measure each field and track the maximum width
@@ -571,21 +842,27 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
                     if (item.company.isNotEmpty()) {
                         val companyWidth = companyPaint.measureText(item.company)
                         if (element.showDates) {
-                            val dateText = formatDateRange(item, element)
-                            val dateWidth = datePaint.measureText(dateText)
-                            // Company and date are on same row, add both
-                            maxWidth = maxOf(maxWidth, companyWidth + dateWidth)
+                            // When date is shown, it's aligned right, so the row uses full width
+                            hasRightAlignedDate = true
+                            maxWidth = maxOf(maxWidth, companyWidth)
                         } else {
                             maxWidth = maxOf(maxWidth, companyWidth)
                         }
                     } else if (element.showDates) {
+                        // Date only row, aligned right
+                        hasRightAlignedDate = true
                         val dateText = formatDateRange(item, element)
                         maxWidth = maxOf(maxWidth, datePaint.measureText(dateText))
                     }
 
-                    // Location width
+                    // Location width (in DETAILED, date can be on same row)
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        if (element.displayStyle == WorkExperienceDisplayStyle.DETAILED && element.showDates) {
+                            hasRightAlignedDate = true
+                            maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        } else {
+                            maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        }
                     }
                 }
                 WorkExperienceDisplayStyle.COMPACT -> {
@@ -598,9 +875,9 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
                     if (titleCompany.isNotEmpty()) {
                         val titleCompanyWidth = titlePaint.measureText(titleCompany)
                         if (element.showDates) {
-                            val dateText = formatDateRange(item, element)
-                            val dateWidth = datePaint.measureText(dateText)
-                            maxWidth = maxOf(maxWidth, titleCompanyWidth + dateWidth)
+                            // When date is shown, it's aligned right, so the row uses full width
+                            hasRightAlignedDate = true
+                            maxWidth = maxOf(maxWidth, titleCompanyWidth)
                         } else {
                             maxWidth = maxOf(maxWidth, titleCompanyWidth)
                         }
@@ -624,8 +901,12 @@ class WorkExperienceElementPdfRenderer : ElementPdfRenderer<ResumeElement.WorkEx
             }
         }
 
-        // Ensure we don't exceed available width
-        return minOf(maxWidth, availableWidth)
+        // If we have right-aligned dates, use full available width to ensure proper spacing
+        return if (hasRightAlignedDate) {
+            availableWidth
+        } else {
+            minOf(maxWidth, availableWidth)
+        }
     }
 
     /**

@@ -105,7 +105,7 @@ fun WorkExperienceElementRenderer(
 
                         // Add spacing between items (but not after last item)
                         if (index < element.items.size - 1) {
-                            Spacer(modifier = Modifier.height(element.spacing.dp))
+                            Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
                         }
                     }
                 }
@@ -128,7 +128,7 @@ fun WorkExperienceElementRenderer(
 
                         // Add spacing between items (but not after last item)
                         if (index < element.items.size - 1) {
-                            Spacer(modifier = Modifier.width(element.spacing.dp))
+                            Spacer(modifier = Modifier.width((element.spacing * zoomLevel).dp))
                         }
                     }
                 }
@@ -169,7 +169,7 @@ private fun StandardWorkExperienceLayout(
     zoomLevel: Float = 1f
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
+        verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
         // Job Title
         if (item.jobTitle.isNotEmpty()) {
@@ -230,7 +230,7 @@ private fun CompactWorkExperienceLayout(
     zoomLevel: Float = 1f
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
+        verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
         // Title + Company Row
         Row(
@@ -291,7 +291,7 @@ private fun DetailedWorkExperienceLayout(
     zoomLevel: Float = 1f
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(element.itemSpacing.dp)
+        verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
         // Job Title
         if (item.jobTitle.isNotEmpty()) {
@@ -352,7 +352,7 @@ private fun ResponsibilityList(
     zoomLevel: Float = 1f
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(element.responsibilitySpacing.dp)
+        verticalArrangement = Arrangement.spacedBy((element.responsibilitySpacing * zoomLevel).dp)
     ) {
         responsibilities.forEachIndexed { index, responsibility ->
             if (responsibility.text.isNotEmpty()) {
