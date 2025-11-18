@@ -3455,6 +3455,22 @@ private fun CertificationElementProperties(
             )
         }
     }
+
+    PropertySection(title = "Typography") {
+        // Certificate name font size
+        SliderField(
+            label = "Name Font Size: ${element.nameStyle.fontSize.toInt()}sp",
+            value = element.nameStyle.fontSize,
+            valueRange = 8f..72f,
+            onValueChange = { newSize ->
+                onUpdateElement(
+                    element.copy(
+                        nameStyle = element.nameStyle.copy(fontSize = newSize)
+                    )
+                )
+            }
+        )
+    }
 }
 
 /**

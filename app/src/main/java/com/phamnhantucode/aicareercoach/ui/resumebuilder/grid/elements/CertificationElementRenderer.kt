@@ -142,7 +142,7 @@ private fun StandardCertificationLayout(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             if (item.name.isNotEmpty()) {
                 Text(
@@ -154,6 +154,7 @@ private fun StandardCertificationLayout(
 
             // Expiry status badge
             if (element.showExpiryStatus && item.expiryDate.isNotEmpty()) {
+                Spacer(modifier = Modifier.width((8 * zoomLevel).dp))
                 ExpiryStatusBadge(item, element, zoomLevel)
             }
         }
@@ -214,7 +215,7 @@ private fun CompactCertificationLayout(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             // Name + Issuer together
             if (item.name.isNotEmpty() || item.issuer.isNotEmpty()) {
@@ -233,6 +234,7 @@ private fun CompactCertificationLayout(
 
             // Expiry status badge
             if (element.showExpiryStatus && item.expiryDate.isNotEmpty()) {
+                Spacer(modifier = Modifier.width((8 * zoomLevel).dp))
                 ExpiryStatusBadge(item, element, zoomLevel)
             }
         }
@@ -271,7 +273,7 @@ private fun DetailedCertificationLayout(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             if (item.name.isNotEmpty()) {
                 Text(
@@ -283,6 +285,7 @@ private fun DetailedCertificationLayout(
 
             // Expiry status badge
             if (element.showExpiryStatus && item.expiryDate.isNotEmpty()) {
+                Spacer(modifier = Modifier.width((8 * zoomLevel).dp))
                 ExpiryStatusBadge(item, element, zoomLevel)
             }
         }
