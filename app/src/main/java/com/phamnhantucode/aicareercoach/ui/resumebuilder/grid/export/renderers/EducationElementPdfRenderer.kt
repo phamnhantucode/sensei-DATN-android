@@ -282,48 +282,107 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         achievementSpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Degree
         if (item.degree.isNotEmpty()) {
-            canvas.drawText(item.degree, x, currentY + degreePaint.textSize, degreePaint)
-            currentY += degreePaint.textSize + itemSpacing
+            val degreeLayout = android.text.StaticLayout.Builder
+                .obtain(item.degree, 0, item.degree.length, degreePaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            degreeLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += degreeLayout.height.toFloat()
+            partCount++
         }
 
         // Institution and Date Row
         if (item.institution.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
+            
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableInstitutionWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.institution, x, currentY + institutionPaint.textSize, institutionPaint)
+            val institutionLayout = android.text.StaticLayout.Builder
+                .obtain(item.institution, 0, item.institution.length, institutionPaint, availableInstitutionWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            institutionLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(institutionPaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += institutionLayout.height.toFloat()
+            partCount++
         } else if (element.showDates) {
             val dateText = formatDateRange(item, element)
             if (dateText.isNotEmpty()) {
+                if (partCount > 0) currentY += itemSpacing
+                
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
                 val dateWidth = datePaint.measureText(dateText)
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
-                currentY += datePaint.textSize + itemSpacing
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
+                
+                val dateHeight = dateMetrics.descent - dateMetrics.ascent
+                currentY += dateHeight
+                partCount++
             }
         }
 
         // Location
         if (element.showLocation && item.location.isNotEmpty()) {
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
-            currentY += locationPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += locationLayout.height.toFloat()
+            partCount++
         }
 
         // GPA
         if (element.showGPA && item.gpa.isNotEmpty()) {
-            canvas.drawText("GPA: ${item.gpa}", x, currentY + gpaPaint.textSize, gpaPaint)
-            currentY += gpaPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val gpaText = "GPA: ${item.gpa}"
+            val gpaMetrics = gpaPaint.fontMetrics
+            val gpaBaseline = currentY - gpaMetrics.ascent
+            canvas.drawText(gpaText, x, gpaBaseline, gpaPaint)
+            
+            val gpaHeight = gpaMetrics.descent - gpaMetrics.ascent
+            currentY += gpaHeight
+            partCount++
         }
 
         // Achievements
         if (item.achievements.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderAchievements(
                 canvas, item.achievements, element, x, currentY, width,
                 achievementPaint, achievementSpacing
@@ -353,6 +412,7 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         achievementSpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Degree + Institution + Date Row
         val degreeInstitution = buildString {
@@ -364,35 +424,74 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         if (degreeInstitution.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableDegreeWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(degreeInstitution, x, currentY + degreePaint.textSize, degreePaint)
+            val degreeLayout = android.text.StaticLayout.Builder
+                .obtain(degreeInstitution, 0, degreeInstitution.length, degreePaint, availableDegreeWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            degreeLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(degreePaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += degreeLayout.height.toFloat()
+            partCount++
         }
 
         // Location and GPA Row
         if (element.showLocation && item.location.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
+            
             val gpaText = if (element.showGPA && item.gpa.isNotEmpty()) "GPA: ${item.gpa}" else ""
             val gpaWidth = if (gpaText.isNotEmpty()) gpaPaint.measureText(gpaText) else 0f
+            val availableLocationWidth = if (gpaText.isNotEmpty()) width - gpaWidth - itemSpacing else width
 
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
 
             if (gpaText.isNotEmpty()) {
-                canvas.drawText(gpaText, x + width - gpaWidth, currentY + gpaPaint.textSize, gpaPaint)
+                val gpaMetrics = gpaPaint.fontMetrics
+                val gpaBaseline = currentY - gpaMetrics.ascent
+                canvas.drawText(gpaText, x + width - gpaWidth, gpaBaseline, gpaPaint)
             }
 
-            currentY += maxOf(locationPaint.textSize, gpaPaint.textSize) + itemSpacing
+            currentY += locationLayout.height.toFloat()
+            partCount++
         } else if (element.showGPA && item.gpa.isNotEmpty()) {
-            canvas.drawText("GPA: ${item.gpa}", x, currentY + gpaPaint.textSize, gpaPaint)
-            currentY += gpaPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val gpaText = "GPA: ${item.gpa}"
+            val gpaMetrics = gpaPaint.fontMetrics
+            val gpaBaseline = currentY - gpaMetrics.ascent
+            canvas.drawText(gpaText, x, gpaBaseline, gpaPaint)
+            
+            val gpaHeight = gpaMetrics.descent - gpaMetrics.ascent
+            currentY += gpaHeight
+            partCount++
         }
 
         // Achievements
         if (item.achievements.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderAchievements(
                 canvas, item.achievements, element, x, currentY, width,
                 achievementPaint, achievementSpacing
@@ -422,48 +521,107 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         achievementSpacing: Float
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Degree
         if (item.degree.isNotEmpty()) {
-            canvas.drawText(item.degree, x, currentY + degreePaint.textSize, degreePaint)
-            currentY += degreePaint.textSize + itemSpacing
+            val degreeLayout = android.text.StaticLayout.Builder
+                .obtain(item.degree, 0, item.degree.length, degreePaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            degreeLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += degreeLayout.height.toFloat()
+            partCount++
         }
 
         // Institution
         if (item.institution.isNotEmpty()) {
-            canvas.drawText(item.institution, x, currentY + institutionPaint.textSize, institutionPaint)
-            currentY += institutionPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val institutionLayout = android.text.StaticLayout.Builder
+                .obtain(item.institution, 0, item.institution.length, institutionPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            institutionLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += institutionLayout.height.toFloat()
+            partCount++
         }
 
         // Location and Dates Row
         if (element.showLocation && item.location.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
+            
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableLocationWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.location, x, currentY + locationPaint.textSize, locationPaint)
+            val locationLayout = android.text.StaticLayout.Builder
+                .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            locationLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(locationPaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += locationLayout.height.toFloat()
+            partCount++
         } else if (element.showDates) {
             val dateText = formatDateRange(item, element)
             if (dateText.isNotEmpty()) {
+                if (partCount > 0) currentY += itemSpacing
+                
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
                 val dateWidth = datePaint.measureText(dateText)
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
-                currentY += datePaint.textSize + itemSpacing
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
+                
+                val dateHeight = dateMetrics.descent - dateMetrics.ascent
+                currentY += dateHeight
+                partCount++
             }
         }
 
         // GPA
         if (element.showGPA && item.gpa.isNotEmpty()) {
-            canvas.drawText("GPA: ${item.gpa}", x, currentY + gpaPaint.textSize, gpaPaint)
-            currentY += gpaPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val gpaText = "GPA: ${item.gpa}"
+            val gpaMetrics = gpaPaint.fontMetrics
+            val gpaBaseline = currentY - gpaMetrics.ascent
+            canvas.drawText(gpaText, x, gpaBaseline, gpaPaint)
+            
+            val gpaHeight = gpaMetrics.descent - gpaMetrics.ascent
+            currentY += gpaHeight
+            partCount++
         }
 
         // Achievements
         if (item.achievements.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderAchievements(
                 canvas, item.achievements, element, x, currentY, width,
                 achievementPaint, achievementSpacing
@@ -492,19 +650,32 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
             if (achievement.text.isNotEmpty()) {
                 val bullet = getBulletCharacter(element.bulletStyle, index, achievement)
                 val bulletWidth = achievementPaint.measureText("$bullet ")
+                val textWidth = width - bulletWidth
 
                 // Draw bullet
-                canvas.drawText(bullet, x, currentY + achievementPaint.textSize, achievementPaint)
+                val bulletMetrics = achievementPaint.fontMetrics
+                val bulletBaseline = currentY - bulletMetrics.ascent
+                canvas.drawText(bullet, x, bulletBaseline, achievementPaint)
 
-                // Draw achievement text (may need word wrapping for long text)
-                canvas.drawText(
-                    achievement.text,
-                    x + bulletWidth,
-                    currentY + achievementPaint.textSize,
-                    achievementPaint
-                )
+                // Draw achievement text with wrapping using StaticLayout
+                val textLayout = android.text.StaticLayout.Builder
+                    .obtain(achievement.text, 0, achievement.text.length, achievementPaint, textWidth.toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                
+                canvas.save()
+                canvas.translate(x + bulletWidth, currentY)
+                textLayout.draw(canvas)
+                canvas.restore()
 
-                currentY += achievementPaint.textSize + achievementSpacing
+                currentY += textLayout.height.toFloat()
+                
+                // Add spacing only if not the last achievement
+                if (index < achievements.size - 1) {
+                    currentY += achievementSpacing
+                }
             }
         }
 
@@ -532,45 +703,178 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         var totalHeight = 0f
 
         element.items.forEachIndexed { index, item ->
-            // Estimate height for this item
             var itemHeight = 0f
+            var partCount = 0
 
             when (element.displayStyle) {
                 EducationDisplayStyle.STANDARD -> {
-                    if (item.degree.isNotEmpty()) itemHeight += degreePaint.textSize + itemSpacing
-                    if (item.institution.isNotEmpty() || element.showDates) {
-                        itemHeight += maxOf(institutionPaint.textSize, datePaint.textSize) + itemSpacing
+                    if (item.degree.isNotEmpty()) {
+                        val degreeLayout = android.text.StaticLayout.Builder
+                            .obtain(item.degree, 0, item.degree.length, degreePaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += degreeLayout.height.toFloat()
+                        partCount++
                     }
+                    
+                    if (item.institution.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableInstitutionWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val institutionLayout = android.text.StaticLayout.Builder
+                            .obtain(item.institution, 0, item.institution.length, institutionPaint, availableInstitutionWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += institutionLayout.height.toFloat()
+                        partCount++
+                    } else if (element.showDates) {
+                        val dateMetrics = datePaint.fontMetrics
+                        itemHeight += dateMetrics.descent - dateMetrics.ascent
+                        partCount++
+                    }
+                    
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        itemHeight += locationPaint.textSize + itemSpacing
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
                     }
+                    
                     if (element.showGPA && item.gpa.isNotEmpty()) {
-                        itemHeight += gpaPaint.textSize + itemSpacing
+                        val gpaMetrics = gpaPaint.fontMetrics
+                        itemHeight += gpaMetrics.descent - gpaMetrics.ascent
+                        partCount++
                     }
                 }
                 EducationDisplayStyle.COMPACT -> {
-                    if (item.degree.isNotEmpty() || item.institution.isNotEmpty()) {
-                        itemHeight += maxOf(degreePaint.textSize, datePaint.textSize) + itemSpacing
+                    val degreeInstitution = buildString {
+                        if (item.degree.isNotEmpty()) append(item.degree)
+                        if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
+                        if (item.institution.isNotEmpty()) append(item.institution)
                     }
-                    if (element.showLocation && item.location.isNotEmpty() || element.showGPA && item.gpa.isNotEmpty()) {
-                        itemHeight += maxOf(locationPaint.textSize, gpaPaint.textSize) + itemSpacing
+                    
+                    if (degreeInstitution.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableDegreeWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val degreeLayout = android.text.StaticLayout.Builder
+                            .obtain(degreeInstitution, 0, degreeInstitution.length, degreePaint, availableDegreeWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += degreeLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        val gpaText = if (element.showGPA && item.gpa.isNotEmpty()) "GPA: ${item.gpa}" else ""
+                        val gpaWidth = if (gpaText.isNotEmpty()) gpaPaint.measureText(gpaText) else 0f
+                        val availableLocationWidth = if (gpaText.isNotEmpty()) bounds.width() - gpaWidth - itemSpacing else bounds.width()
+                        
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
+                    } else if (element.showGPA && item.gpa.isNotEmpty()) {
+                        val gpaMetrics = gpaPaint.fontMetrics
+                        itemHeight += gpaMetrics.descent - gpaMetrics.ascent
+                        partCount++
                     }
                 }
                 EducationDisplayStyle.DETAILED -> {
-                    if (item.degree.isNotEmpty()) itemHeight += degreePaint.textSize + itemSpacing
-                    if (item.institution.isNotEmpty()) itemHeight += institutionPaint.textSize + itemSpacing
-                    if (element.showLocation && item.location.isNotEmpty() || element.showDates) {
-                        itemHeight += maxOf(locationPaint.textSize, datePaint.textSize) + itemSpacing
+                    if (item.degree.isNotEmpty()) {
+                        val degreeLayout = android.text.StaticLayout.Builder
+                            .obtain(item.degree, 0, item.degree.length, degreePaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += degreeLayout.height.toFloat()
+                        partCount++
                     }
+                    
+                    if (item.institution.isNotEmpty()) {
+                        val institutionLayout = android.text.StaticLayout.Builder
+                            .obtain(item.institution, 0, item.institution.length, institutionPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += institutionLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (element.showLocation && item.location.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableLocationWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val locationLayout = android.text.StaticLayout.Builder
+                            .obtain(item.location, 0, item.location.length, locationPaint, availableLocationWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += locationLayout.height.toFloat()
+                        partCount++
+                    } else if (element.showDates) {
+                        val dateMetrics = datePaint.fontMetrics
+                        itemHeight += dateMetrics.descent - dateMetrics.ascent
+                        partCount++
+                    }
+                    
                     if (element.showGPA && item.gpa.isNotEmpty()) {
-                        itemHeight += gpaPaint.textSize + itemSpacing
+                        val gpaMetrics = gpaPaint.fontMetrics
+                        itemHeight += gpaMetrics.descent - gpaMetrics.ascent
+                        partCount++
                     }
                 }
             }
 
             // Add achievements height
             if (item.achievements.isNotEmpty()) {
-                itemHeight += (achievementPaint.textSize + achievementSpacing) * item.achievements.size
+                item.achievements.forEachIndexed { achIndex, achievement ->
+                    if (achievement.text.isNotEmpty()) {
+                        val bullet = getBulletCharacter(element.bulletStyle, achIndex, achievement)
+                        val bulletWidth = achievementPaint.measureText("$bullet ")
+                        val textWidth = bounds.width() - bulletWidth
+                        
+                        val textLayout = android.text.StaticLayout.Builder
+                            .obtain(achievement.text, 0, achievement.text.length, achievementPaint, textWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        
+                        itemHeight += textLayout.height.toFloat()
+                        
+                        if (achIndex < item.achievements.size - 1) {
+                            itemHeight += achievementSpacing
+                        }
+                    }
+                }
+                
+                if (item.achievements.isNotEmpty()) partCount++
+            }
+            
+            // Add spacing between parts (not after last)
+            if (partCount > 1) {
+                itemHeight += itemSpacing * (partCount - 1)
             }
 
             totalHeight += itemHeight
@@ -599,6 +903,7 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
         mapper: GridCoordinateMapper
     ): Float {
         var maxWidth = 0f
+        var hasRightAlignedContent = false
 
         element.items.forEach { item ->
             // Measure each field and track the maximum width
@@ -613,56 +918,64 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
                     if (item.institution.isNotEmpty()) {
                         val institutionWidth = institutionPaint.measureText(item.institution)
                         if (element.showDates) {
-                            val dateText = formatDateRange(item, element)
-                            val dateWidth = datePaint.measureText(dateText)
-                            // Institution and date are on same row, add both
-                            maxWidth = maxOf(maxWidth, institutionWidth + dateWidth)
+                            // When date is shown, it's aligned right, so use full width
+                            hasRightAlignedContent = true
+                            maxWidth = maxOf(maxWidth, institutionWidth)
                         } else {
                             maxWidth = maxOf(maxWidth, institutionWidth)
                         }
                     } else if (element.showDates) {
+                        // Date only row, aligned right
+                        hasRightAlignedContent = true
                         val dateText = formatDateRange(item, element)
                         maxWidth = maxOf(maxWidth, datePaint.measureText(dateText))
                     }
 
-                    // Location width
+                    // Location width (in DETAILED, date can be on same row)
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        if (element.displayStyle == EducationDisplayStyle.DETAILED && element.showDates) {
+                            hasRightAlignedContent = true
+                            maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        } else {
+                            maxWidth = maxOf(maxWidth, locationPaint.measureText(item.location))
+                        }
                     }
 
                     // GPA width
                     if (element.showGPA && item.gpa.isNotEmpty()) {
-                        maxWidth = maxOf(maxWidth, gpaPaint.measureText(item.gpa))
+                        maxWidth = maxOf(maxWidth, gpaPaint.measureText("GPA: ${item.gpa}"))
                     }
                 }
                 EducationDisplayStyle.COMPACT -> {
                     // Degree + institution on same line
                     val degreeInstitution = buildString {
                         if (item.degree.isNotEmpty()) append(item.degree)
-                        if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(" at ")
+                        if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
                         if (item.institution.isNotEmpty()) append(item.institution)
                     }
                     if (degreeInstitution.isNotEmpty()) {
                         val degreeInstitutionWidth = degreePaint.measureText(degreeInstitution)
                         if (element.showDates) {
-                            val dateText = formatDateRange(item, element)
-                            val dateWidth = datePaint.measureText(dateText)
-                            maxWidth = maxOf(maxWidth, degreeInstitutionWidth + dateWidth)
+                            // When date is shown, it's aligned right, so use full width
+                            hasRightAlignedContent = true
+                            maxWidth = maxOf(maxWidth, degreeInstitutionWidth)
                         } else {
                             maxWidth = maxOf(maxWidth, degreeInstitutionWidth)
                         }
                     }
 
                     // Location and GPA (can be on same row)
-                    var locationGpaWidth = 0f
                     if (element.showLocation && item.location.isNotEmpty()) {
-                        locationGpaWidth += locationPaint.measureText(item.location)
-                    }
-                    if (element.showGPA && item.gpa.isNotEmpty()) {
-                        locationGpaWidth += gpaPaint.measureText(item.gpa)
-                    }
-                    if (locationGpaWidth > 0f) {
-                        maxWidth = maxOf(maxWidth, locationGpaWidth)
+                        val locationWidth = locationPaint.measureText(item.location)
+                        if (element.showGPA && item.gpa.isNotEmpty()) {
+                            // GPA is aligned right
+                            hasRightAlignedContent = true
+                            maxWidth = maxOf(maxWidth, locationWidth)
+                        } else {
+                            maxWidth = maxOf(maxWidth, locationWidth)
+                        }
+                    } else if (element.showGPA && item.gpa.isNotEmpty()) {
+                        maxWidth = maxOf(maxWidth, gpaPaint.measureText("GPA: ${item.gpa}"))
                     }
                 }
             }
@@ -678,8 +991,12 @@ class EducationElementPdfRenderer : ElementPdfRenderer<ResumeElement.EducationEl
             }
         }
 
-        // Ensure we don't exceed available width
-        return minOf(maxWidth, availableWidth)
+        // If we have right-aligned content, use full available width to ensure proper spacing
+        return if (hasRightAlignedContent) {
+            availableWidth
+        } else {
+            minOf(maxWidth, availableWidth)
+        }
     }
 
     /**

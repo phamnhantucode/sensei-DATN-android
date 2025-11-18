@@ -186,41 +186,87 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         context: PdfRenderContext
     ): Float {
         var currentY = y
+        var partCount = 0
 
-        // Project name and date
+        // Project name and date on same row
         if (item.name.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableNameWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.name, x, currentY + namePaint.textSize, namePaint)
+            val nameLayout = android.text.StaticLayout.Builder
+                .obtain(item.name, 0, item.name.length, namePaint, availableNameWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            nameLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(namePaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += nameLayout.height.toFloat()
+            partCount++
         }
 
         // Technologies
         if (element.showTechnologies && item.technologies.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
+            partCount++
         }
 
         // Description
         if (element.showDescription && item.description.isNotEmpty()) {
-            canvas.drawText(item.description, x, currentY + descriptionPaint.textSize, descriptionPaint)
-            currentY += descriptionPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val descLayout = android.text.StaticLayout.Builder
+                .obtain(item.description, 0, item.description.length, descriptionPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            descLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += descLayout.height.toFloat()
+            partCount++
         }
 
         // Link
         if (element.showLink && item.link.isNotEmpty()) {
-            canvas.drawText(item.link, x, currentY + linkPaint.textSize, linkPaint)
-            currentY += linkPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val linkLayout = android.text.StaticLayout.Builder
+                .obtain(item.link, 0, item.link.length, linkPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            linkLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += linkLayout.height.toFloat()
+            partCount++
         }
 
         // Highlights
         if (item.highlights.isNotEmpty()) {
-            currentY += renderHighlights(canvas, item, element, x, currentY, highlightPaint, itemSpacing, mapper)
+            if (partCount > 0) currentY += itemSpacing
+            currentY += renderHighlights(canvas, item, element, x, currentY, width, highlightPaint, itemSpacing, mapper)
         }
 
         return currentY - y
@@ -244,23 +290,39 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         context: PdfRenderContext
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Name + Date
         if (item.name.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
             val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+            val availableNameWidth = if (dateText.isNotEmpty()) width - dateWidth - itemSpacing else width
 
-            canvas.drawText(item.name, x, currentY + namePaint.textSize, namePaint)
+            val nameLayout = android.text.StaticLayout.Builder
+                .obtain(item.name, 0, item.name.length, namePaint, availableNameWidth.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            nameLayout.draw(canvas)
+            canvas.restore()
 
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x + width - dateWidth, currentY + datePaint.textSize, datePaint)
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x + width - dateWidth, dateBaseline, datePaint)
             }
 
-            currentY += maxOf(namePaint.textSize, datePaint.textSize) + itemSpacing
+            currentY += nameLayout.height.toFloat()
+            partCount++
         }
 
         // Technologies
         if (element.showTechnologies && item.technologies.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
         }
 
@@ -285,42 +347,93 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         context: PdfRenderContext
     ): Float {
         var currentY = y
+        var partCount = 0
 
         // Project name
         if (item.name.isNotEmpty()) {
-            canvas.drawText(item.name, x, currentY + namePaint.textSize, namePaint)
-            currentY += namePaint.textSize + itemSpacing
+            val nameLayout = android.text.StaticLayout.Builder
+                .obtain(item.name, 0, item.name.length, namePaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            nameLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += nameLayout.height.toFloat()
+            partCount++
         }
 
         // Date
         if (element.showDates) {
             val dateText = formatDateRange(item, element)
             if (dateText.isNotEmpty()) {
-                canvas.drawText(dateText, x, currentY + datePaint.textSize, datePaint)
-                currentY += datePaint.textSize + itemSpacing
+                if (partCount > 0) currentY += itemSpacing
+                
+                val dateMetrics = datePaint.fontMetrics
+                val dateBaseline = currentY - dateMetrics.ascent
+                canvas.drawText(dateText, x, dateBaseline, datePaint)
+                
+                val dateHeight = dateMetrics.descent - dateMetrics.ascent
+                currentY += dateHeight
+                partCount++
             }
         }
 
         // Technologies
         if (element.showTechnologies && item.technologies.isNotEmpty()) {
+            if (partCount > 0) currentY += itemSpacing
             currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
+            partCount++
         }
 
         // Description
         if (element.showDescription && item.description.isNotEmpty()) {
-            canvas.drawText(item.description, x, currentY + descriptionPaint.textSize, descriptionPaint)
-            currentY += descriptionPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val descLayout = android.text.StaticLayout.Builder
+                .obtain(item.description, 0, item.description.length, descriptionPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            descLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += descLayout.height.toFloat()
+            partCount++
         }
 
         // Highlights
         if (item.highlights.isNotEmpty()) {
-            currentY += renderHighlights(canvas, item, element, x, currentY, highlightPaint, itemSpacing, mapper)
+            if (partCount > 0) currentY += itemSpacing
+            currentY += renderHighlights(canvas, item, element, x, currentY, width, highlightPaint, itemSpacing, mapper)
+            partCount++
         }
 
         // Link
         if (element.showLink && item.link.isNotEmpty()) {
-            canvas.drawText(item.link, x, currentY + linkPaint.textSize, linkPaint)
-            currentY += linkPaint.textSize + itemSpacing
+            if (partCount > 0) currentY += itemSpacing
+            
+            val linkLayout = android.text.StaticLayout.Builder
+                .obtain(item.link, 0, item.link.length, linkPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
+            canvas.save()
+            canvas.translate(x, currentY)
+            linkLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += linkLayout.height.toFloat()
         }
 
         return currentY - y
@@ -343,7 +456,12 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         val tagPadding = mapper.borderWidthToPdfPoints(8f)
         val tagSpacing = mapper.borderWidthToPdfPoints(element.technologySpacing)
         val tagRadius = mapper.cornerRadiusToPdfPoints(element.technologyTagCornerRadius)
-        val tagHeight = technologyPaint.textSize + tagPadding * 2
+        val verticalPadding = mapper.borderWidthToPdfPoints(6f)
+        
+        // Calculate badge height accounting for font metrics
+        val fontMetrics = technologyPaint.fontMetrics
+        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+        val tagHeight = textActualHeight + verticalPadding * 2
 
         val tagBackgroundPaint = Paint().apply {
             color = element.technologyTagBackgroundColor?.toInt() ?: 0xFFE3F2FD.toInt()
@@ -376,12 +494,14 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
                 canvas.drawRoundRect(tagRect, tagRadius, tagRadius, borderPaint)
             }
 
-            canvas.drawText(tech, currentX + tagPadding, currentY + tagPadding + technologyPaint.textSize, technologyPaint)
+            // Draw text centered vertically in badge
+            val textY = currentY + tagHeight / 2f - (fontMetrics.ascent + fontMetrics.descent) / 2f
+            canvas.drawText(tech, currentX + tagPadding, textY, technologyPaint)
 
             currentX += tagWidth + tagSpacing
         }
 
-        return currentY - y + tagHeight + mapper.borderWidthToPdfPoints(element.itemSpacing)
+        return currentY - y + tagHeight
     }
 
     private fun renderHighlights(
@@ -390,21 +510,43 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         element: ResumeElement.ProjectElement,
         x: Float,
         y: Float,
+        width: Float,
         highlightPaint: TextPaint,
         highlightSpacing: Float,
         mapper: GridCoordinateMapper
     ): Float {
         var currentY = y
 
-        item.highlights.forEach { highlight ->
+        item.highlights.forEachIndexed { index, highlight ->
             if (highlight.text.isNotEmpty()) {
-                val bullet = getBulletCharacter(element.bulletStyle, 0, highlight)
+                val bullet = getBulletCharacter(element.bulletStyle, index, highlight)
                 val bulletWidth = highlightPaint.measureText("$bullet ")
+                val textWidth = width - bulletWidth
 
-                canvas.drawText(bullet, x, currentY + highlightPaint.textSize, highlightPaint)
-                canvas.drawText(highlight.text, x + bulletWidth, currentY + highlightPaint.textSize, highlightPaint)
+                // Draw bullet
+                val bulletMetrics = highlightPaint.fontMetrics
+                val bulletBaseline = currentY - bulletMetrics.ascent
+                canvas.drawText(bullet, x, bulletBaseline, highlightPaint)
 
-                currentY += highlightPaint.textSize + highlightSpacing
+                // Draw highlight text with wrapping using StaticLayout
+                val textLayout = android.text.StaticLayout.Builder
+                    .obtain(highlight.text, 0, highlight.text.length, highlightPaint, textWidth.toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                
+                canvas.save()
+                canvas.translate(x + bulletWidth, currentY)
+                textLayout.draw(canvas)
+                canvas.restore()
+
+                currentY += textLayout.height.toFloat()
+                
+                // Add spacing only if not the last highlight
+                if (index < item.highlights.size - 1) {
+                    currentY += highlightSpacing
+                }
             }
         }
 
@@ -424,39 +566,202 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
     ): Float {
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val itemSpacing = mapper.borderWidthToPdfPoints(element.itemSpacing)
+        val highlightSpacing = itemSpacing
         var totalHeight = 0f
 
         element.items.forEachIndexed { index, item ->
             var itemHeight = 0f
+            var partCount = 0
 
             when (element.displayStyle) {
-                ProjectDisplayStyle.STANDARD, ProjectDisplayStyle.COMPACT -> {
-                    if (item.name.isNotEmpty()) itemHeight += maxOf(namePaint.textSize, datePaint.textSize) + itemSpacing
-                    if (element.showTechnologies && item.technologies.isNotEmpty()) {
-                        itemHeight += technologyPaint.textSize + itemSpacing
+                ProjectDisplayStyle.STANDARD -> {
+                    if (item.name.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableNameWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val nameLayout = android.text.StaticLayout.Builder
+                            .obtain(item.name, 0, item.name.length, namePaint, availableNameWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += nameLayout.height.toFloat()
+                        partCount++
                     }
-                    if (element.displayStyle == ProjectDisplayStyle.STANDARD) {
-                        if (element.showDescription && item.description.isNotEmpty()) {
-                            itemHeight += descriptionPaint.textSize + itemSpacing
+                    
+                    if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                        val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        val tagPadding = mapper.borderWidthToPdfPoints(8f)
+                        val verticalPadding = mapper.borderWidthToPdfPoints(6f)
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
+                    }
+                    
+                    if (element.showDescription && item.description.isNotEmpty()) {
+                        val descLayout = android.text.StaticLayout.Builder
+                            .obtain(item.description, 0, item.description.length, descriptionPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += descLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (element.showLink && item.link.isNotEmpty()) {
+                        val linkLayout = android.text.StaticLayout.Builder
+                            .obtain(item.link, 0, item.link.length, linkPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += linkLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (item.highlights.isNotEmpty()) {
+                        item.highlights.forEachIndexed { hIndex, highlight ->
+                            if (highlight.text.isNotEmpty()) {
+                                val bullet = getBulletCharacter(element.bulletStyle, hIndex, highlight)
+                                val bulletWidth = highlightPaint.measureText("$bullet ")
+                                val textWidth = bounds.width() - bulletWidth
+                                
+                                val textLayout = android.text.StaticLayout.Builder
+                                    .obtain(highlight.text, 0, highlight.text.length, highlightPaint, textWidth.toInt().coerceAtLeast(1))
+                                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                                    .setLineSpacing(0f, 1f)
+                                    .setIncludePad(false)
+                                    .build()
+                                
+                                itemHeight += textLayout.height.toFloat()
+                                
+                                if (hIndex < item.highlights.size - 1) {
+                                    itemHeight += highlightSpacing
+                                }
+                            }
                         }
-                        if (element.showLink && item.link.isNotEmpty()) {
-                            itemHeight += linkPaint.textSize + itemSpacing
-                        }
-                        itemHeight += (highlightPaint.textSize + itemSpacing) * item.highlights.size
+                        
+                        if (item.highlights.isNotEmpty()) partCount++
+                    }
+                    
+                    if (partCount > 1) {
+                        itemHeight += itemSpacing * (partCount - 1)
+                    }
+                }
+                ProjectDisplayStyle.COMPACT -> {
+                    if (item.name.isNotEmpty()) {
+                        val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                        val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                        val availableNameWidth = if (dateText.isNotEmpty()) bounds.width() - dateWidth - itemSpacing else bounds.width()
+                        
+                        val nameLayout = android.text.StaticLayout.Builder
+                            .obtain(item.name, 0, item.name.length, namePaint, availableNameWidth.toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += nameLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                        val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        val verticalPadding = mapper.borderWidthToPdfPoints(6f)
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
+                    }
+                    
+                    if (partCount > 1) {
+                        itemHeight += itemSpacing * (partCount - 1)
                     }
                 }
                 ProjectDisplayStyle.DETAILED -> {
-                    if (item.name.isNotEmpty()) itemHeight += namePaint.textSize + itemSpacing
-                    if (element.showDates) itemHeight += datePaint.textSize + itemSpacing
+                    if (item.name.isNotEmpty()) {
+                        val nameLayout = android.text.StaticLayout.Builder
+                            .obtain(item.name, 0, item.name.length, namePaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += nameLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (element.showDates) {
+                        val dateText = formatDateRange(item, element)
+                        if (dateText.isNotEmpty()) {
+                            val dateMetrics = datePaint.fontMetrics
+                            itemHeight += dateMetrics.descent - dateMetrics.ascent
+                            partCount++
+                        }
+                    }
+                    
                     if (element.showTechnologies && item.technologies.isNotEmpty()) {
-                        itemHeight += technologyPaint.textSize + itemSpacing
+                        val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        val verticalPadding = mapper.borderWidthToPdfPoints(6f)
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
                     }
+                    
                     if (element.showDescription && item.description.isNotEmpty()) {
-                        itemHeight += descriptionPaint.textSize + itemSpacing
+                        val descLayout = android.text.StaticLayout.Builder
+                            .obtain(item.description, 0, item.description.length, descriptionPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += descLayout.height.toFloat()
+                        partCount++
                     }
-                    itemHeight += (highlightPaint.textSize + itemSpacing) * item.highlights.size
+                    
+                    if (item.highlights.isNotEmpty()) {
+                        item.highlights.forEachIndexed { hIndex, highlight ->
+                            if (highlight.text.isNotEmpty()) {
+                                val bullet = getBulletCharacter(element.bulletStyle, hIndex, highlight)
+                                val bulletWidth = highlightPaint.measureText("$bullet ")
+                                val textWidth = bounds.width() - bulletWidth
+                                
+                                val textLayout = android.text.StaticLayout.Builder
+                                    .obtain(highlight.text, 0, highlight.text.length, highlightPaint, textWidth.toInt().coerceAtLeast(1))
+                                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                                    .setLineSpacing(0f, 1f)
+                                    .setIncludePad(false)
+                                    .build()
+                                
+                                itemHeight += textLayout.height.toFloat()
+                                
+                                if (hIndex < item.highlights.size - 1) {
+                                    itemHeight += highlightSpacing
+                                }
+                            }
+                        }
+                        
+                        if (item.highlights.isNotEmpty()) partCount++
+                    }
+                    
                     if (element.showLink && item.link.isNotEmpty()) {
-                        itemHeight += linkPaint.textSize + itemSpacing
+                        val linkLayout = android.text.StaticLayout.Builder
+                            .obtain(item.link, 0, item.link.length, linkPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += linkLayout.height.toFloat()
+                        partCount++
+                    }
+                    
+                    if (partCount > 1) {
+                        itemHeight += itemSpacing * (partCount - 1)
                     }
                 }
             }
@@ -480,14 +785,15 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         mapper: GridCoordinateMapper
     ): Float {
         var maxWidth = 0f
+        var hasRightAlignedDate = false
 
         element.items.forEach { item ->
             if (item.name.isNotEmpty()) {
                 val nameWidth = namePaint.measureText(item.name)
                 if (element.showDates) {
-                    val dateText = formatDateRange(item, element)
-                    val dateWidth = datePaint.measureText(dateText)
-                    maxWidth = maxOf(maxWidth, nameWidth + dateWidth)
+                    // When date is shown, it's aligned right, so use full width
+                    hasRightAlignedDate = true
+                    maxWidth = maxOf(maxWidth, nameWidth)
                 } else {
                     maxWidth = maxOf(maxWidth, nameWidth)
                 }
@@ -511,7 +817,12 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             }
         }
 
-        return minOf(maxWidth, availableWidth)
+        // If we have right-aligned dates, use full available width to ensure proper spacing
+        return if (hasRightAlignedDate) {
+            availableWidth
+        } else {
+            minOf(maxWidth, availableWidth)
+        }
     }
 
     private fun getBulletCharacter(bulletStyle: BulletStyle, index: Int, highlight: ProjectHighlight): String {
