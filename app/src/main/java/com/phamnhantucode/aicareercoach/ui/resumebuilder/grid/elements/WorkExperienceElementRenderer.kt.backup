@@ -10,8 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -23,12 +21,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * Renders an education element on the resume
- * Displays a list of education entries with degrees, institutions, dates, and achievements
+ * Renders a work experience element on the resume
+ * Displays a list of work experiences with job titles, companies, dates, and responsibilities
  */
 @Composable
-fun EducationElementRenderer(
-    element: ResumeElement.EducationElement,
+fun WorkExperienceElementRenderer(
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f,
     modifier: Modifier = Modifier
 ) {
@@ -92,14 +90,14 @@ fun EducationElementRenderer(
         }
 
         when (element.orientation) {
-            EducationOrientation.VERTICAL -> {
+            WorkExperienceOrientation.VERTICAL -> {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = verticalArrangementForColumn,
                     horizontalAlignment = horizontalAlignmentForColumn
                 ) {
                     element.items.forEachIndexed { index, item ->
-                        EducationItemRenderer(
+                        WorkExperienceItemRenderer(
                             item = item,
                             element = element,
                             zoomLevel = zoomLevel
@@ -112,7 +110,7 @@ fun EducationElementRenderer(
                     }
                 }
             }
-            EducationOrientation.HORIZONTAL -> {
+            WorkExperienceOrientation.HORIZONTAL -> {
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = horizontalArrangement,
@@ -121,7 +119,7 @@ fun EducationElementRenderer(
                     element.items.forEachIndexed { index, item ->
                         // Each item gets equal weight
                         Box(modifier = Modifier.weight(1f)) {
-                            EducationItemRenderer(
+                            WorkExperienceItemRenderer(
                                 item = item,
                                 element = element,
                                 zoomLevel = zoomLevel
@@ -140,62 +138,62 @@ fun EducationElementRenderer(
 }
 
 /**
- * Renders a single education item based on display style
+ * Renders a single work experience item based on display style
  */
 @Composable
-private fun EducationItemRenderer(
-    item: EducationItem,
-    element: ResumeElement.EducationElement,
+private fun WorkExperienceItemRenderer(
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f
 ) {
     when (element.displayStyle) {
-        EducationDisplayStyle.STANDARD -> {
-            StandardEducationLayout(item, element, zoomLevel)
+        WorkExperienceDisplayStyle.STANDARD -> {
+            StandardWorkExperienceLayout(item, element, zoomLevel)
         }
-        EducationDisplayStyle.COMPACT -> {
-            CompactEducationLayout(item, element, zoomLevel)
+        WorkExperienceDisplayStyle.COMPACT -> {
+            CompactWorkExperienceLayout(item, element, zoomLevel)
         }
-        EducationDisplayStyle.DETAILED -> {
-            DetailedEducationLayout(item, element, zoomLevel)
+        WorkExperienceDisplayStyle.DETAILED -> {
+            DetailedWorkExperienceLayout(item, element, zoomLevel)
         }
     }
 }
 
 /**
- * Standard layout: Degree and institution on separate lines
+ * Standard layout: Title and company on separate lines
  */
 @Composable
-private fun StandardEducationLayout(
-    item: EducationItem,
-    element: ResumeElement.EducationElement,
+private fun StandardWorkExperienceLayout(
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
-        // Degree
-        if (item.degree.isNotEmpty()) {
+        // Job Title
+        if (item.jobTitle.isNotEmpty()) {
             Text(
-                text = item.degree,
-                style = element.degreeStyle.toComposeTextStyle(zoomLevel)
+                text = item.jobTitle,
+                style = element.titleStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
-        // Institution and Date Row
+        // Company and Date Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (item.institution.isNotEmpty()) {
+            if (item.company.isNotEmpty()) {
                 Text(
-                    text = item.institution,
-                    style = element.institutionStyle.toComposeTextStyle(zoomLevel),
+                    text = item.company,
+                    style = element.companyStyle.toComposeTextStyle(zoomLevel),
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
 
-            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
                     style = element.dateStyle.toComposeTextStyle(zoomLevel)
@@ -211,18 +209,10 @@ private fun StandardEducationLayout(
             )
         }
 
-        // GPA
-        if (element.showGPA && item.gpa.isNotEmpty()) {
-            Text(
-                text = "GPA: ${item.gpa}",
-                style = element.gpaStyle.toComposeTextStyle(zoomLevel)
-            )
-        }
-
-        // Achievements
-        if (item.achievements.isNotEmpty()) {
-            AchievementList(
-                achievements = item.achievements,
+        // Responsibilities
+        if (item.responsibilities.isNotEmpty()) {
+            ResponsibilityList(
+                responsibilities = item.responsibilities,
                 element = element,
                 zoomLevel = zoomLevel
             )
@@ -231,40 +221,40 @@ private fun StandardEducationLayout(
 }
 
 /**
- * Compact layout: Degree and institution on same line
+ * Compact layout: Title and company on same line
  */
 @Composable
-private fun CompactEducationLayout(
-    item: EducationItem,
-    element: ResumeElement.EducationElement,
+private fun CompactWorkExperienceLayout(
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
-        // Degree + Institution Row
+        // Title + Company Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Degree and Institution together
-            if (item.degree.isNotEmpty() || item.institution.isNotEmpty()) {
-                val degreeInstitution = buildString {
-                    if (item.degree.isNotEmpty()) append(item.degree)
-                    if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
-                    if (item.institution.isNotEmpty()) append(item.institution)
+            // Title and Company together
+            if (item.jobTitle.isNotEmpty() || item.company.isNotEmpty()) {
+                val titleCompany = buildString {
+                    if (item.jobTitle.isNotEmpty()) append(item.jobTitle)
+                    if (item.jobTitle.isNotEmpty() && item.company.isNotEmpty()) append(" at ")
+                    if (item.company.isNotEmpty()) append(item.company)
                 }
 
                 Text(
-                    text = degreeInstitution,
-                    style = element.degreeStyle.toComposeTextStyle(zoomLevel),
+                    text = titleCompany,
+                    style = element.titleStyle.toComposeTextStyle(zoomLevel),
                     modifier = Modifier.weight(1f, fill = false)
                 )
             }
 
             // Dates
-            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
                     style = element.dateStyle.toComposeTextStyle(zoomLevel)
@@ -272,32 +262,18 @@ private fun CompactEducationLayout(
             }
         }
 
-        // Location and GPA Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (element.showLocation && item.location.isNotEmpty()) {
-                Text(
-                    text = item.location,
-                    style = element.locationStyle.toComposeTextStyle(zoomLevel),
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-            }
-
-            if (element.showGPA && item.gpa.isNotEmpty()) {
-                Text(
-                    text = "GPA: ${item.gpa}",
-                    style = element.gpaStyle.toComposeTextStyle(zoomLevel)
-                )
-            }
+        // Location
+        if (element.showLocation && item.location.isNotEmpty()) {
+            Text(
+                text = item.location,
+                style = element.locationStyle.toComposeTextStyle(zoomLevel)
+            )
         }
 
-        // Achievements
-        if (item.achievements.isNotEmpty()) {
-            AchievementList(
-                achievements = item.achievements,
+        // Responsibilities
+        if (item.responsibilities.isNotEmpty()) {
+            ResponsibilityList(
+                responsibilities = item.responsibilities,
                 element = element,
                 zoomLevel = zoomLevel
             )
@@ -309,27 +285,27 @@ private fun CompactEducationLayout(
  * Detailed layout: All fields prominently displayed
  */
 @Composable
-private fun DetailedEducationLayout(
-    item: EducationItem,
-    element: ResumeElement.EducationElement,
+private fun DetailedWorkExperienceLayout(
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy((element.itemSpacing * zoomLevel).dp)
     ) {
-        // Degree
-        if (item.degree.isNotEmpty()) {
+        // Job Title
+        if (item.jobTitle.isNotEmpty()) {
             Text(
-                text = item.degree,
-                style = element.degreeStyle.toComposeTextStyle(zoomLevel)
+                text = item.jobTitle,
+                style = element.titleStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
-        // Institution
-        if (item.institution.isNotEmpty()) {
+        // Company
+        if (item.company.isNotEmpty()) {
             Text(
-                text = item.institution,
-                style = element.institutionStyle.toComposeTextStyle(zoomLevel)
+                text = item.company,
+                style = element.companyStyle.toComposeTextStyle(zoomLevel)
             )
         }
 
@@ -347,7 +323,7 @@ private fun DetailedEducationLayout(
                 )
             }
 
-            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+            if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty() || item.isCurrentRole)) {
                 Text(
                     text = formatDateRange(item, element),
                     style = element.dateStyle.toComposeTextStyle(zoomLevel)
@@ -355,18 +331,10 @@ private fun DetailedEducationLayout(
             }
         }
 
-        // GPA
-        if (element.showGPA && item.gpa.isNotEmpty()) {
-            Text(
-                text = "GPA: ${item.gpa}",
-                style = element.gpaStyle.toComposeTextStyle(zoomLevel)
-            )
-        }
-
-        // Achievements
-        if (item.achievements.isNotEmpty()) {
-            AchievementList(
-                achievements = item.achievements,
+        // Responsibilities
+        if (item.responsibilities.isNotEmpty()) {
+            ResponsibilityList(
+                responsibilities = item.responsibilities,
                 element = element,
                 zoomLevel = zoomLevel
             )
@@ -375,33 +343,33 @@ private fun DetailedEducationLayout(
 }
 
 /**
- * Renders list of achievements with bullets
+ * Renders list of responsibilities with bullets
  */
 @Composable
-private fun AchievementList(
-    achievements: List<AchievementItem>,
-    element: ResumeElement.EducationElement,
+private fun ResponsibilityList(
+    responsibilities: List<ResponsibilityItem>,
+    element: ResumeElement.WorkExperienceElement,
     zoomLevel: Float = 1f
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy((element.achievementSpacing * zoomLevel).dp)
+        verticalArrangement = Arrangement.spacedBy((element.responsibilitySpacing * zoomLevel).dp)
     ) {
-        achievements.forEachIndexed { index, achievement ->
-            if (achievement.text.isNotEmpty()) {
+        responsibilities.forEachIndexed { index, responsibility ->
+            if (responsibility.text.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // Bullet
                     Text(
-                        text = getBulletCharacter(element.bulletStyle, index, achievement),
-                        style = element.achievementStyle.toComposeTextStyle(zoomLevel)
+                        text = getBulletCharacter(element.bulletStyle, index, responsibility),
+                        style = element.responsibilityStyle.toComposeTextStyle(zoomLevel)
                     )
 
-                    // Achievement text
+                    // Responsibility text
                     Text(
-                        text = achievement.text,
-                        style = element.achievementStyle.toComposeTextStyle(zoomLevel),
+                        text = responsibility.text,
+                        style = element.responsibilityStyle.toComposeTextStyle(zoomLevel),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -416,7 +384,7 @@ private fun AchievementList(
 private fun getBulletCharacter(
     bulletStyle: BulletStyle,
     index: Int,
-    achievement: AchievementItem
+    responsibility: ResponsibilityItem
 ): String {
     return when (bulletStyle) {
         BulletStyle.DISC -> "•"
@@ -424,7 +392,7 @@ private fun getBulletCharacter(
         BulletStyle.ARROW -> "→"
         BulletStyle.CHEVRON -> "›"
         BulletStyle.NUMBERED -> "${index + 1}."
-        BulletStyle.CUSTOM_ICON -> achievement.customBullet ?: "•"
+        BulletStyle.CUSTOM_ICON -> responsibility.customBullet ?: "•"
         BulletStyle.NONE -> ""
     }
 }
@@ -433,11 +401,11 @@ private fun getBulletCharacter(
  * Format date range for display
  */
 private fun formatDateRange(
-    item: EducationItem,
-    element: ResumeElement.EducationElement
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement
 ): String {
     val start = formatDate(item.startDate, element.dateFormat)
-    val end = formatDate(item.endDate, element.dateFormat)
+    val end = if (item.isCurrentRole) "Present" else formatDate(item.endDate, element.dateFormat)
 
     return when {
         start.isNotEmpty() && end.isNotEmpty() -> "$start${element.dateSeparator}$end"

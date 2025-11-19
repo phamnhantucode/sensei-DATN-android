@@ -90,10 +90,10 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END
 
-        // Calculate vertical starting position based on vertical alignment
-        val totalItemHeight = element.items.sumOf {
-            if (it.value.isEmpty()) 0.0 else (textPaint.textSize + spacing).toDouble()
-        }.toFloat() - spacing // Remove last spacing
+        // Calculate vertical starting position based on vertical alignment (matching SkillElementPdfRenderer pattern)
+        val itemCount = element.items.count { it.value.isNotEmpty() }
+        val totalItemHeight = itemCount * textPaint.textSize + 
+                              if (itemCount > 1) (spacing * (itemCount - 1)) else 0f
 
         var currentY = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
             VerticalAlignment.TOP -> 0f
@@ -101,8 +101,15 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
             VerticalAlignment.BOTTOM -> bounds.height() - totalItemHeight
         }
 
+        var isFirstItem = true
         element.items.forEach { item ->
             if (item.value.isEmpty()) return@forEach
+
+            // Add spacing between items (not before first item)
+            if (!isFirstItem) {
+                currentY += spacing
+            }
+            isFirstItem = false
 
             // Measure the entire item width
             val itemWidth = measureItemWidth(item, element, textPaint, boldTextPaint, mapper)
@@ -139,7 +146,7 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                 )
             }
 
-            currentY += textPaint.textSize + spacing
+            currentY += textPaint.textSize
         }
     }
 
@@ -165,10 +172,11 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
             VerticalAlignment.BOTTOM -> bounds.height()
         }
 
-        // Calculate total width of all items
+        // Calculate total width of all items (matching SkillElementPdfRenderer pattern)
+        val itemCount = element.items.count { it.value.isNotEmpty() }
         val totalWidth = element.items.filter { it.value.isNotEmpty() }.sumOf {
             measureItemWidth(it, element, textPaint, boldTextPaint, mapper).toDouble()
-        }.toFloat() + (spacing * (element.items.count { it.value.isNotEmpty() } - 1))
+        }.toFloat() + if (itemCount > 1) (spacing * (itemCount - 1)) else 0f
 
         // Calculate horizontal starting position based on horizontal alignment
         var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -177,8 +185,15 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
             HorizontalAlignment.END -> bounds.width() - totalWidth
         }
 
+        var isFirstItem = true
         element.items.forEach { item ->
             if (item.value.isEmpty()) return@forEach
+
+            // Add spacing between items (not before first item)
+            if (!isFirstItem) {
+                currentX += spacing
+            }
+            isFirstItem = false
 
             // Render in order based on iconAfterText
             if (!iconAfterText) {
@@ -203,12 +218,6 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                     canvas, item, element, currentX, baselineY - textPaint.textSize,
                     textPaint, boldTextPaint, mapper, context
                 )
-            } else {
-                currentX += spacing
-            }
-
-            if (!iconAfterText) {
-                currentX += spacing
             }
         }
     }

@@ -10,8 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
@@ -70,7 +68,7 @@ fun CertificationElementRenderer(
                     Modifier
                 }
             )
-            .padding((8  * zoomLevel).dp)
+            .padding((8 * zoomLevel).dp)
     ) {
         // Map alignment enums to Compose alignment values
         val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -99,7 +97,7 @@ fun CertificationElementRenderer(
 
                 // Add spacing between items (but not after last item)
                 if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
+                    Spacer(modifier = Modifier.height(element.spacing.dp))
                 }
             }
         }

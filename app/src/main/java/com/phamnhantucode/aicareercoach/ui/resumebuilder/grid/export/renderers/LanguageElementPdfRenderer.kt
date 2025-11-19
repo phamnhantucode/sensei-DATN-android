@@ -402,7 +402,7 @@ class LanguageElementPdfRenderer : ElementPdfRenderer<ResumeElement.LanguageElem
         // Calculate total height
         val totalHeight = rows.sumOf { row -> 
             row.maxOfOrNull { it.height }?.toDouble() ?: 0.0 
-        }.toFloat() + (rows.size - 1) * spacing / 2
+        }.toFloat() + if (rows.size > 1) (spacing * (rows.size - 1)) else 0f
 
         // Apply vertical alignment
         val startY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
@@ -413,10 +413,17 @@ class LanguageElementPdfRenderer : ElementPdfRenderer<ResumeElement.LanguageElem
 
         // Second pass: render tags
         var currentY = startY
+        var isFirstRow = true
 
         rows.forEach { row ->
+            // Add spacing between rows (not before first row)
+            if (!isFirstRow) {
+                currentY += spacing
+            }
+            isFirstRow = false
+
             val rowHeight = row.maxOfOrNull { it.height } ?: 0f
-            val rowWidth = row.sumOf { it.width.toDouble() }.toFloat() + (spacing * (row.size - 1))
+            val rowWidth = row.sumOf { it.width.toDouble() }.toFloat() + if (row.size > 1) (spacing * (row.size - 1)) else 0f
 
             // Apply horizontal alignment for this row
             var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -425,7 +432,14 @@ class LanguageElementPdfRenderer : ElementPdfRenderer<ResumeElement.LanguageElem
                 HorizontalAlignment.END -> bounds.width() - rowWidth
             }
 
+            var isFirstTag = true
             row.forEach { tag ->
+                // Add spacing between tags in row (not before first tag)
+                if (!isFirstTag) {
+                    currentX += spacing
+                }
+                isFirstTag = false
+
                 // Draw tag background
                 val tagRect = RectF(currentX, currentY, currentX + tag.width, currentY + tag.height)
                 canvas.drawRoundRect(tagRect, tagRadius, tagRadius, tagBackgroundPaint)
@@ -455,10 +469,10 @@ class LanguageElementPdfRenderer : ElementPdfRenderer<ResumeElement.LanguageElem
                     canvas.drawText(tag.proficiencyText, proficiencyX, proficiencyY, proficiencyTextPaint)
                 }
 
-                currentX += tag.width + spacing
+                currentX += tag.width
             }
 
-            currentY += rowHeight + spacing / 2
+            currentY += rowHeight
         }
     }
 

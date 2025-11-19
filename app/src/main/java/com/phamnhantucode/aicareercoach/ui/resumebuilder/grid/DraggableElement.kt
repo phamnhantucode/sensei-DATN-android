@@ -35,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.phamnhantucode.aicareercoach.BuildConfig
 import kotlin.math.roundToInt
+import android.text.TextPaint
+import android.text.StaticLayout
+import android.text.Layout
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * A draggable element on the grid
@@ -47,6 +51,7 @@ fun DraggableElement(
     zoomLevel: Float = 1f,
     isSelected: Boolean = false,
     isDragging: Boolean = false,
+    enabled: Boolean = true,
     onDragStart: (ResumeElement) -> Unit = { _ -> },
     onDrag: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onDragEnd: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
@@ -56,6 +61,7 @@ fun DraggableElement(
     onOpenProperties: (ResumeElement) -> Unit = { _ -> },
     content: @Composable BoxScope.() -> Unit
 ) {
+    val context = LocalContext.current
     val density = LocalDensity.current.density
     val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
@@ -92,8 +98,9 @@ fun DraggableElement(
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
     } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
-        // For wrap content, we'll use a placeholder height that will be adjusted by the content
-        element.position.rowSpan * cellSizePx // Use rowSpan as max height
+        // Calculate actual content height for wrap content mode
+        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+        actualContentHeight ?: (element.position.rowSpan * cellSizePx) // Fallback to rowSpan if calculation fails
     } else {
         element.position.rowSpan * cellSizePx
     }
@@ -117,23 +124,9 @@ fun DraggableElement(
                     y = (baseY + offsetY).roundToInt()
                 )
             }
-            .then(
-                if (element.position.widthMode == SizeMode.WRAP_CONTENT && element.position.heightMode == SizeMode.WRAP_CONTENT) {
-                    Modifier.wrapContentSize()
-                } else if (element.position.widthMode == SizeMode.WRAP_CONTENT) {
-                    Modifier
-                        .wrapContentWidth()
-                        .height(GridUtils.pxToDp(interactionHeight, density))
-                } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
-                    Modifier
-                        .width(GridUtils.pxToDp(width, density))
-                        .wrapContentHeight()
-                } else {
-                    Modifier.size(
-                        width = GridUtils.pxToDp(width, density),
-                        height = GridUtils.pxToDp(interactionHeight, density)
-                    )
-                }
+            .size(
+                width = GridUtils.pxToDp(width, density),
+                height = GridUtils.pxToDp(interactionHeight, density)
             )
             .graphicsLayer {
                 // Scale up slightly when dragging for visual feedback
@@ -150,120 +143,122 @@ fun DraggableElement(
                     if (isDragging) 8f else if (isSelected) 4f else 0f
                 }
             }
-            .pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, interactionHeight) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    // Consume down event immediately to prevent parent from also handling it
-                    down.consume()
+            .then(
+                if (enabled) {
+                    Modifier.pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, interactionHeight) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            // Consume down event to prevent parent from handling it
+                            down.consume()
 
-                    // Check if touch is on a resize handle (only for selected, unlocked elements)
-                    if (isSelected && !element.locked) {
-                        val handleHitSize = 16.dp.toPx() // Hit area for handles (2x the 8dp visual size)
-                        val touchX = down.position.x
-                        val touchY = down.position.y
+                            // Check if touch is on a resize handle (only for selected, unlocked elements)
+                            if (isSelected && !element.locked) {
+                                val handleHitSize = 16.dp.toPx() // Hit area for handles (2x the 8dp visual size)
+                                val touchX = down.position.x
+                                val touchY = down.position.y
 
-                        if (isTouchOnResizeHandle(touchX, touchY, width, interactionHeight, handleHitSize)) {
-                            // Touch is on a resize handle - let resize handle process it
-                            return@awaitEachGesture
-                        }
-                    }
-
-                    var hasDragged = false
-                    var dragStartCalled = false
-
-                    // Try to detect drag
-                    if (!element.locked) {
-                        // Element is unlocked - allow dragging
-                        drag(down.id) { change ->
-                            if (!hasDragged) {
-                                hasDragged = true
-                                if (!dragStartCalled) {
-                                    onDragStart(element)
-                                    dragStartCalled = true
+                                if (isTouchOnResizeHandle(touchX, touchY, width, interactionHeight, handleHitSize)) {
+                                    // Touch is on a resize handle - let resize handle process it
+                                    return@awaitEachGesture
                                 }
                             }
 
-                            val dragAmount = change.positionChange()
-                            change.consume()
+                            var hasDragged = false
+                            var dragStartCalled = false
 
-                            offsetX += dragAmount.x
-                            offsetY += dragAmount.y
+                            // Try to detect drag
+                            if (!element.locked) {
+                                // Element is unlocked - allow dragging
+                                drag(down.id) { change ->
+                                    if (!hasDragged) {
+                                        hasDragged = true
+                                        if (!dragStartCalled) {
+                                            onDragStart(element)
+                                            dragStartCalled = true
+                                        }
+                                    }
 
-                            // Calculate grid bounds in pixels
-                            val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
-                            val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
+                                    val dragAmount = change.positionChange()
+                                    change.consume()
 
-                            // Clamp offsets to keep element within bounds
-                            val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
-                            val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
+                                    offsetX += dragAmount.x
+                                    offsetY += dragAmount.y
 
-                            // Update offsets to clamped values
-                            offsetX = clampedX - baseX
-                            offsetY = clampedY - baseY
+                                    // Calculate grid bounds in pixels
+                                    val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
+                                    val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
 
-                            // Calculate current grid position with snap
-                            val (newRow, newCol) = GridUtils.offsetToGridPosition(
-                                offsetX = clampedX,
-                                offsetY = clampedY,
-                                cellSizePx = cellSizePx,
-                                snapEnabled = gridConfig.snapToGrid,
-                                threshold = gridConfig.snapThreshold
-                            )
+                                    // Clamp offsets to keep element within bounds
+                                    val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
+                                    val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
 
-                            currentDragPosition = GridPosition(
-                                row = newRow,
-                                col = newCol,
-                                rowSpan = element.position.rowSpan,
-                                colSpan = element.position.colSpan
-                            )
+                                    // Update offsets to clamped values
+                                    offsetX = clampedX - baseX
+                                    offsetY = clampedY - baseY
 
-                            onDrag(element, currentDragPosition)
-                        }
-                    } else {
-                        // Element is locked - consume the drag gesture without allowing movement
-                        drag(down.id) { change ->
-                            // Consume the gesture but don't update position
-                            change.consume()
+                                    // Calculate current grid position with snap
+                                    val (newRow, newCol) = GridUtils.offsetToGridPosition(
+                                        offsetX = clampedX,
+                                        offsetY = clampedY,
+                                        cellSizePx = cellSizePx,
+                                        snapEnabled = gridConfig.snapToGrid,
+                                        threshold = gridConfig.snapThreshold
+                                    )
+
+                                    currentDragPosition = element.position.copy(
+                                        row = newRow,
+                                        col = newCol
+                                    )
+
+                                    onDrag(element, currentDragPosition)
+                                }
+                            } else {
+                                // Element is locked - consume the drag gesture without allowing movement
+                                drag(down.id) { change ->
+                                    // Consume the gesture but don't update position
+                                    change.consume()
+                                }
+                            }
+
+                            // Handle end of gesture
+                            if (!hasDragged) {
+                                // This was a tap, not a drag
+                                if (isSelected) {
+                                    // Already selected - open properties panel
+                                    onOpenProperties(element)
+                                } else {
+                                    // Not selected - select it
+                                    onSelect(element)
+                                }
+                            } else {
+                                // This was a drag - handle position update
+                                val finalPosition = if (gridConfig.snapToGrid) {
+                                    val snappedX = GridUtils.snapToGrid(baseX + offsetX, cellSizePx)
+                                    val snappedY = GridUtils.snapToGrid(baseY + offsetY, cellSizePx)
+
+                                    val row = GridUtils.pxToGrid(snappedY, cellSizePx)
+                                    val col = GridUtils.pxToGrid(snappedX, cellSizePx)
+
+                                    val position = element.position.copy(
+                                        row = row,
+                                        col = col
+                                    )
+
+                                    // Clamp to ensure it's within bounds
+                                    GridUtils.clampPosition(position, gridConfig)
+                                } else {
+                                    // Clamp the current drag position to bounds
+                                    GridUtils.clampPosition(currentDragPosition, gridConfig)
+                                }
+
+                                onDragEnd(element, finalPosition)
+                            }
                         }
                     }
-
-                    // Handle end of gesture
-                    if (!hasDragged) {
-                        // This was a tap, not a drag
-                        if (isSelected) {
-                            // Already selected - open properties panel
-                            onOpenProperties(element)
-                        } else {
-                            // Not selected - select it
-                            onSelect(element)
-                        }
-                    } else {
-                        // This was a drag - handle position update
-                        val finalPosition = if (gridConfig.snapToGrid) {
-                            val snappedX = GridUtils.snapToGrid(baseX + offsetX, cellSizePx)
-                            val snappedY = GridUtils.snapToGrid(baseY + offsetY, cellSizePx)
-
-                            val row = GridUtils.pxToGrid(snappedY, cellSizePx)
-                            val col = GridUtils.pxToGrid(snappedX, cellSizePx)
-
-                            val position = GridPosition(
-                                row = row,
-                                col = col,
-                                rowSpan = element.position.rowSpan,
-                                colSpan = element.position.colSpan
-                            )
-
-                            // Clamp to ensure it's within bounds
-                            GridUtils.clampPosition(position, gridConfig)
-                        } else {
-                            // Clamp the current drag position to bounds
-                            GridUtils.clampPosition(currentDragPosition, gridConfig)
-                        }
-
-                        onDragEnd(element, finalPosition)
-                    }
+                } else {
+                    Modifier
                 }
-            }
+            )
     ) {
         // Content (rendered first, at the bottom)
         content()
@@ -275,6 +270,7 @@ fun DraggableElement(
                 gridConfig = gridConfig,
                 cellSizePx = cellSizePx,
                 zoomLevel = zoomLevel,
+                enabled = enabled,
                 onResize = onResize
             )
         }
@@ -307,6 +303,7 @@ private fun BoxScope.SelectionBorder(
     gridConfig: GridConfig,
     cellSizePx: Float,
     zoomLevel: Float,
+    enabled: Boolean,
     onResize: (ResumeElement, GridPosition) -> Unit
 ) {
     Box(
@@ -320,11 +317,12 @@ private fun BoxScope.SelectionBorder(
     )
 
     // Resize handles (corners and edges)
-    if (!element.locked) {
+    if (!element.locked && enabled) {
         ResizeHandles(
             element = element,
             cellSizePx = cellSizePx,
             zoomLevel = zoomLevel,
+            gridConfig = gridConfig,
             onResize = onResize
         )
     }
@@ -338,6 +336,7 @@ private fun BoxScope.ResizeHandles(
     element: ResumeElement,
     cellSizePx: Float,
     zoomLevel: Float,
+    gridConfig: GridConfig,
     onResize: (ResumeElement, GridPosition) -> Unit
 ) {
     val handleSize = 8.dp
@@ -376,7 +375,8 @@ private fun BoxScope.ResizeHandles(
             deltaX = accumulatedDeltaX,
             deltaY = accumulatedDeltaY,
             cellSizePx = cellSizePx,
-            enforceSquare = enforceSquare
+            enforceSquare = enforceSquare,
+            gridConfig = gridConfig
         )
         onResize(element, newPosition)
     }
@@ -571,6 +571,7 @@ fun DragGhost(
     isValid: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val context = LocalContext.current
     val density = LocalDensity.current.density
     val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
@@ -586,6 +587,11 @@ fun DragGhost(
 
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
+    } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
+        // Calculate actual content height for wrap content mode
+        // We use the element's original position heightMode, but the current width (which depends on colSpan)
+        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+        actualContentHeight ?: (position.rowSpan * cellSizePx)
     } else {
         position.rowSpan * cellSizePx
     }
@@ -686,7 +692,8 @@ fun calculateResizedPosition(
     deltaX: Float,
     deltaY: Float,
     cellSizePx: Float,
-    enforceSquare: Boolean = false
+    enforceSquare: Boolean = false,
+    gridConfig: GridConfig? = null
 ): GridPosition {
     val deltaCol = (deltaX / cellSizePx).roundToInt()
     val deltaRow = (deltaY / cellSizePx).roundToInt()
@@ -770,5 +777,622 @@ fun calculateResizedPosition(
         else -> originalPosition // Edge handles not implemented yet
     }
 
-    return newPosition
+    // Clamp to grid bounds if gridConfig is provided
+    return if (gridConfig != null) {
+        GridUtils.clampPosition(newPosition, gridConfig)
+    } else {
+        newPosition
+    }
+}
+
+/**
+ * Calculate the actual content height for an element when heightMode is WRAP_CONTENT
+ */
+private fun calculateContentHeight(
+    element: ResumeElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float? {
+    return when (element) {
+        is ResumeElement.TextElement -> {
+            calculateTextContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.WorkExperienceElement -> {
+            calculateWorkExperienceContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.ProjectElement -> {
+            calculateProjectContentHeight(element, width, density, zoomLevel, context)
+        }
+        // Add more element types as needed
+        else -> null
+    }
+}
+
+/**
+ * Calculate text content height using StaticLayout (same as renderer)
+ */
+private fun calculateTextContentHeight(
+    element: ResumeElement.TextElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.content.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty text
+    }
+
+    // Calculate base dimensions (unscaled) - matching TextElementRenderer logic
+    val basePadding = 8f * density // 8dp in pixels
+    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    
+    // Create text paint with base text size (no zoom) - matching TextElementRenderer
+    val textPaint = TextPaint().apply {
+        isAntiAlias = true
+        textSize = element.textStyle.fontSize * density // No zoom applied
+        color = element.textStyle.color.toInt()
+        
+        // Use Poppins font with proper weight mapping
+        typeface = FontManager.getPoppinsTypeface(
+            context,
+            element.textStyle.fontWeight,
+            element.textStyle.isItalic
+        )
+        
+        isUnderlineText = element.textStyle.isUnderlined
+        letterSpacing = element.textStyle.letterSpacing
+    }
+    
+    // Create layout with base width - matching TextElementRenderer
+    val layoutAlignment = when (element.alignment) {
+        TextAlignment.LEFT -> Layout.Alignment.ALIGN_NORMAL
+        TextAlignment.CENTER -> Layout.Alignment.ALIGN_CENTER
+        TextAlignment.RIGHT -> Layout.Alignment.ALIGN_OPPOSITE
+        TextAlignment.JUSTIFY -> Layout.Alignment.ALIGN_NORMAL
+    }
+    
+    val lineSpacingMultiplier = element.textStyle.lineHeight?.let {
+        it / element.textStyle.fontSize
+    } ?: 1.0f
+    
+    val builder = StaticLayout.Builder
+        .obtain(element.content, 0, element.content.length, textPaint, baseWidth.toInt().coerceAtLeast(1))
+        .setAlignment(layoutAlignment)
+        .setLineSpacing(0f, lineSpacingMultiplier)
+        .setIncludePad(false)
+        .setMaxLines(element.maxLines ?: Int.MAX_VALUE)
+    
+    if (element.alignment == TextAlignment.JUSTIFY && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        builder.setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
+    } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        builder.setJustificationMode(Layout.JUSTIFICATION_MODE_NONE)
+    }
+    
+    val layout = builder.build()
+    
+    // Calculate actual content height
+    val topPadding = layout.getLineTop(0).toFloat()
+    val textHeight = layout.height.toFloat() - topPadding
+    
+    // Add padding and apply zoom
+    val totalHeight = (textHeight + (basePadding * 2)) * zoomLevel
+    
+    return totalHeight
+}
+
+/**
+ * Calculate work experience content height using StaticLayout (matching PDF renderer logic)
+ */
+private fun calculateWorkExperienceContentHeight(
+    element: ResumeElement.WorkExperienceElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled)
+    val basePadding = 8f * density // 8dp in pixels
+    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    
+    // Create text paints for different styles (no zoom applied)
+    val titlePaint = createWorkExperienceTextPaint(element.titleStyle, density, context)
+    val companyPaint = createWorkExperienceTextPaint(element.companyStyle, density, context)
+    val datePaint = createWorkExperienceTextPaint(element.dateStyle, density, context)
+    val locationPaint = createWorkExperienceTextPaint(element.locationStyle, density, context)
+    val responsibilityPaint = createWorkExperienceTextPaint(element.responsibilityStyle, density, context)
+    
+    // Calculate spacing values
+    val spacing = element.spacing * density
+    val itemSpacing = element.itemSpacing * density
+    val responsibilitySpacing = element.responsibilitySpacing * density
+    
+    var totalHeight = 0f
+    
+    // Calculate height for each work experience item
+    element.items.forEachIndexed { index, item ->
+        var itemHeight = 0f
+        var partCount = 0
+        
+        when (element.displayStyle) {
+            WorkExperienceDisplayStyle.STANDARD -> {
+                // Job Title
+                if (item.jobTitle.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.jobTitle, titlePaint, baseWidth)
+                    itemHeight += layout.height.toFloat()
+                    partCount++
+                }
+                
+                // Company (and date if shown)
+                if (item.company.isNotEmpty()) {
+                    val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                    val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                    val availableCompanyWidth = if (dateText.isNotEmpty()) baseWidth - dateWidth - itemSpacing else baseWidth
+                    
+                    val companyLayout = createSimpleLayout(item.company, companyPaint, availableCompanyWidth)
+                    itemHeight += companyLayout.height.toFloat()
+                    partCount++
+                } else if (element.showDates) {
+                    val dateMetrics = datePaint.fontMetrics
+                    itemHeight += dateMetrics.descent - dateMetrics.ascent
+                    partCount++
+                }
+                
+                // Location
+                if (element.showLocation && item.location.isNotEmpty()) {
+                    val locationLayout = createSimpleLayout(item.location, locationPaint, baseWidth)
+                    itemHeight += locationLayout.height.toFloat()
+                    partCount++
+                }
+            }
+            WorkExperienceDisplayStyle.COMPACT -> {
+                // Title + Company on same line
+                val titleCompany = buildString {
+                    if (item.jobTitle.isNotEmpty()) append(item.jobTitle)
+                    if (item.jobTitle.isNotEmpty() && item.company.isNotEmpty()) append(" at ")
+                    if (item.company.isNotEmpty()) append(item.company)
+                }
+                
+                if (titleCompany.isNotEmpty()) {
+                    val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                    val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                    val availableTitleWidth = if (dateText.isNotEmpty()) baseWidth - dateWidth - itemSpacing else baseWidth
+                    
+                    val titleLayout = createSimpleLayout(titleCompany, titlePaint, availableTitleWidth)
+                    itemHeight += titleLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Location
+                if (element.showLocation && item.location.isNotEmpty()) {
+                    val locationLayout = createSimpleLayout(item.location, locationPaint, baseWidth)
+                    itemHeight += locationLayout.height.toFloat()
+                    partCount++
+                }
+            }
+            WorkExperienceDisplayStyle.DETAILED -> {
+                // Job Title
+                if (item.jobTitle.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.jobTitle, titlePaint, baseWidth)
+                    itemHeight += layout.height.toFloat()
+                    partCount++
+                }
+                
+                // Company
+                if (item.company.isNotEmpty()) {
+                    val companyLayout = createSimpleLayout(item.company, companyPaint, baseWidth)
+                    itemHeight += companyLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Location (and date if shown)
+                if (element.showLocation && item.location.isNotEmpty()) {
+                    val dateText = if (element.showDates) formatDateRange(item, element) else ""
+                    val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                    val availableLocationWidth = if (dateText.isNotEmpty()) baseWidth - dateWidth - itemSpacing else baseWidth
+                    
+                    val locationLayout = createSimpleLayout(item.location, locationPaint, availableLocationWidth)
+                    itemHeight += locationLayout.height.toFloat()
+                    partCount++
+                } else if (element.showDates) {
+                    val dateMetrics = datePaint.fontMetrics
+                    itemHeight += dateMetrics.descent - dateMetrics.ascent
+                    partCount++
+                }
+            }
+        }
+        
+        // Add responsibilities height
+        if (item.responsibilities.isNotEmpty()) {
+            item.responsibilities.forEachIndexed { respIndex, responsibility ->
+                if (responsibility.text.isNotEmpty()) {
+                    val bullet = getBulletCharacter(element.bulletStyle, respIndex, responsibility)
+                    val bulletWidth = responsibilityPaint.measureText("$bullet ")
+                    val textWidth = baseWidth - bulletWidth
+                    
+                    val textLayout = createSimpleLayout(responsibility.text, responsibilityPaint, textWidth)
+                    itemHeight += textLayout.height.toFloat()
+                    
+                    // Add spacing between responsibilities (not after last)
+                    if (respIndex < item.responsibilities.size - 1) {
+                        itemHeight += responsibilitySpacing
+                    }
+                }
+            }
+            
+            // Add spacing before responsibilities if there's content above
+            if (partCount > 0) {
+                itemHeight += itemSpacing
+            }
+        }
+        
+        totalHeight += itemHeight
+        
+        // Add spacing between items (but not after last item)
+        if (index < element.items.size - 1) {
+            totalHeight += spacing
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + (basePadding * 2)) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Create text paint for work experience fields
+ */
+private fun createWorkExperienceTextPaint(
+    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    density: Float,
+    context: android.content.Context
+): TextPaint {
+    return TextPaint().apply {
+        isAntiAlias = true
+        textSize = textStyle.fontSize * density
+        color = textStyle.color.toInt()
+        
+        typeface = FontManager.getPoppinsTypeface(
+            context,
+            textStyle.fontWeight,
+            textStyle.isItalic
+        )
+        
+        isUnderlineText = textStyle.isUnderlined
+        letterSpacing = textStyle.letterSpacing
+    }
+}
+
+/**
+ * Create simple text layout for measurements
+ */
+private fun createSimpleLayout(
+    text: String,
+    paint: TextPaint,
+    width: Float
+): StaticLayout {
+    return StaticLayout.Builder
+        .obtain(text, 0, text.length, paint, width.toInt().coerceAtLeast(1))
+        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+        .setLineSpacing(0f, 1f)
+        .setIncludePad(false)
+        .build()
+}
+
+/**
+ * Get bullet character based on bullet style
+ */
+private fun getBulletCharacter(
+    bulletStyle: BulletStyle,
+    index: Int,
+    responsibility: ResponsibilityItem
+): String {
+    return when (bulletStyle) {
+        BulletStyle.DISC -> "•"
+        BulletStyle.DASH -> "-"
+        BulletStyle.ARROW -> "→"
+        BulletStyle.CHEVRON -> "›"
+        BulletStyle.NUMBERED -> "${index + 1}."
+        BulletStyle.CUSTOM_ICON -> responsibility.customBullet ?: "•"
+        BulletStyle.NONE -> ""
+    }
+}
+
+/**
+ * Format date range for display
+ */
+private fun formatDateRange(
+    item: WorkExperienceItem,
+    element: ResumeElement.WorkExperienceElement
+): String {
+    val start = formatDate(item.startDate, element.dateFormat)
+    val end = if (item.isCurrentRole) "Present" else formatDate(item.endDate, element.dateFormat)
+    
+    return when {
+        start.isNotEmpty() && end.isNotEmpty() -> "$start${element.dateSeparator}$end"
+        start.isNotEmpty() -> start
+        end.isNotEmpty() -> end
+        else -> ""
+    }
+}
+
+/**
+ * Format a single date string based on date format
+ */
+private fun formatDate(dateString: String, dateFormat: DateFormat): String {
+    if (dateString.isEmpty()) return ""
+    
+    return try {
+        val date = java.time.LocalDate.parse(dateString)
+        
+        when (dateFormat) {
+            DateFormat.MMM_YYYY -> date.format(java.time.format.DateTimeFormatter.ofPattern("MMM yyyy"))
+            DateFormat.MM_YYYY -> date.format(java.time.format.DateTimeFormatter.ofPattern("MM/yyyy"))
+            DateFormat.FULL -> date.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy"))
+            DateFormat.SHORT -> date.format(java.time.format.DateTimeFormatter.ofPattern("M/yy"))
+            DateFormat.YYYY -> date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy"))
+        }
+    } catch (e: Exception) {
+        dateString // Return original if parsing fails
+    }
+}
+
+/**
+ * Calculate project content height using StaticLayout (matching PDF renderer logic)
+ */
+private fun calculateProjectContentHeight(
+    element: ResumeElement.ProjectElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled)
+    val basePadding = 8f * density // 8dp in pixels
+    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    
+    // Create text paints for different styles (no zoom applied)
+    val namePaint = createWorkExperienceTextPaint(element.nameStyle, density, context)
+    val descriptionPaint = createWorkExperienceTextPaint(element.descriptionStyle, density, context)
+    val datePaint = createWorkExperienceTextPaint(element.dateStyle, density, context)
+    val technologyPaint = createWorkExperienceTextPaint(element.technologyStyle, density, context)
+    val highlightPaint = createWorkExperienceTextPaint(element.highlightStyle, density, context)
+    val linkPaint = createWorkExperienceTextPaint(element.linkStyle, density, context)
+    
+    // Calculate spacing values
+    val spacing = element.spacing * density
+    val itemSpacing = element.itemSpacing * density
+    val highlightSpacing = element.highlightSpacing * density
+    
+    var totalHeight = 0f
+    
+    // Calculate height for each project item
+    element.items.forEachIndexed { index, item ->
+        var itemHeight = 0f
+        var partCount = 0
+        
+        when (element.displayStyle) {
+            ProjectDisplayStyle.STANDARD -> {
+                // Project Name and Date on same row
+                if (item.name.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.name, namePaint, baseWidth)
+                    itemHeight += layout.height.toFloat()
+                    partCount++
+                }
+                
+                // Technologies (as tags with padding)
+                if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                    val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    if (technologies.isNotEmpty()) {
+                        val tagPadding = 8f * density
+                        val verticalPadding = 6f * density
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
+                    }
+                }
+                
+                // Description
+                if (element.showDescription && item.description.isNotEmpty()) {
+                    val descLayout = createSimpleLayout(item.description, descriptionPaint, baseWidth)
+                    itemHeight += descLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Link
+                if (element.showLink && item.link.isNotEmpty()) {
+                    val linkLayout = createSimpleLayout(item.link, linkPaint, baseWidth)
+                    itemHeight += linkLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Add spacing between parts
+                if (partCount > 1) {
+                    itemHeight += itemSpacing * (partCount - 1)
+                }
+            }
+            ProjectDisplayStyle.COMPACT -> {
+                // Name + Date on same line
+                val nameAndDate = buildString {
+                    if (item.name.isNotEmpty()) append(item.name)
+                }
+                
+                if (nameAndDate.isNotEmpty()) {
+                    val dateText = if (element.showDates) formatProjectDateRange(item) else ""
+                    val dateWidth = if (dateText.isNotEmpty()) datePaint.measureText(dateText) else 0f
+                    val availableNameWidth = if (dateText.isNotEmpty()) baseWidth - dateWidth - itemSpacing else baseWidth
+                    
+                    val nameLayout = createSimpleLayout(nameAndDate, namePaint, availableNameWidth)
+                    itemHeight += nameLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Technologies (as tags with padding)
+                if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                    val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    if (technologies.isNotEmpty()) {
+                        val tagPadding = 8f * density
+                        val verticalPadding = 6f * density
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
+                    }
+                }
+                
+                // Description
+                if (element.showDescription && item.description.isNotEmpty()) {
+                    val descLayout = createSimpleLayout(item.description, descriptionPaint, baseWidth)
+                    itemHeight += descLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Link
+                if (element.showLink && item.link.isNotEmpty()) {
+                    val linkLayout = createSimpleLayout(item.link, linkPaint, baseWidth)
+                    itemHeight += linkLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Add spacing between parts
+                if (partCount > 1) {
+                    itemHeight += itemSpacing * (partCount - 1)
+                }
+            }
+            ProjectDisplayStyle.DETAILED -> {
+                // Project Name
+                if (item.name.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.name, namePaint, baseWidth)
+                    itemHeight += layout.height.toFloat()
+                    partCount++
+                }
+                
+                // Date
+                if (element.showDates) {
+                    val dateText = formatProjectDateRange(item)
+                    if (dateText.isNotEmpty()) {
+                        val dateMetrics = datePaint.fontMetrics
+                        itemHeight += dateMetrics.descent - dateMetrics.ascent
+                        partCount++
+                    }
+                }
+                
+                // Technologies (as tags with padding)
+                if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                    val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    if (technologies.isNotEmpty()) {
+                        val tagPadding = 8f * density
+                        val verticalPadding = 6f * density
+                        val fontMetrics = technologyPaint.fontMetrics
+                        val textActualHeight = fontMetrics.descent - fontMetrics.ascent
+                        val tagHeight = textActualHeight + verticalPadding * 2
+                        itemHeight += tagHeight
+                        partCount++
+                    }
+                }
+                
+                // Link
+                if (element.showLink && item.link.isNotEmpty()) {
+                    val linkLayout = createSimpleLayout(item.link, linkPaint, baseWidth)
+                    itemHeight += linkLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Description
+                if (element.showDescription && item.description.isNotEmpty()) {
+                    val descLayout = createSimpleLayout(item.description, descriptionPaint, baseWidth)
+                    itemHeight += descLayout.height.toFloat()
+                    partCount++
+                }
+                
+                // Add spacing between parts
+                if (partCount > 1) {
+                    itemHeight += itemSpacing * (partCount - 1)
+                }
+            }
+        }
+        
+        // Add highlights height
+        if (item.highlights.isNotEmpty()) {
+            item.highlights.forEachIndexed { highlightIndex, highlight ->
+                if (highlight.text.isNotEmpty()) {
+                    val bullet = getBulletCharacter(element.bulletStyle, highlightIndex, highlight)
+                    val bulletWidth = highlightPaint.measureText("$bullet ")
+                    val textWidth = baseWidth - bulletWidth
+                    
+                    val textLayout = createSimpleLayout(highlight.text, highlightPaint, textWidth)
+                    itemHeight += textLayout.height.toFloat()
+                    
+                    // Add spacing between highlights (not after last)
+                    if (highlightIndex < item.highlights.size - 1) {
+                        itemHeight += highlightSpacing
+                    }
+                }
+            }
+            
+            // Add spacing before highlights if there's content above
+            if (partCount > 0) {
+                itemHeight += itemSpacing
+            }
+        }
+        
+        totalHeight += itemHeight
+        
+        // Add spacing between items (but not after last item)
+        if (index < element.items.size - 1) {
+            totalHeight += spacing
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + (basePadding * 2)) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Get bullet character for project highlights
+ */
+private fun getBulletCharacter(
+    bulletStyle: BulletStyle,
+    index: Int,
+    highlight: ProjectHighlight
+): String {
+    return when (bulletStyle) {
+        BulletStyle.DISC -> "•"
+        BulletStyle.DASH -> "-"
+        BulletStyle.ARROW -> "→"
+        BulletStyle.CHEVRON -> "›"
+        BulletStyle.NUMBERED -> "${index + 1}."
+        BulletStyle.CUSTOM_ICON -> highlight.customBullet ?: "•"
+        BulletStyle.NONE -> ""
+    }
+}
+
+/**
+ * Format project date range for display
+ */
+private fun formatProjectDateRange(item: ProjectItem): String {
+    val start = if (item.startDate.isNotEmpty()) item.startDate else ""
+    val end = if (item.isOngoing) "Ongoing" else item.endDate
+    
+    return when {
+        start.isNotEmpty() && end.isNotEmpty() -> "$start - $end"
+        start.isNotEmpty() -> start
+        end.isNotEmpty() -> end
+        else -> ""
+    }
 }

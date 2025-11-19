@@ -1,30 +1,24 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
+import android.graphics.Paint
+import android.graphics.RectF
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
 
 /**
  * Renders a language element on the resume
  * Displays a list of languages with proficiency levels in various visual styles
+ * Uses Canvas rendering for proper zoom handling without clipping issues
  */
 @Composable
 fun LanguageElementRenderer(
@@ -32,59 +26,43 @@ fun LanguageElementRenderer(
     zoomLevel: Float = 1f,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor = element.style.backgroundColor?.let { Color(it) }
-    val borderColor = element.style.borderColor?.let { Color(it) }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (backgroundColor != null) {
-                    Modifier.background(
-                        color = backgroundColor,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
-                    )
-                } else {
-                    Modifier
+    val context = LocalContext.current
+    
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
+            val density = context.resources.displayMetrics.density
+            
+            // Calculate base dimensions (unscaled)
+            val basePadding = 8f * density
+            val baseWidth = (size.width / zoomLevel) - (basePadding * 2)
+            val baseHeight = (size.height / zoomLevel) - (basePadding * 2)
+            
+            // Apply zoom via Canvas scaling
+            nativeCanvas.save()
+            nativeCanvas.scale(zoomLevel, zoomLevel)
+            nativeCanvas.translate(basePadding, basePadding)
+            
+            // Clip to content bounds
+            nativeCanvas.clipRect(0f, 0f, baseWidth, baseHeight)
+            
+            // Render based on display style
+            when (element.displayStyle) {
+                LanguageDisplayStyle.TEXT_LABELS -> {
+                    drawTextLabelsLanguageLayout(nativeCanvas, element, context, baseWidth, baseHeight, density)
                 }
-            )
-            .then(
-                if (borderColor != null && element.style.borderWidth > 0) {
-                    Modifier
-                        .border(
-                            width = element.style.borderWidth.dp,
-                            color = borderColor,
-                            shape = RoundedCornerShape(element.style.borderRadius.dp)
-                        )
-                } else {
-                    Modifier
+                LanguageDisplayStyle.PROGRESS_BARS -> {
+                    drawProgressBarsLanguageLayout(nativeCanvas, element, context, baseWidth, baseHeight, density)
                 }
-            )
-            .then(
-                if (element.style.shadowBlur > 0) {
-                    Modifier.shadow(
-                        elevation = element.style.shadowBlur.dp,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
-                    )
-                } else {
-                    Modifier
+                LanguageDisplayStyle.DOTS -> {
+                    drawDotsLanguageLayout(nativeCanvas, element, context, baseWidth, baseHeight, density)
                 }
-            )
-            .padding((8 * zoomLevel).dp)
-    ) {
-        when (element.displayStyle) {
-            LanguageDisplayStyle.TEXT_LABELS -> {
-                TextLabelsLanguageLayout(element, zoomLevel)
+                LanguageDisplayStyle.TAGS -> {
+                    drawTagsLanguageLayout(nativeCanvas, element, context, baseWidth, baseHeight, density)
+                }
             }
-            LanguageDisplayStyle.PROGRESS_BARS -> {
-                ProgressBarsLanguageLayout(element, zoomLevel)
-            }
-            LanguageDisplayStyle.DOTS -> {
-                DotsLanguageLayout(element, zoomLevel)
-            }
-            LanguageDisplayStyle.TAGS -> {
-                TagsLanguageLayout(element, zoomLevel)
-            }
+            
+            nativeCanvas.restore()
         }
     }
 }
@@ -92,279 +70,391 @@ fun LanguageElementRenderer(
 /**
  * Text labels layout: Simple text layout (Language - Proficiency)
  */
-@Composable
-private fun TextLabelsLanguageLayout(
+private fun drawTextLabelsLanguageLayout(
+    canvas: android.graphics.Canvas,
     element: ResumeElement.LanguageElement,
-    zoomLevel: Float = 1f
+    context: android.content.Context,
+    width: Float,
+    height: Float,
+    density: Float
 ) {
-    val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-        HorizontalAlignment.START -> Alignment.Start
-        HorizontalAlignment.CENTER -> Alignment.CenterHorizontally
-        HorizontalAlignment.END -> Alignment.End
-    }
-
-    val verticalArrangementForColumn = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
-        VerticalAlignment.TOP -> Arrangement.Top
-        VerticalAlignment.CENTER -> Arrangement.Center
-        VerticalAlignment.BOTTOM -> Arrangement.Bottom
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = verticalArrangementForColumn,
-        horizontalAlignment = horizontalAlignmentForColumn
-    ) {
-        element.items.forEachIndexed { index, item ->
-            if (item.name.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Language name
-                    Text(
-                        text = item.name,
-                        style = element.languageStyle.toComposeTextStyle(zoomLevel),
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
-                    // Proficiency label
-                    val proficiencyText = getProficiencyText(item, element.proficiencyType)
-                    if (proficiencyText.isNotEmpty()) {
-                        Text(
-                            text = proficiencyText,
-                            style = element.proficiencyLabelStyle.toComposeTextStyle(zoomLevel)
-                        )
-                    }
-                }
-
-                // Add spacing between items (but not after last item)
-                if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
-                }
-            }
+    val languageTextPaint = createTextPaint(element.languageStyle, context)
+    val proficiencyTextPaint = createTextPaint(element.proficiencyLabelStyle, context)
+    val spacing = element.spacing * density
+    
+    // Calculate layouts for all items
+    val layouts = mutableListOf<Triple<String, String, Float>>()
+    var totalHeight = 0f
+    
+    element.items.forEach { item ->
+        if (item.name.isNotEmpty()) {
+            val proficiencyText = getProficiencyText(item, element.proficiencyType)
+            val itemHeight = languageTextPaint.textSize.coerceAtLeast(proficiencyTextPaint.textSize)
+            layouts.add(Triple(item.name, proficiencyText, itemHeight))
+            totalHeight += itemHeight
         }
+    }
+    
+    if (layouts.size > 1) {
+        totalHeight += spacing * (layouts.size - 1)
+    }
+    
+    // Apply vertical alignment
+    var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+        VerticalAlignment.TOP -> 0f
+        VerticalAlignment.CENTER -> (height - totalHeight) / 2f
+        VerticalAlignment.BOTTOM -> height - totalHeight
+    }
+    
+    // Draw each item
+    var isFirstItem = true
+    layouts.forEach { (name, proficiencyText, itemHeight) ->
+        if (!isFirstItem) {
+            currentY += spacing
+        }
+        isFirstItem = false
+        
+        val nameWidth = languageTextPaint.measureText(name)
+        val proficiencyWidth = if (proficiencyText.isNotEmpty()) proficiencyTextPaint.measureText(proficiencyText) else 0f
+        
+        // Draw language name - aligned according to horizontalAlignment
+        val nameX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (width - nameWidth) / 2f
+            HorizontalAlignment.END -> width - nameWidth
+        }
+        
+        canvas.drawText(name, nameX, currentY + languageTextPaint.textSize, languageTextPaint)
+        
+        // Draw proficiency label - always at the right edge
+        if (proficiencyText.isNotEmpty()) {
+            canvas.drawText(
+                proficiencyText,
+                width - proficiencyWidth,
+                currentY + proficiencyTextPaint.textSize,
+                proficiencyTextPaint
+            )
+        }
+        
+        currentY += itemHeight
     }
 }
 
 /**
  * Progress bars layout: Visual bars showing proficiency
  */
-@Composable
-private fun ProgressBarsLanguageLayout(
+private fun drawProgressBarsLanguageLayout(
+    canvas: android.graphics.Canvas,
     element: ResumeElement.LanguageElement,
-    zoomLevel: Float = 1f
+    context: android.content.Context,
+    width: Float,
+    height: Float,
+    density: Float
 ) {
-    val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-        HorizontalAlignment.START -> Alignment.Start
-        HorizontalAlignment.CENTER -> Alignment.CenterHorizontally
-        HorizontalAlignment.END -> Alignment.End
+    val languageTextPaint = createTextPaint(element.languageStyle, context)
+    val proficiencyTextPaint = createTextPaint(element.proficiencyLabelStyle, context)
+    val spacing = element.spacing * density
+    val barHeight = element.progressBarHeight * density
+    val barRadius = element.progressBarCornerRadius * density
+    
+    val backgroundPaint = Paint().apply {
+        color = (element.progressBarBackgroundColor ?: 0xFFE0E0E0.toInt()).toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
-
-    val verticalArrangementForColumn = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
-        VerticalAlignment.TOP -> Arrangement.Top
-        VerticalAlignment.CENTER -> Arrangement.Center
-        VerticalAlignment.BOTTOM -> Arrangement.Bottom
+    
+    val progressPaint = Paint().apply {
+        color = (element.progressBarColor ?: 0xFF2196F3.toInt()).toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = verticalArrangementForColumn,
-        horizontalAlignment = horizontalAlignmentForColumn
-    ) {
-        element.items.forEachIndexed { index, item ->
-            if (item.name.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy((2 * zoomLevel).dp)
-                ) {
-                    // Language name and proficiency label
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = item.name,
-                            style = element.languageStyle.toComposeTextStyle(zoomLevel)
-                        )
-
-                        val proficiencyText = getProficiencyText(item, element.proficiencyType)
-                        if (proficiencyText.isNotEmpty()) {
-                            Text(
-                                text = proficiencyText,
-                                style = element.proficiencyLabelStyle.toComposeTextStyle(zoomLevel)
-                            )
-                        }
-                    }
-
-                    // Progress bar
-                    val progressBarColor = element.progressBarColor?.let { Color(it) } ?: Color.Blue
-                    val progressBarBackgroundColor = element.progressBarBackgroundColor?.let { Color(it) } ?: Color.LightGray
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(element.progressBarHeight.dp)
-                            .clip(RoundedCornerShape(element.progressBarCornerRadius.dp))
-                            .background(progressBarBackgroundColor)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(item.proficiency.coerceIn(0f, 1f))
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(element.progressBarCornerRadius.dp))
-                                .background(progressBarColor)
-                        )
-                    }
-                }
-
-                // Add spacing between items (but not after last item)
-                if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
-                }
-            }
+    
+    // Calculate total height
+    var itemCount = 0
+    var totalHeight = 0f
+    element.items.forEach { item ->
+        if (item.name.isNotEmpty()) {
+            totalHeight += languageTextPaint.textSize + 2f * density + barHeight
+            itemCount++
         }
+    }
+    if (itemCount > 1) {
+        totalHeight += spacing * (itemCount - 1)
+    }
+    
+    // Apply vertical alignment
+    var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+        VerticalAlignment.TOP -> 0f
+        VerticalAlignment.CENTER -> (height - totalHeight) / 2f
+        VerticalAlignment.BOTTOM -> height - totalHeight
+    }
+    
+    var isFirstItem = true
+    element.items.forEach { item ->
+        if (item.name.isEmpty()) return@forEach
+        
+        if (!isFirstItem) {
+            currentY += spacing
+        }
+        isFirstItem = false
+        
+        // Draw language name and proficiency label
+        val proficiencyText = getProficiencyText(item, element.proficiencyType)
+        val nameWidth = languageTextPaint.measureText(item.name)
+        val proficiencyWidth = if (proficiencyText.isNotEmpty()) proficiencyTextPaint.measureText(proficiencyText) else 0f
+        
+        // Draw language name - aligned according to horizontalAlignment
+        val nameX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (width - nameWidth) / 2f
+            HorizontalAlignment.END -> width - nameWidth
+        }
+        
+        canvas.drawText(item.name, nameX, currentY + languageTextPaint.textSize, languageTextPaint)
+        
+        // Draw proficiency label - always at the right edge
+        if (proficiencyText.isNotEmpty()) {
+            canvas.drawText(
+                proficiencyText,
+                width - proficiencyWidth,
+                currentY + proficiencyTextPaint.textSize,
+                proficiencyTextPaint
+            )
+        }
+        
+        currentY += languageTextPaint.textSize + 2f * density
+        
+        // Draw progress bar background
+        val barStartX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> 0f
+            HorizontalAlignment.END -> 0f
+        }
+        val barRect = RectF(barStartX, currentY, barStartX + width, currentY + barHeight)
+        canvas.drawRoundRect(barRect, barRadius, barRadius, backgroundPaint)
+        
+        // Draw progress fill
+        val proficiency = item.proficiency.coerceIn(0f, 1f)
+        val fillWidth = width * proficiency
+        if (fillWidth > 0) {
+            val fillRect = RectF(barStartX, currentY, barStartX + fillWidth, currentY + barHeight)
+            canvas.drawRoundRect(fillRect, barRadius, barRadius, progressPaint)
+        }
+        
+        currentY += barHeight
     }
 }
 
 /**
  * Dots layout: Dot indicators for proficiency
  */
-@Composable
-private fun DotsLanguageLayout(
+private fun drawDotsLanguageLayout(
+    canvas: android.graphics.Canvas,
     element: ResumeElement.LanguageElement,
-    zoomLevel: Float = 1f
+    context: android.content.Context,
+    width: Float,
+    height: Float,
+    density: Float
 ) {
-    val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-        HorizontalAlignment.START -> Alignment.Start
-        HorizontalAlignment.CENTER -> Alignment.CenterHorizontally
-        HorizontalAlignment.END -> Alignment.End
+    val languageTextPaint = createTextPaint(element.languageStyle, context)
+    val spacing = element.spacing * density
+    val dotSize = element.dotSize * density
+    val dotSpacing = 4f * density
+    
+    val filledPaint = Paint().apply {
+        color = (element.progressBarColor ?: 0xFF2196F3.toInt()).toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
-
-    val verticalArrangementForColumn = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
-        VerticalAlignment.TOP -> Arrangement.Top
-        VerticalAlignment.CENTER -> Arrangement.Center
-        VerticalAlignment.BOTTOM -> Arrangement.Bottom
+    
+    val emptyPaint = Paint().apply {
+        color = (element.progressBarBackgroundColor ?: 0xFFE0E0E0.toInt()).toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = verticalArrangementForColumn,
-        horizontalAlignment = horizontalAlignmentForColumn
-    ) {
-        element.items.forEachIndexed { index, item ->
-            if (item.name.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Language name
-                    Text(
-                        text = item.name,
-                        style = element.languageStyle.toComposeTextStyle(zoomLevel),
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
-                    // Dot rating
-                    val filledDots = (item.proficiency * element.maxDots).toInt().coerceIn(0, element.maxDots)
-                    val progressBarColor = element.progressBarColor?.let { Color(it) } ?: Color.Blue
-                    val progressBarBackgroundColor = element.progressBarBackgroundColor?.let { Color(it) } ?: Color.LightGray
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy((4 * zoomLevel).dp)
-                    ) {
-                        repeat(element.maxDots) { dotIndex ->
-                            Box(
-                                modifier = Modifier
-                                    .size(element.dotSize.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (dotIndex < filledDots) progressBarColor
-                                        else progressBarBackgroundColor
-                                    )
-                            )
-                        }
-                    }
-                }
-
-                // Add spacing between items (but not after last item)
-                if (index < element.items.size - 1) {
-                    Spacer(modifier = Modifier.height((element.spacing * zoomLevel).dp))
-                }
-            }
+    
+    // Calculate layouts for all items
+    val layouts = mutableListOf<Pair<LanguageItem, Float>>()
+    var totalHeight = 0f
+    
+    element.items.forEach { item ->
+        if (item.name.isNotEmpty()) {
+            val itemHeight = languageTextPaint.textSize
+            layouts.add(item to itemHeight)
+            totalHeight += itemHeight
         }
+    }
+    
+    if (layouts.size > 1) {
+        totalHeight += spacing * (layouts.size - 1)
+    }
+    
+    // Apply vertical alignment
+    var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+        VerticalAlignment.TOP -> 0f
+        VerticalAlignment.CENTER -> (height - totalHeight) / 2f
+        VerticalAlignment.BOTTOM -> height - totalHeight
+    }
+    
+    var isFirstItem = true
+    layouts.forEach { (item, itemHeight) ->
+        if (!isFirstItem) {
+            currentY += spacing
+        }
+        isFirstItem = false
+        
+        val textWidth = languageTextPaint.measureText(item.name)
+        val dotsWidth = (dotSize * element.maxDots) + (dotSpacing * (element.maxDots - 1))
+        val totalItemWidth = textWidth + 8f * density + dotsWidth
+        
+        val itemStartX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (width - totalItemWidth) / 2f
+            HorizontalAlignment.END -> width - totalItemWidth
+        }
+        
+        // Draw language name
+        canvas.drawText(item.name, itemStartX, currentY + languageTextPaint.textSize, languageTextPaint)
+        
+        // Draw dots
+        var dotX = itemStartX + textWidth + 8f * density
+        val proficiency = item.proficiency.coerceIn(0f, 1f)
+        val filledDots = (proficiency * element.maxDots).toInt().coerceIn(0, element.maxDots)
+        
+        repeat(element.maxDots) { index ->
+            val paint = if (index < filledDots) filledPaint else emptyPaint
+            canvas.drawCircle(
+                dotX + dotSize / 2,
+                currentY + itemHeight / 2,
+                dotSize / 2,
+                paint
+            )
+            dotX += dotSize + dotSpacing
+        }
+        
+        currentY += itemHeight
     }
 }
 
 /**
  * Tags layout: Chip-style tags with proficiency
  */
-@Composable
-private fun TagsLanguageLayout(
+private fun drawTagsLanguageLayout(
+    canvas: android.graphics.Canvas,
     element: ResumeElement.LanguageElement,
-    zoomLevel: Float = 1f
+    context: android.content.Context,
+    width: Float,
+    height: Float,
+    density: Float
 ) {
-    val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-        HorizontalAlignment.START -> Alignment.Start
-        HorizontalAlignment.CENTER -> Alignment.CenterHorizontally
-        HorizontalAlignment.END -> Alignment.End
+    val languageTextPaint = createTextPaint(element.languageStyle, context)
+    val proficiencyTextPaint = createTextPaint(element.proficiencyLabelStyle, context)
+    val spacing = element.spacing * density
+    val tagPadding = 12f * density
+    val tagRadius = element.tagCornerRadius * density
+    
+    val tagBackgroundPaint = Paint().apply {
+        color = (element.tagBackgroundColor ?: 0xFFE3F2FD.toInt()).toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
-
-    val verticalArrangementForColumn = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
-        VerticalAlignment.TOP -> Arrangement.Top
-        VerticalAlignment.CENTER -> Arrangement.Center
-        VerticalAlignment.BOTTOM -> Arrangement.Bottom
-    }
-
-    FlowRow(
-        modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy((element.spacing * zoomLevel).dp),
-        verticalArrangement = Arrangement.spacedBy((element.spacing / 2 * zoomLevel).dp)
-    ) {
-        element.items.forEach { item ->
-            if (item.name.isNotEmpty()) {
-                val bgColor = element.tagBackgroundColor?.let { Color(it) } ?: Color.LightGray
-                val borderColor = element.tagBorderColor?.let { Color(it) }
-
-                Column(
-                    modifier = Modifier
-                        .then(
-                            if (borderColor != null && element.tagBorderWidth > 0) {
-                                Modifier.border(
-                                    width = element.tagBorderWidth.dp,
-                                    color = borderColor,
-                                    shape = RoundedCornerShape(element.tagCornerRadius.dp)
-                                )
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .background(
-                            color = bgColor,
-                            shape = RoundedCornerShape(element.tagCornerRadius.dp)
-                        )
-                        .padding(horizontal = (12 * zoomLevel).dp, vertical = (6 * zoomLevel).dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Language name
-                    Text(
-                        text = item.name,
-                        style = element.languageStyle.toComposeTextStyle(zoomLevel)
-                    )
-
-                    // Proficiency label
-                    val proficiencyText = getProficiencyText(item, element.proficiencyType)
-                    if (proficiencyText.isNotEmpty()) {
-                        Text(
-                            text = proficiencyText,
-                            style = element.proficiencyLabelStyle.toComposeTextStyle(zoomLevel)
-                        )
-                    }
-                }
-            }
+    
+    val tagBorderPaint = if (element.tagBorderColor != null && element.tagBorderWidth > 0) {
+        Paint().apply {
+            color = element.tagBorderColor.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = element.tagBorderWidth * density
+            isAntiAlias = true
         }
+    } else null
+    
+    // Group tags into rows
+    data class TagInfo(val name: String, val proficiencyText: String, val width: Float, val height: Float)
+    val rows = mutableListOf<MutableList<TagInfo>>()
+    var currentRow = mutableListOf<TagInfo>()
+    var currentRowWidth = 0f
+    
+    element.items.forEach { item ->
+        if (item.name.isEmpty()) return@forEach
+        
+        val proficiencyText = getProficiencyText(item, element.proficiencyType)
+        val nameWidth = languageTextPaint.measureText(item.name)
+        val proficiencyWidth = if (proficiencyText.isNotEmpty()) proficiencyTextPaint.measureText(proficiencyText) else 0f
+        val textWidth = nameWidth.coerceAtLeast(proficiencyWidth)
+        
+        val tagWidth = textWidth + tagPadding * 2
+        val tagHeight = languageTextPaint.textSize + 
+            (if (proficiencyText.isNotEmpty()) proficiencyTextPaint.textSize + 2f * density else 0f) + 
+            tagPadding * 2
+        
+        if (currentRowWidth + tagWidth > width && currentRow.isNotEmpty()) {
+            rows.add(currentRow)
+            currentRow = mutableListOf()
+            currentRowWidth = 0f
+        }
+        
+        currentRow.add(TagInfo(item.name, proficiencyText, tagWidth, tagHeight))
+        currentRowWidth += tagWidth + if (currentRow.size > 1) spacing else 0f
+    }
+    if (currentRow.isNotEmpty()) {
+        rows.add(currentRow)
+    }
+    
+    val maxRowHeight = rows.flatMap { it.map { tag -> tag.height } }.maxOrNull() ?: 0f
+    val totalHeight = (maxRowHeight * rows.size) + if (rows.size > 1) (spacing * (rows.size - 1)) else 0f
+    
+    // Apply vertical alignment
+    val startY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+        VerticalAlignment.TOP -> 0f
+        VerticalAlignment.CENTER -> (height - totalHeight) / 2f
+        VerticalAlignment.BOTTOM -> height - totalHeight
+    }
+    
+    var currentY = startY
+    var isFirstRow = true
+    rows.forEach { row ->
+        if (!isFirstRow) {
+            currentY += spacing
+        }
+        isFirstRow = false
+        
+        val rowWidth = row.sumOf { it.width.toDouble() }.toFloat() + 
+                      if (row.size > 1) (spacing * (row.size - 1)) else 0f
+        
+        var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (width - rowWidth) / 2f
+            HorizontalAlignment.END -> width - rowWidth
+        }
+        
+        var isFirstTag = true
+        row.forEach { tag ->
+            if (!isFirstTag) {
+                currentX += spacing
+            }
+            isFirstTag = false
+            
+            val rect = RectF(currentX, currentY, currentX + tag.width, currentY + tag.height)
+            canvas.drawRoundRect(rect, tagRadius, tagRadius, tagBackgroundPaint)
+            
+            tagBorderPaint?.let {
+                canvas.drawRoundRect(rect, tagRadius, tagRadius, it)
+            }
+            
+            val textX = currentX + tagPadding
+            var textY = currentY + tagPadding + languageTextPaint.textSize
+            
+            canvas.drawText(tag.name, textX, textY, languageTextPaint)
+            
+            if (tag.proficiencyText.isNotEmpty()) {
+                textY += 2f * density + proficiencyTextPaint.textSize
+                canvas.drawText(tag.proficiencyText, textX, textY, proficiencyTextPaint)
+            }
+            
+            currentX += tag.width
+        }
+        
+        currentY += maxRowHeight
     }
 }
 
@@ -383,18 +473,28 @@ private fun getProficiencyText(item: LanguageItem, proficiencyType: LanguageProf
 }
 
 /**
- * Convert custom TextStyle to Compose TextStyle
+ * Create text paint for drawing text on canvas
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(
-    zoomLevel: Float = 1f
-): TextStyle {
-    return TextStyle(
-        fontSize = (fontSize * zoomLevel).sp,
-        fontWeight = fontWeight,
-        color = Color(color),
-        lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: TextUnit.Unspecified,
-        letterSpacing = (letterSpacing * zoomLevel).sp,
-        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-        textDecoration = if (isUnderlined) TextDecoration.Underline else TextDecoration.None
-    )
+private fun createTextPaint(
+    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    context: android.content.Context
+): TextPaint {
+    return TextPaint().apply {
+        isAntiAlias = true
+        val density = context.resources.displayMetrics.density
+        textSize = textStyle.fontSize * density
+        color = textStyle.color.toInt()
+        
+        typeface = FontManager.getPoppinsTypeface(
+            context,
+            textStyle.fontWeight,
+            textStyle.isItalic
+        )
+        
+        isUnderlineText = textStyle.isUnderlined
+        
+        if (textStyle.letterSpacing != 0f) {
+            letterSpacing = textStyle.letterSpacing / textStyle.fontSize
+        }
+    }
 }

@@ -75,57 +75,57 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         context: PdfRenderContext
     ) {
         val textPaint = createSkillTextPaint(element, mapper, context)
-        
-        // Get actual text height using font metrics (includes ascent + descent)
-        val fontMetrics = textPaint.fontMetrics
-        val textHeight = fontMetrics.descent - fontMetrics.ascent
-        
-        // Grid editor uses padding(vertical = spacing/2) on each Row, meaning:
-        // - Each item gets spacing/2 padding above and below
-        // - Total vertical space per item = textHeight + spacing
         val spacingPerItem = mapper.borderWidthToPdfPoints(element.spacing)
 
-        // Calculate total content height
-        // Each item occupies (textHeight + spacing), minus spacing after last item
+        // Calculate total content height using StaticLayout
         val itemCount = element.items.count { it.name.isNotEmpty() }
-        val totalHeight = if (itemCount > 0) {
-            itemCount * (textHeight + spacingPerItem) - spacingPerItem
-        } else {
-            0f
-        }
-
-        // Apply vertical alignment
-        // Note: In grid editor, each Row has padding(vertical = spacing/2), which adds spacing/2
-        // above the first item and below the last item. We need to account for this.
-        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
-            VerticalAlignment.TOP -> spacingPerItem / 2  // Start with spacing/2 padding like grid editor
-            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
-            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight - spacingPerItem / 2  // End with spacing/2 padding
-        }
-
-        var itemIndex = 0
+        var totalHeight = 0f
+        val layouts = mutableListOf<Pair<String, android.text.StaticLayout>>()
+        
         element.items.forEach { item ->
             if (item.name.isNotEmpty()) {
                 val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
                 val text = bullet + item.name
-                val textWidth = textPaint.measureText(text)
-
-                // Apply horizontal alignment
-                val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
-                    HorizontalAlignment.START -> 0f
-                    HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
-                    HorizontalAlignment.END -> bounds.width() - textWidth
-                }
-
-                // Draw text at baseline
-                // currentY is the top of the text box, so we need to offset by -ascent to get to baseline
-                canvas.drawText(text, xPosition, currentY - fontMetrics.ascent, textPaint)
                 
-                // Move to next item: advance by textHeight + spacing
-                // This matches grid editor's Row with padding(vertical = spacing/2)
-                currentY += textHeight + spacingPerItem
-                itemIndex++
+                val layout = android.text.StaticLayout.Builder
+                    .obtain(text, 0, text.length, textPaint, bounds.width().toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                
+                layouts.add(text to layout)
+                totalHeight += layout.height.toFloat()
             }
+        }
+        
+        if (itemCount > 1) {
+            totalHeight += spacingPerItem * (itemCount - 1)
+        }
+
+        // Apply vertical alignment
+        var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
+            VerticalAlignment.TOP -> 0f
+            VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
+            VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
+        }
+
+        layouts.forEach { (text, layout) ->
+            val textWidth = textPaint.measureText(text)
+
+            // Apply horizontal alignment
+            val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+                HorizontalAlignment.START -> 0f
+                HorizontalAlignment.CENTER -> (bounds.width() - textWidth) / 2f
+                HorizontalAlignment.END -> bounds.width() - textWidth
+            }
+
+            canvas.save()
+            canvas.translate(xPosition, currentY)
+            layout.draw(canvas)
+            canvas.restore()
+            
+            currentY += layout.height.toFloat() + spacingPerItem
         }
     }
 
@@ -321,19 +321,31 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val spacingPerItem = mapper.borderWidthToPdfPoints(element.spacing)
         val dotSize = mapper.borderWidthToPdfPoints(element.dotSize)
         val dotSpacing = mapper.borderWidthToPdfPoints(4f)
-        
-        // Get actual text height using font metrics
-        val fontMetrics = textPaint.fontMetrics
-        val textHeight = fontMetrics.descent - fontMetrics.ascent
 
-        // Calculate total height for vertical alignment
-        // Each item occupies textHeight + spacing, minus spacing after last item
+        // Calculate total height using StaticLayout
         val itemCount = element.items.count { it.name.isNotEmpty() }
-        val totalHeight = itemCount * (textHeight + spacingPerItem) - spacingPerItem
+        var totalHeight = 0f
+        val layouts = mutableListOf<Pair<SkillItem, android.text.StaticLayout>>()
+        
+        element.items.forEach { item ->
+            if (item.name.isNotEmpty()) {
+                val layout = android.text.StaticLayout.Builder
+                    .obtain(item.name, 0, item.name.length, textPaint, bounds.width().toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                
+                layouts.add(item to layout)
+                totalHeight += layout.height.toFloat()
+            }
+        }
+        
+        if (itemCount > 1) {
+            totalHeight += spacingPerItem * (itemCount - 1)
+        }
 
         // Apply vertical alignment
-        // Note: Grid editor uses Arrangement.spacedBy(spacing), which adds spacing between items
-        // but NOT before first or after last item, so no adjustment needed for DOTS layout
         var currentY = when (element.verticalAlignment ?: VerticalAlignment.TOP) {
             VerticalAlignment.TOP -> 0f
             VerticalAlignment.CENTER -> (bounds.height() - totalHeight) / 2f
@@ -352,13 +364,12 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             isAntiAlias = true
         }
 
-        element.items.forEach { item ->
-            if (item.name.isEmpty()) return@forEach
-
+        layouts.forEach { (item, layout) ->
             val textWidth = textPaint.measureText(item.name)
             val dotsWidth = (dotSize * element.maxDots) + (dotSpacing * (element.maxDots - 1))
-            val textDotSpacing = mapper.borderWidthToPdfPoints(8f) // Space between text and dots
+            val textDotSpacing = mapper.borderWidthToPdfPoints(8f)
             val totalItemWidth = textWidth + textDotSpacing + dotsWidth
+            val itemHeight = layout.height.toFloat()
 
             // Apply horizontal alignment to entire item (text + dots together)
             val itemStartX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -368,7 +379,10 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             }
 
             // Draw skill name
-            canvas.drawText(item.name, itemStartX, currentY - fontMetrics.ascent, textPaint)
+            canvas.save()
+            canvas.translate(itemStartX, currentY)
+            layout.draw(canvas)
+            canvas.restore()
 
             // Draw dots (positioned after text, vertically centered with text)
             var dotX = itemStartX + textWidth + textDotSpacing
@@ -379,15 +393,14 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
                 val paint = if (index < filledDots) filledPaint else emptyPaint
                 canvas.drawCircle(
                     dotX + dotSize / 2,
-                    currentY + textHeight / 2,
+                    currentY + itemHeight / 2,
                     dotSize / 2,
                     paint
                 )
                 dotX += dotSize + dotSpacing
             }
 
-            // Move to next item
-            currentY += textHeight + spacingPerItem
+            currentY += itemHeight + spacingPerItem
         }
     }
 
@@ -405,30 +418,54 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         val categoryTextPaint = createCategoryTextPaint(element, mapper, context)
         val spacingPerItem = mapper.borderWidthToPdfPoints(element.spacing)
         val groupSpacing = mapper.borderWidthToPdfPoints(element.groupSpacing)
-        
-        // Get actual text heights using font metrics
-        val skillFontMetrics = skillTextPaint.fontMetrics
-        val skillTextHeight = skillFontMetrics.descent - skillFontMetrics.ascent
-        val categoryFontMetrics = categoryTextPaint.fontMetrics
-        val categoryTextHeight = categoryFontMetrics.descent - categoryFontMetrics.ascent
 
-        // Calculate total height for vertical alignment
+        // Calculate total height using StaticLayout
         val groups = element.items.groupBy { it.category }
         var totalHeight = 0f
+        val groupLayouts = mutableListOf<Triple<String, android.text.StaticLayout?, List<Pair<String, android.text.StaticLayout>>>>()
+        
         groups.entries.forEachIndexed { groupIndex, entry ->
             val category = entry.key
             val skills = entry.value
+            
+            var categoryLayout: android.text.StaticLayout? = null
             if (category.isNotEmpty()) {
-                totalHeight += categoryTextHeight + 4f
+                categoryLayout = android.text.StaticLayout.Builder
+                    .obtain(category, 0, category.length, categoryTextPaint, bounds.width().toInt().coerceAtLeast(1))
+                    .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(0f, 1f)
+                    .setIncludePad(false)
+                    .build()
+                totalHeight += categoryLayout.height.toFloat() + 4f
             }
-            val skillCount = skills.count { it.name.isNotEmpty() }
-            if (skillCount > 0) {
-                // Each skill item occupies textHeight + spacing, minus spacing after last item in group
-                totalHeight += skillCount * (skillTextHeight + spacingPerItem) - spacingPerItem
+            
+            val skillLayouts = mutableListOf<Pair<String, android.text.StaticLayout>>()
+            skills.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
+                    val text = bullet + item.name
+                    
+                    val layout = android.text.StaticLayout.Builder
+                        .obtain(text, 0, text.length, skillTextPaint, bounds.width().toInt().coerceAtLeast(1))
+                        .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                        .setLineSpacing(0f, 1f)
+                        .setIncludePad(false)
+                        .build()
+                    
+                    skillLayouts.add(text to layout)
+                    totalHeight += layout.height.toFloat()
+                }
             }
+            
+            if (skillLayouts.size > 1) {
+                totalHeight += spacingPerItem * (skillLayouts.size - 1)
+            }
+            
             if (groupIndex < groups.size - 1) {
                 totalHeight += groupSpacing
             }
+            
+            groupLayouts.add(Triple(category, categoryLayout, skillLayouts))
         }
 
         // Apply vertical alignment
@@ -438,30 +475,26 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
             VerticalAlignment.BOTTOM -> bounds.height() - totalHeight
         }
 
-        groups.forEach { (category, skills) ->
+        groupLayouts.forEach { (category, categoryLayout, skillLayouts) ->
             // Draw category header
-            if (category.isNotEmpty()) {
+            if (categoryLayout != null) {
                 val categoryWidth = categoryTextPaint.measureText(category)
                 val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
                     HorizontalAlignment.START -> 0f
                     HorizontalAlignment.CENTER -> (bounds.width() - categoryWidth) / 2f
                     HorizontalAlignment.END -> bounds.width() - categoryWidth
                 }
-                canvas.drawText(category, xPosition, currentY - categoryFontMetrics.ascent, categoryTextPaint)
-                currentY += categoryTextHeight + 4f
+                
+                canvas.save()
+                canvas.translate(xPosition, currentY)
+                categoryLayout.draw(canvas)
+                canvas.restore()
+                
+                currentY += categoryLayout.height.toFloat() + 4f
             }
 
             // Draw skills in this category
-            val skillsInCategory = skills.filter { it.name.isNotEmpty() }
-            
-            // Add spacing/2 before first skill (matching Row's vertical padding in grid editor)
-            if (skillsInCategory.isNotEmpty()) {
-                currentY += spacingPerItem / 2
-            }
-            
-            skillsInCategory.forEachIndexed { skillIndex, item ->
-                val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
-                val text = bullet + item.name
+            skillLayouts.forEach { (text, layout) ->
                 val textWidth = skillTextPaint.measureText(text)
 
                 val xPosition = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
@@ -470,18 +503,15 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
                     HorizontalAlignment.END -> bounds.width() - textWidth
                 }
 
-                canvas.drawText(text, xPosition, currentY - skillFontMetrics.ascent, skillTextPaint)
+                canvas.save()
+                canvas.translate(xPosition, currentY)
+                layout.draw(canvas)
+                canvas.restore()
                 
-                // Move to next item: advance by textHeight + spacing
-                currentY += skillTextHeight + spacingPerItem
-            }
-            
-            // Subtract spacing/2 after last skill to match grid editor
-            if (skillsInCategory.isNotEmpty()) {
-                currentY -= spacingPerItem / 2
+                currentY += layout.height.toFloat() + spacingPerItem
             }
 
-            currentY += groupSpacing // Add group spacing after this group
+            currentY += groupSpacing
         }
     }
 

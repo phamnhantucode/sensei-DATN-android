@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +68,7 @@ fun GridEditorScreen(
     val isSaving by viewModel.isSaving.collectAsState()
     val pdfExportState by viewModel.pdfExportState.collectAsState()
     val zoomLevel by viewModel.zoomLevel.collectAsState()
+    val isMoveMode by viewModel.isMoveMode.collectAsState()
 
     var showPropertyPanel by remember { mutableStateOf(false) }
     var showTemplateDialog by remember { mutableStateOf(false) }
@@ -139,8 +143,9 @@ fun GridEditorScreen(
             GridEditorBottomBar(
                 gridConfig = gridResume.gridConfig,
                 zoomLevel = zoomLevel,
+                isMoveMode = isMoveMode,
                 onToggleGrid = { viewModel.toggleGrid() },
-                onToggleSnap = { viewModel.toggleSnap() },
+                onToggleMoveMode = { viewModel.toggleMoveMode() },
                 onZoomIn = { viewModel.zoomIn() },
                 onZoomOut = { viewModel.zoomOut() },
                 onUndo = { viewModel.undo() },
@@ -164,6 +169,7 @@ fun GridEditorScreen(
                     selectedElement = selectedElement,
                     draggedElement = draggedElement,
                     zoomLevel = zoomLevel,
+                    isMoveMode = isMoveMode,
                     onElementSelect = { viewModel.selectElement(it) },
                     onElementDeselect = { viewModel.deselectElement() },
                     onDragStart = { viewModel.startDrag(it) },
@@ -197,7 +203,8 @@ fun GridEditorScreen(
                         viewModel.updateElement(updatedElement)
                     },
                     onOpenProperties = { showPropertyPanel = true },
-                    onZoomChange = { viewModel.setZoomLevel(it) }
+                    onZoomChange = { viewModel.setZoomLevel(it) },
+                    onExitMoveMode = { viewModel.toggleMoveMode() }
                 )
 
                 // Floating action button to add elements
@@ -418,8 +425,9 @@ private fun GridEditorTopBar(
 private fun GridEditorBottomBar(
     gridConfig: GridConfig,
     zoomLevel: Float,
+    isMoveMode: Boolean,
     onToggleGrid: () -> Unit,
-    onToggleSnap: () -> Unit,
+    onToggleMoveMode: () -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onUndo: () -> Unit,
@@ -455,14 +463,14 @@ private fun GridEditorBottomBar(
                     }
                 )
 
-                // Snap to Grid
+                // Move Mode (Pan & Zoom)
                 FilterChip(
-                    selected = gridConfig.snapToGrid,
-                    onClick = onToggleSnap,
-                    label = { Text("Snap") },
+                    selected = isMoveMode,
+                    onClick = onToggleMoveMode,
+                    label = { Text("Move") },
                     leadingIcon = {
                         Icon(
-                            IconAliases.GridOn,
+                            IconAliases.Move,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -508,6 +516,7 @@ private fun GridCanvas(
     selectedElement: ResumeElement?,
     draggedElement: DragState?,
     zoomLevel: Float,
+    isMoveMode: Boolean,
     onElementSelect: (ResumeElement) -> Unit,
     onElementDeselect: () -> Unit,
     onDragStart: (ResumeElement) -> Unit,
@@ -515,7 +524,8 @@ private fun GridCanvas(
     onDragEnd: (ResumeElement, GridPosition) -> Unit,
     onResize: (ResumeElement, GridPosition) -> Unit,
     onOpenProperties: () -> Unit,
-    onZoomChange: (Float) -> Unit
+    onZoomChange: (Float) -> Unit,
+    onExitMoveMode: () -> Unit
 ) {
     val density = LocalDensity.current.density
     val cellSizePx = gridResume.gridConfig.cellSizeDp * density
@@ -524,188 +534,353 @@ private fun GridCanvas(
         cellSizePx
     )
 
-    val scrollStateVertical = rememberScrollState()
-    val scrollStateHorizontal = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
-
-    // Track zoom level for pinch-to-zoom gesture
+    // Track zoom level
     var currentZoom by remember { mutableFloatStateOf(zoomLevel) }
+    
+    // Pan offset for move mode
+    var panOffsetX by remember { mutableFloatStateOf(0f) }
+    var panOffsetY by remember { mutableFloatStateOf(0f) }
 
-    // Update currentZoom when zoomLevel changes externally (from buttons)
-    LaunchedEffect(zoomLevel) {
-        currentZoom = zoomLevel
-    }
+    // Scroll states for non-move mode
+    val horizontalScrollState = rememberScrollState()
+    val verticalScrollState = rememberScrollState()
 
-    Box(
+    // 1. Use BoxWithConstraints to get the REAL canvas size (excluding top/bottom bars)
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    // Wait for first pointer down
-                    val firstDown = awaitFirstDown(requireUnconsumed = false)
-
-                    // Track if we're in a zoom gesture
-                    var isZooming = false
-
-                    do {
-                        val event = awaitPointerEvent()
-                        val pointerCount = event.changes.size
-
-                        // Only handle zoom if we have 2+ fingers
-                        if (pointerCount >= 2) {
-                            val zoom = event.calculateZoom()
-                            if (zoom != 1f) {
-                                isZooming = true
-                                currentZoom = (currentZoom * zoom).coerceIn(0.25f, 2f)
-                                onZoomChange(currentZoom)
-                                // Consume the event so scroll doesn't interfere
-                                event.changes.forEach { it.consume() }
-                            }
-                        } else if (pointerCount == 1 && !isZooming) {
-                            // Single finger and not zooming - let it pass through for element interaction
-                            // Don't consume
-                        }
-                    } while (event.changes.any { it.pressed })
-                }
-            }
-            .verticalScroll(scrollStateVertical)
-            .horizontalScroll(scrollStateHorizontal),
-        contentAlignment = Alignment.Center
     ) {
-        // Resume page (A4-like container)
+        val viewportWidthPx = constraints.maxWidth.toFloat()
+        val viewportHeightPx = constraints.maxHeight.toFloat()
+        val viewportWidthDp = maxWidth
+        val viewportHeightDp = maxHeight
+
+        // Helper to clamp pan offset
+        fun clampPan(panX: Float, panY: Float, zoom: Float): Pair<Float, Float> {
+            val pageW = gridWidthPx * zoom
+            val pageH = gridHeightPx * zoom
+            
+            val newX = if (pageW <= viewportWidthPx) {
+                (viewportWidthPx - pageW) / 2f
+            } else {
+                panX.coerceIn(viewportWidthPx - pageW, 0f)
+            }
+            
+            val newY = if (pageH <= viewportHeightPx) {
+                (viewportHeightPx - pageH) / 2f
+            } else {
+                panY.coerceIn(viewportHeightPx - pageH, 0f)
+            }
+            
+            return newX to newY
+        }
+
+        // Sync zoom from ViewModel and handle zoom anchor (center of viewport)
+        LaunchedEffect(zoomLevel) {
+            if (currentZoom != zoomLevel) {
+                val oldZoom = currentZoom
+                val newZoom = zoomLevel
+                val zoomFactor = if (oldZoom > 0) newZoom / oldZoom else 1f
+                
+                if (isMoveMode) {
+                    // Zoom to center of viewport
+                    val cx = viewportWidthPx / 2f
+                    val cy = viewportHeightPx / 2f
+                    val targetPanX = cx - (cx - panOffsetX) * zoomFactor
+                    val targetPanY = cy - (cy - panOffsetY) * zoomFactor
+                    
+                    val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, newZoom)
+                    panOffsetX = clampedX
+                    panOffsetY = clampedY
+                } else {
+                    // Adjust scroll to keep center
+                    val cx = viewportWidthPx / 2f
+                    val cy = viewportHeightPx / 2f
+                    
+                    val scrollX = horizontalScrollState.value
+                    val scrollY = verticalScrollState.value
+                    
+                    val newScrollX = ((scrollX + cx) * zoomFactor - cx).roundToInt()
+                    val newScrollY = ((scrollY + cy) * zoomFactor - cy).roundToInt()
+                    
+                    horizontalScrollState.scrollTo(newScrollX)
+                    verticalScrollState.scrollTo(newScrollY)
+                }
+                currentZoom = zoomLevel
+            }
+        }
+
+        // Continuous Sync: Keep the "inactive" state updated so it's ready when we switch modes
+        if (isMoveMode) {
+            // We are in Move Mode -> Keep ScrollState updated
+            LaunchedEffect(panOffsetX, panOffsetY, viewportWidthPx, viewportHeightPx, currentZoom) {
+                val pageWidthPx = gridWidthPx * currentZoom
+                val pageHeightPx = gridHeightPx * currentZoom
+                val innerWidth = maxOf(viewportWidthPx, pageWidthPx)
+                val innerHeight = maxOf(viewportHeightPx, pageHeightPx)
+                
+                val newScrollX = ((innerWidth - pageWidthPx) / 2f - panOffsetX).roundToInt()
+                val newScrollY = ((innerHeight - pageHeightPx) / 2f - panOffsetY).roundToInt()
+                
+                horizontalScrollState.scrollTo(newScrollX)
+                verticalScrollState.scrollTo(newScrollY)
+            }
+        } else {
+            // We are in Scroll Mode -> Keep PanOffset updated
+            val scrollX = horizontalScrollState.value
+            val scrollY = verticalScrollState.value
+            
+            LaunchedEffect(scrollX, scrollY, viewportWidthPx, viewportHeightPx, currentZoom) {
+                val pageWidthPx = gridWidthPx * currentZoom
+                val pageHeightPx = gridHeightPx * currentZoom
+                val innerWidth = maxOf(viewportWidthPx, pageWidthPx)
+                val innerHeight = maxOf(viewportHeightPx, pageHeightPx)
+                
+                val targetPanX = (innerWidth - pageWidthPx) / 2f - scrollX
+                val targetPanY = (innerHeight - pageHeightPx) / 2f - scrollY
+                
+                // We don't clamp here because ScrollState is already valid/clamped by definition
+                panOffsetX = targetPanX
+                panOffsetY = targetPanY
+            }
+        }
+
+        // 2. Gesture Handler
+        val gestureModifier = Modifier.pointerInput(isMoveMode) {
+            awaitEachGesture {
+                val firstDown = awaitFirstDown(requireUnconsumed = false)
+                var isZooming = false
+
+                do {
+                    val event = awaitPointerEvent()
+                    val pointerCount = event.changes.size
+
+                    if (pointerCount >= 2) {
+                        val zoom = event.calculateZoom()
+                        val centroid = event.calculateCentroid(useCurrent = true)
+                        if (zoom != 1f) {
+                            isZooming = true
+                            val oldZoom = currentZoom
+                            val newZoom = (currentZoom * zoom).coerceIn(0.25f, 2f)
+                            val zoomFactor = newZoom / oldZoom
+
+                            if (isMoveMode) {
+                                val cx = centroid.x
+                                val cy = centroid.y
+                                val targetPanX = cx - (cx - panOffsetX) * zoomFactor
+                                val targetPanY = cy - (cy - panOffsetY) * zoomFactor
+                                
+                                val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, newZoom)
+                                panOffsetX = clampedX
+                                panOffsetY = clampedY
+                            }
+                            
+                            currentZoom = newZoom
+                            onZoomChange(currentZoom)
+                            event.changes.forEach { it.consume() }
+                        }
+                    } else if (pointerCount == 1 && !isZooming && isMoveMode) {
+                        val change = event.changes.first()
+                        if (change.positionChanged()) {
+                            val targetPanX = panOffsetX + change.positionChange().x
+                            val targetPanY = panOffsetY + change.positionChange().y
+                            
+                            val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, currentZoom)
+                            panOffsetX = clampedX
+                            panOffsetY = clampedY
+                            
+                            change.consume()
+                        }
+                    }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+
+        // 3. The Scrollable Container (Active only when NOT in move mode)
+        // We apply scroll here, but we ensure the inner content fills the viewport to allow centering
         Box(
             modifier = Modifier
-                .size(
-                    width = GridUtils.pxToDp(gridWidthPx, density) * zoomLevel,
-                    height = GridUtils.pxToDp(gridHeightPx, density) * zoomLevel
-                )
-                .background(Color.White)
-                .padding(0.dp)
-                .pointerInput(Unit) {
-                    // Tap outside to deselect - only respond to unconsumed taps
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = true)
-                        val up = waitForUpOrCancellation()
-                        if (up != null && !up.isConsumed) {
-                            // This was a tap on the background (not consumed by child elements)
-                            onElementDeselect()
-                        }
+                .fillMaxSize()
+                .then(gestureModifier)
+                .then(
+                    if (!isMoveMode) {
+                        Modifier
+                            .horizontalScroll(horizontalScrollState, enabled = false)
+                            .verticalScroll(verticalScrollState, enabled = false)
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    horizontalScrollState.dispatchRawDelta(-dragAmount.x)
+                                    verticalScrollState.dispatchRawDelta(-dragAmount.y)
+                                }
+                            }
+                    } else {
+                        Modifier
                     }
-                }
+                ),
+            // Crucial: If not in move mode, align content to center of the scroll view
+            contentAlignment = if (!isMoveMode) Alignment.Center else Alignment.TopStart
         ) {
-            // Grid background
-            GridBackground(
-                gridConfig = gridResume.gridConfig,
-                zoomLevel = zoomLevel
-            )
+            // 4. The Page Wrapper
+            // In scroll mode: We force this box to be at least the size of the viewport.
+            // This ensures that if the page is small, it sits in the center of the screen.
+            // In move mode: We use offset.
+            Box(
+                modifier = Modifier
+                    .then(
+                        if (isMoveMode) {
+                             // Just wrap content, position is handled by offset
+                            Modifier.wrapContentSize(Alignment.TopStart, unbounded = true)
+                        } else {
+                            // Force minimum size to allow centering within scroll
+                            Modifier.defaultMinSize(
+                                minWidth = viewportWidthDp, 
+                                minHeight = viewportHeightDp
+                            )
+                        }
+                    ),
+                contentAlignment = Alignment.Center // Centers the actual resume page inside this wrapper
+            ) {
+                // 5. The Actual Resume Page
+                Box(
+                    modifier = Modifier
+                        .then(
+                            if (isMoveMode) {
+                                Modifier.offset {
+                                    androidx.compose.ui.unit.IntOffset(
+                                        x = panOffsetX.roundToInt(),
+                                        y = panOffsetY.roundToInt()
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .size(
+                            width = GridUtils.pxToDp(gridWidthPx, density) * currentZoom,
+                            height = GridUtils.pxToDp(gridHeightPx, density) * currentZoom
+                        )
+                        .background(Color.White)
+                        .pointerInput(isMoveMode) {
+                            if (isMoveMode) {
+                                detectTapGestures(onDoubleTap = { onExitMoveMode() })
+                            } else {
+                                detectTapGestures(onTap = { onElementDeselect() })
+                            }
+                        }
+                ) {
+                    // Grid Lines
+                    GridBackground(
+                        gridConfig = gridResume.gridConfig,
+                        zoomLevel = currentZoom
+                    )
 
-            // Render all elements from first page
-            gridResume.pages.firstOrNull()?.let { page ->
-                page.elementsByZIndex().forEach { element ->
-                    key(element.id) {
-                        val isSelected = selectedElement?.id == element.id
-                        val isDragging = draggedElement?.element?.id == element.id
+                    // Elements
+                    gridResume.pages.firstOrNull()?.let { page ->
+                        page.elementsByZIndex().forEach { element ->
+                            key(element.id) {
+                                val isSelected = selectedElement?.id == element.id
+                                val isDragging = draggedElement?.element?.id == element.id
 
-                        DraggableElement(
-                            element = element,
-                            gridConfig = gridResume.gridConfig,
-                            zoomLevel = zoomLevel,
-                            isSelected = isSelected,
-                            isDragging = isDragging,
-                            onDragStart = onDragStart,
-                            onDrag = onDrag,
-                            onDragEnd = onDragEnd,
-                            onResize = onResize,
-                            onSelect = onElementSelect,
-                            onDeselect = onElementDeselect,
-                            onOpenProperties = { _ -> onOpenProperties() }
-                        ) {
-                        // Render element content based on type
-                        when (element) {
-                            is ResumeElement.TextElement -> {
-                                TextElementRenderer(
+                                DraggableElement(
                                     element = element,
-                                    isEditing = false,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.ImageElement -> {
-                                ImageElementRenderer(
-                                    element = element
-                                )
-                            }
-                            is ResumeElement.ShapeElement -> {
-                                ShapeElementRenderer(
-                                    element = element
-                                )
-                            }
-                            is ResumeElement.ContactElement -> {
-                                ContactElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.WorkExperienceElement -> {
-                                WorkExperienceElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.EducationElement -> {
-                                EducationElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.SkillElement -> {
-                                SkillElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.ProjectElement -> {
-                                ProjectElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.CertificationElement -> {
-                                CertificationElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            is ResumeElement.LanguageElement -> {
-                                LanguageElementRenderer(
-                                    element = element,
-                                    zoomLevel = zoomLevel
-                                )
-                            }
-                            else -> {
-                                // Placeholder for other element types
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.LightGray)
-                                )
+                                    gridConfig = gridResume.gridConfig,
+                                    zoomLevel = currentZoom,
+                                    isSelected = isSelected && !isMoveMode,
+                                    isDragging = isDragging && !isMoveMode,
+                                    enabled = !isMoveMode,
+                                    onDragStart = onDragStart,
+                                    onDrag = onDrag,
+                                    onDragEnd = onDragEnd,
+                                    onResize = onResize,
+                                    onSelect = onElementSelect,
+                                    onDeselect = onElementDeselect,
+                                    onOpenProperties = { _ -> onOpenProperties() }
+                                ) {
+                                    when (element) {
+                                        is ResumeElement.TextElement -> {
+                                            TextElementRenderer(
+                                                element = element,
+                                                isEditing = false,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.ImageElement -> {
+                                            ImageElementRenderer(
+                                                element = element
+                                            )
+                                        }
+                                        is ResumeElement.ShapeElement -> {
+                                            ShapeElementRenderer(
+                                                element = element
+                                            )
+                                        }
+                                        is ResumeElement.ContactElement -> {
+                                            ContactElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.WorkExperienceElement -> {
+                                            WorkExperienceElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.EducationElement -> {
+                                            EducationElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.SkillElement -> {
+                                            SkillElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.ProjectElement -> {
+                                            ProjectElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.CertificationElement -> {
+                                            CertificationElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.LanguageElement -> {
+                                            LanguageElementRenderer(
+                                                element = element,
+                                                zoomLevel = currentZoom
+                                            )
+                                        }
+                                        else -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color.LightGray)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    }
-                }
-            }
 
-            // Show drag ghost if dragging
-            draggedElement?.let { drag ->
-                DragGhost(
-                    element = drag.element,
-                    position = drag.currentPosition,
-                    gridConfig = gridResume.gridConfig,
-                    zoomLevel = zoomLevel,
-                    isValid = drag.isValidPosition
-                ) {
-                    // Ghost content (simplified)
+                    // Drag Ghost
+                    draggedElement?.let { drag ->
+                        DragGhost(
+                            element = drag.element,
+                            position = drag.currentPosition,
+                            gridConfig = gridResume.gridConfig,
+                            zoomLevel = currentZoom,
+                            isValid = drag.isValidPosition
+                        ) {}
+                    }
                 }
             }
         }
@@ -1009,4 +1184,5 @@ private object IconAliases {
     val GridOn = Icons.Default.Dashboard
     val TextFields = Icons.Default.TextFormat
     val BarChart = Icons.Default.BarChart
+    val Move = Icons.Default.OpenWith
 }

@@ -69,6 +69,10 @@ class GridEditorViewModel(
     private val _zoomLevel = MutableStateFlow(1f)
     val zoomLevel: StateFlow<Float> = _zoomLevel.asStateFlow()
 
+    // Move mode state - when enabled, user can pan and zoom without interacting with elements
+    private val _isMoveMode = MutableStateFlow(false)
+    val isMoveMode: StateFlow<Boolean> = _isMoveMode.asStateFlow()
+
     // Undo/Redo stacks
     private val undoStack = mutableListOf<GridResume>()
     private val redoStack = mutableListOf<GridResume>()
@@ -591,6 +595,17 @@ class GridEditorViewModel(
                     snapToGrid = !resume.gridConfig.snapToGrid
                 )
             )
+        }
+    }
+
+    /**
+     * Toggles move mode (pan and zoom without element interaction)
+     */
+    fun toggleMoveMode() {
+        _isMoveMode.update { !it }
+        // Deselect any selected element when entering move mode
+        if (_isMoveMode.value) {
+            deselectElement()
         }
     }
 
