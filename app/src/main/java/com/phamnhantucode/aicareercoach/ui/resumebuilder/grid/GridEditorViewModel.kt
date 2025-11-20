@@ -455,6 +455,131 @@ class GridEditorViewModel(
         _selectedElement.value = null
     }
 
+    /**
+     * Toggles element visibility
+     */
+    fun toggleElementVisibility(elementId: String) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val element = currentPage.elements.find { it.id == elementId } ?: return
+
+        val updatedElement = when (element) {
+            is ResumeElement.TextElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ImageElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ShapeElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ChartElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ContainerElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.IconElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ContactElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.WorkExperienceElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.EducationElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.SkillElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.ProjectElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.CertificationElement -> element.copy(isVisible = !element.isVisible)
+            is ResumeElement.LanguageElement -> element.copy(isVisible = !element.isVisible)
+        }
+
+        val updatedPage = currentPage.updateElement(elementId) { updatedElement }
+        updatePage(updatedPage)
+        
+        // Update selection if needed
+        if (_selectedElement.value?.id == elementId) {
+            _selectedElement.value = updatedElement
+        }
+
+        triggerAutoSave()
+    }
+
+    /**
+     * Toggles element lock state
+     */
+    fun toggleElementLock(elementId: String) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val element = currentPage.elements.find { it.id == elementId } ?: return
+
+        val updatedElement = when (element) {
+            is ResumeElement.TextElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ImageElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ShapeElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ChartElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ContainerElement -> element.copy(locked = !element.locked)
+            is ResumeElement.IconElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ContactElement -> element.copy(locked = !element.locked)
+            is ResumeElement.WorkExperienceElement -> element.copy(locked = !element.locked)
+            is ResumeElement.EducationElement -> element.copy(locked = !element.locked)
+            is ResumeElement.SkillElement -> element.copy(locked = !element.locked)
+            is ResumeElement.ProjectElement -> element.copy(locked = !element.locked)
+            is ResumeElement.CertificationElement -> element.copy(locked = !element.locked)
+            is ResumeElement.LanguageElement -> element.copy(locked = !element.locked)
+        }
+
+        val updatedPage = currentPage.updateElement(elementId) { updatedElement }
+        updatePage(updatedPage)
+
+        // Update selection if needed
+        if (_selectedElement.value?.id == elementId) {
+            _selectedElement.value = updatedElement
+        }
+
+        triggerAutoSave()
+    }
+
+    /**
+     * Moves an element to a new layer (Z-index)
+     * @param fromIndex The current index in the list (sorted by Z-index DESCENDING)
+     * @param toIndex The new index in the list
+     */
+    fun moveElementLayer(fromIndex: Int, toIndex: Int) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        
+        // Get elements sorted by Z-index DESCENDING (Front to Back)
+        // This matches the UI display order
+        val sortedElements = currentPage.elements.sortedByDescending { it.zIndex }.toMutableList()
+        
+        if (fromIndex !in sortedElements.indices || toIndex !in sortedElements.indices) return
+        
+        // Move the element in the list
+        val element = sortedElements.removeAt(fromIndex)
+        sortedElements.add(toIndex, element)
+        
+        // Re-assign Z-indices based on the new list order
+        // The first item in the list (index 0) should have the highest Z-index
+        // The last item should have the lowest
+        val totalElements = sortedElements.size
+        val updatedElements = sortedElements.mapIndexed { index, el ->
+            val newZIndex = totalElements - 1 - index
+            
+            if (el.zIndex == newZIndex) el else {
+                when (el) {
+                    is ResumeElement.TextElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ImageElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ShapeElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ChartElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ContainerElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.IconElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ContactElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.WorkExperienceElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.EducationElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.SkillElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.ProjectElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.CertificationElement -> el.copy(zIndex = newZIndex)
+                    is ResumeElement.LanguageElement -> el.copy(zIndex = newZIndex)
+                }
+            }
+        }
+        
+        // Update the page with the new elements list
+        val updatedPage = currentPage.copy(elements = updatedElements)
+        updatePage(updatedPage)
+        
+        triggerAutoSave()
+    }
+
     // ============================================================================
     // Drag & Drop
     // ============================================================================

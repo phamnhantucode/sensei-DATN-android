@@ -148,6 +148,7 @@ sealed class ResumeElement {
     abstract val zIndex: Int
     abstract val locked: Boolean
     abstract val userInfoTag: UserInfoTag?
+    abstract val isVisible: Boolean
 
     /**
      * Text element - displays formatted text
@@ -159,6 +160,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val content: String = "",
         val textStyle: TextStyle = TextStyle(),
         val alignment: TextAlignment = TextAlignment.LEFT,
@@ -176,6 +178,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val imageUrl: String = "", // Can be file:// or http://
         val contentScale: ImageScale = ImageScale.FIT,
         val cornerRadius: Float = 0f,
@@ -193,6 +196,7 @@ sealed class ResumeElement {
         override val zIndex: Int = -1, // Behind by default
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val shapeType: ShapeType = ShapeType.RECTANGLE,
         val cornerRadius: Float = 0f,
         val customHeightDp: Float? = null, // Custom height for dividers (overrides rowSpan)
@@ -209,6 +213,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val chartType: ChartType = ChartType.HORIZONTAL_BAR,
         val data: ChartData = ChartData()
     ) : ResumeElement()
@@ -223,6 +228,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val children: List<String> = emptyList(), // Child element IDs
         val padding: Padding = Padding(),
         val clipContent: Boolean = false
@@ -238,6 +244,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val iconName: String = "", // Material icon name or emoji
         val iconType: IconType = IconType.MATERIAL
     ) : ResumeElement()
@@ -253,6 +260,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<ContactItem> = emptyList(),
         val iconStyle: ContactIconStyle = ContactIconStyle.ICON,
         val spacing: Float = 8f, // dp between items
@@ -274,6 +282,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<WorkExperienceItem> = emptyList(),
         val displayStyle: WorkExperienceDisplayStyle = WorkExperienceDisplayStyle.STANDARD,
         val orientation: WorkExperienceOrientation = WorkExperienceOrientation.VERTICAL,
@@ -305,6 +314,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<EducationItem> = emptyList(),
         val displayStyle: EducationDisplayStyle = EducationDisplayStyle.STANDARD,
         val orientation: EducationOrientation = EducationOrientation.VERTICAL,
@@ -338,6 +348,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<SkillItem> = emptyList(),
         val displayStyle: SkillDisplayStyle = SkillDisplayStyle.LIST,
         val spacing: Float = 8f, // dp between skill items
@@ -376,6 +387,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<ProjectItem> = emptyList(),
         val displayStyle: ProjectDisplayStyle = ProjectDisplayStyle.STANDARD,
         val showDates: Boolean = true,
@@ -415,6 +427,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<CertificationItem> = emptyList(),
         val displayStyle: CertificationDisplayStyle = CertificationDisplayStyle.STANDARD,
         val showIssueDate: Boolean = true,
@@ -448,6 +461,7 @@ sealed class ResumeElement {
         override val zIndex: Int = 0,
         override val locked: Boolean = false,
         override val userInfoTag: UserInfoTag? = null,
+        override val isVisible: Boolean = true,
         val items: List<LanguageItem> = emptyList(),
         val displayStyle: LanguageDisplayStyle = LanguageDisplayStyle.TEXT_LABELS,
         val proficiencyType: LanguageProficiencyType = LanguageProficiencyType.TEXT,

@@ -71,6 +71,7 @@ fun GridEditorScreen(
     val isMoveMode by viewModel.isMoveMode.collectAsState()
 
     var showPropertyPanel by remember { mutableStateOf(false) }
+    var showLayersPanel by remember { mutableStateOf(false) }
     var showTemplateDialog by remember { mutableStateOf(false) }
     var showElementPicker by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
@@ -144,8 +145,10 @@ fun GridEditorScreen(
                 gridConfig = gridResume.gridConfig,
                 zoomLevel = zoomLevel,
                 isMoveMode = isMoveMode,
+                showLayersPanel = showLayersPanel,
                 onToggleGrid = { viewModel.toggleGrid() },
                 onToggleMoveMode = { viewModel.toggleMoveMode() },
+                onToggleLayers = { showLayersPanel = !showLayersPanel },
                 onZoomIn = { viewModel.zoomIn() },
                 onZoomOut = { viewModel.zoomOut() },
                 onUndo = { viewModel.undo() },
@@ -218,8 +221,31 @@ fun GridEditorScreen(
                 }
             }
 
+            // Layers Panel (right side) - shown when toggled
+            if (showLayersPanel) {
+                Surface(
+                    modifier = Modifier
+                        .width(300.dp)
+                        .fillMaxHeight(),
+                    tonalElevation = 2.dp
+                ) {
+                    LayersPanel(
+                        elements = gridResume.pages.firstOrNull()?.elements ?: emptyList(),
+                        selectedElementId = selectedElement?.id,
+                        onSelectElement = { viewModel.selectElement(it) },
+                        onToggleVisibility = { viewModel.toggleElementVisibility(it) },
+                        onToggleLock = { viewModel.toggleElementLock(it) },
+                        onMoveLayer = { from, to -> viewModel.moveElementLayer(from, to) },
+                        onClose = { showLayersPanel = false }
+                    )
+                }
+            }
+
             // Property panel (right side) - shown when element is selected
-            if (showPropertyPanel && selectedElement != null) {
+            // Only show if Layers Panel is NOT shown (to avoid clutter), or stack them?
+            // Let's show Property Panel only if Layers Panel is hidden, or maybe allow side-by-side?
+            // For mobile/tablet, side-by-side might be too much. Let's prioritize Layers Panel if open.
+            if (showPropertyPanel && selectedElement != null && !showLayersPanel) {
                 Surface(
                     modifier = Modifier
                         .width(300.dp)
@@ -426,8 +452,10 @@ private fun GridEditorBottomBar(
     gridConfig: GridConfig,
     zoomLevel: Float,
     isMoveMode: Boolean,
+    showLayersPanel: Boolean,
     onToggleGrid: () -> Unit,
     onToggleMoveMode: () -> Unit,
+    onToggleLayers: () -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onUndo: () -> Unit,
@@ -471,6 +499,20 @@ private fun GridEditorBottomBar(
                     leadingIcon = {
                         Icon(
                             IconAliases.Move,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                // Layers Toggle
+                FilterChip(
+                    selected = showLayersPanel,
+                    onClick = onToggleLayers,
+                    label = { Text("Layers") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Layers,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -778,7 +820,9 @@ private fun GridCanvas(
 
                     // Elements
                     gridResume.pages.firstOrNull()?.let { page ->
-                        page.elementsByZIndex().forEach { element ->
+                        page.elementsByZIndex()
+                            .filter { it.isVisible } // Only render visible elements
+                            .forEach { element ->
                             key(element.id) {
                                 val isSelected = selectedElement?.id == element.id
                                 val isDragging = draggedElement?.element?.id == element.id
