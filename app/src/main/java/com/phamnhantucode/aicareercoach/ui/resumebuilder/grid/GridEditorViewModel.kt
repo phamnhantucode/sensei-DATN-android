@@ -2,16 +2,18 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.converters.toFormResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.converters.toGridResume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidPdfGenerator
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -373,7 +375,7 @@ class GridEditorViewModel(
     /**
      * Adds a new element to the canvas
      */
-    fun addElement(elementType: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType) {
+    fun addElement(elementType: ElementType) {
         saveToUndoStack()
 
         val currentPage = _gridResume.value.pages.firstOrNull() ?: ResumePage()
@@ -464,21 +466,8 @@ class GridEditorViewModel(
         val currentPage = _gridResume.value.pages.firstOrNull() ?: return
         val element = currentPage.elements.find { it.id == elementId } ?: return
 
-        val updatedElement = when (element) {
-            is ResumeElement.TextElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ImageElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ShapeElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ChartElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ContainerElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.IconElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ContactElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.WorkExperienceElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.EducationElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.SkillElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.ProjectElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.CertificationElement -> element.copy(isVisible = !element.isVisible)
-            is ResumeElement.LanguageElement -> element.copy(isVisible = !element.isVisible)
-        }
+        // Use generic update extension
+        val updatedElement = element.update(isVisible = !element.isVisible)
 
         val updatedPage = currentPage.updateElement(elementId) { updatedElement }
         updatePage(updatedPage)
@@ -500,21 +489,8 @@ class GridEditorViewModel(
         val currentPage = _gridResume.value.pages.firstOrNull() ?: return
         val element = currentPage.elements.find { it.id == elementId } ?: return
 
-        val updatedElement = when (element) {
-            is ResumeElement.TextElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ImageElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ShapeElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ChartElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ContainerElement -> element.copy(locked = !element.locked)
-            is ResumeElement.IconElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ContactElement -> element.copy(locked = !element.locked)
-            is ResumeElement.WorkExperienceElement -> element.copy(locked = !element.locked)
-            is ResumeElement.EducationElement -> element.copy(locked = !element.locked)
-            is ResumeElement.SkillElement -> element.copy(locked = !element.locked)
-            is ResumeElement.ProjectElement -> element.copy(locked = !element.locked)
-            is ResumeElement.CertificationElement -> element.copy(locked = !element.locked)
-            is ResumeElement.LanguageElement -> element.copy(locked = !element.locked)
-        }
+        // Use generic update extension
+        val updatedElement = element.update(locked = !element.locked)
 
         val updatedPage = currentPage.updateElement(elementId) { updatedElement }
         updatePage(updatedPage)
@@ -555,21 +531,8 @@ class GridEditorViewModel(
             val newZIndex = totalElements - 1 - index
             
             if (el.zIndex == newZIndex) el else {
-                when (el) {
-                    is ResumeElement.TextElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ImageElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ShapeElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ChartElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ContainerElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.IconElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ContactElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.WorkExperienceElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.EducationElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.SkillElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.ProjectElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.CertificationElement -> el.copy(zIndex = newZIndex)
-                    is ResumeElement.LanguageElement -> el.copy(zIndex = newZIndex)
-                }
+                // Use generic update extension
+                el.update(zIndex = newZIndex)
             }
         }
         
@@ -641,7 +604,8 @@ class GridEditorViewModel(
 
             if (latestElementFromPage != null) {
                 // Update only the position, preserving all other properties
-                val updatedElement = updateElementPositionValue(latestElementFromPage, clampedPosition)
+                // Use generic update extension
+                val updatedElement = latestElementFromPage.update(position = clampedPosition)
 
                 val updatedPage = currentPage.updateElement(updatedElement.id) { updatedElement }
                 updatePage(updatedPage)
@@ -787,7 +751,7 @@ class GridEditorViewModel(
      * @param saveToUndo Whether to save current state to undo stack (default: true)
      */
     fun applyUserDataToTemplate(
-        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume,
+        resume: Resume,
         saveToUndo: Boolean = true
     ) {
         if (saveToUndo) {
@@ -798,534 +762,209 @@ class GridEditorViewModel(
         val updatedPages = currentPages.map { page ->
             val updatedElements = page.elements.map { element ->
                 val tag = element.userInfoTag
-                if (tag == null || tag == UserInfoTag.NONE) {
-                    return@map element
-                }
-
-                when (element) {
-                    is ResumeElement.TextElement -> {
-                        val content = when (tag) {
-                            UserInfoTag.NAME -> resume.personalInfo.fullName
-                            UserInfoTag.EMAIL -> resume.personalInfo.email
-                            UserInfoTag.PHONE -> resume.personalInfo.phone
-                            UserInfoTag.LOCATION -> resume.personalInfo.location
-                            UserInfoTag.GITHUB -> resume.personalInfo.github
-                            UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
-                            UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
-                            UserInfoTag.PROFESSIONAL_SUMMARY -> resume.professionalSummary
-                            UserInfoTag.AVATAR -> element.content // Avatar doesn't apply to text
-                            UserInfoTag.WORK_EXPERIENCE -> element.content // Work experience doesn't apply to text
-                            UserInfoTag.EDUCATION -> element.content // Education doesn't apply to text
-                            UserInfoTag.SKILLS -> element.content // Skills doesn't apply to text
-                            UserInfoTag.PROJECTS -> element.content // Projects doesn't apply to text
-                            UserInfoTag.CERTIFICATIONS -> element.content // Certifications doesn't apply to text
-                            UserInfoTag.LANGUAGES -> element.content // Languages doesn't apply to text
-                            UserInfoTag.NONE -> element.content
-                        }
-                        element.copy(content = content)
-                    }
-                    is ResumeElement.ImageElement -> {
-                        if (tag == UserInfoTag.AVATAR && resume.personalInfo.avatar.isNotEmpty()) {
-                            element.copy(imageUrl = resume.personalInfo.avatar)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.ContactElement -> {
-                        // Update contact items with user info based on their tags
-                        val updatedItems = element.items.map { item ->
-                            val tag = item.userInfoTag ?: return@map item
-                            val value = when (tag) {
-                                UserInfoTag.NAME -> resume.personalInfo.fullName
-                                UserInfoTag.EMAIL -> resume.personalInfo.email
-                                UserInfoTag.PHONE -> resume.personalInfo.phone
-                                UserInfoTag.LOCATION -> resume.personalInfo.location
-                                UserInfoTag.GITHUB -> resume.personalInfo.github
-                                UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
-                                UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
-                                UserInfoTag.PROFESSIONAL_SUMMARY -> item.value // Professional summary doesn't apply to contact
-                                UserInfoTag.AVATAR -> item.value // Avatar doesn't apply to contact
-                                UserInfoTag.WORK_EXPERIENCE -> item.value // Work experience doesn't apply to contact
-                                UserInfoTag.EDUCATION -> item.value // Education doesn't apply to contact
-                                UserInfoTag.SKILLS -> item.value // Skills doesn't apply to contact
-                                UserInfoTag.PROJECTS -> item.value // Projects doesn't apply to contact
-                                UserInfoTag.CERTIFICATIONS -> item.value // Certifications doesn't apply to contact
-                                UserInfoTag.LANGUAGES -> item.value // Languages doesn't apply to contact
-                                UserInfoTag.NONE -> item.value
-                            }
-                            item.copy(value = value)
-                        }
-                        element.copy(items = updatedItems)
-                    }
-                    is ResumeElement.WorkExperienceElement -> {
-                        if (tag == UserInfoTag.WORK_EXPERIENCE && resume.workExperiences.isNotEmpty()) {
-                            // Convert form WorkExperience to grid WorkExperienceItem
-                            val workExperienceItems = resume.workExperiences.map { work ->
-                                WorkExperienceItem(
-                                    jobTitle = work.jobTitle,
-                                    company = work.company,
-                                    location = work.location,
-                                    startDate = work.startDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    endDate = if (work.isCurrentRole) {
-                                        "Present"
-                                    } else {
-                                        work.endDate?.format(
-                                            java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                        ) ?: ""
-                                    },
-                                    isCurrentRole = work.isCurrentRole,
-                                    responsibilities = work.responsibilities.map { resp ->
-                                        ResponsibilityItem(text = resp)
-                                    }
-                                )
-                            }
-                            element.copy(items = workExperienceItems)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.EducationElement -> {
-                        if (tag == UserInfoTag.EDUCATION && resume.education.isNotEmpty()) {
-                            val educationItems = resume.education.map { edu ->
-                                EducationItem(
-                                    degree = edu.degree,
-                                    institution = edu.institution,
-                                    location = edu.location,
-                                    startDate = edu.startDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    endDate = edu.endDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    gpa = edu.gpa,
-                                    achievements = edu.achievements.map { ach ->
-                                        AchievementItem(text = ach)
-                                    }
-                                )
-                            }
-                            element.copy(items = educationItems)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.SkillElement -> {
-                        if (resume.skills.isNotEmpty()) {
-                            val skillItems = resume.skills.map { skill ->
-                                SkillItem(name = skill)
-                            }
-                            element.copy(items = skillItems)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.ProjectElement -> {
-                        if (resume.projects.isNotEmpty()) {
-                            val projectItems = resume.projects.map { proj ->
-                                ProjectItem(
-                                    name = proj.title,
-                                    description = proj.description,
-                                    startDate = proj.startDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    endDate = proj.endDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    isOngoing = false,
-                                    technologies = proj.technologies.joinToString(", "),
-                                    link = proj.link,
-                                    highlights = emptyList()
-                                )
-                            }
-                            element.copy(items = projectItems)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.CertificationElement -> {
-                        if (resume.certifications.isNotEmpty()) {
-                            val certificationItems = resume.certifications.map { cert ->
-                                CertificationItem(
-                                    name = cert.name,
-                                    issuer = cert.issuer,
-                                    issueDate = cert.issueDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    expiryDate = cert.expiryDate?.format(
-                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
-                                    ) ?: "",
-                                    credentialId = cert.credentialId,
-                                    verificationLink = ""
-                                )
-                            }
-                            element.copy(items = certificationItems)
-                        } else {
-                            element
-                        }
-                    }
-                    is ResumeElement.LanguageElement -> {
-                        if (resume.languages.isNotEmpty()) {
-                            val languageItems = resume.languages.map { lang ->
-                                val proficiencyValue = when (lang.proficiency) {
-                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.NATIVE -> 1.0f
-                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.FLUENT -> 0.9f
-                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.PROFICIENT -> 0.7f
-                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.INTERMEDIATE -> 0.5f
-                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency.ELEMENTARY -> 0.3f
-                                }
-                                LanguageItem(
-                                    name = lang.name,
-                                    proficiency = proficiencyValue,
-                                    proficiencyLabel = lang.proficiency.displayName
-                                )
-                            }
-                            element.copy(items = languageItems)
-                        } else {
-                            element
-                        }
-                    }
-                    else -> element
+                if (tag != null && tag != UserInfoTag.NONE) {
+                    // Create updated element based on tag
+                    createUpdatedElementFromTag(element, tag, resume)
+                } else {
+                    element
                 }
             }
             page.copy(elements = updatedElements)
         }
 
-        _gridResume.value = _gridResume.value.copy(pages = updatedPages)
+        val updatedResume = _gridResume.value.copy(pages = updatedPages)
+        _gridResume.value = updatedResume
 
         if (saveToUndo) {
             triggerAutoSave()
         }
     }
 
+    /**
+     * Helper to create updated element from user data tag
+     */
+    private fun createUpdatedElementFromTag(
+        element: ResumeElement,
+        tag: UserInfoTag,
+        resume: Resume
+    ): ResumeElement {
+        return when (element) {
+            is ResumeElement.TextElement -> {
+                val newContent = when (tag) {
+                    UserInfoTag.NAME -> resume.personalInfo.fullName
+                    UserInfoTag.EMAIL -> resume.personalInfo.email
+                    UserInfoTag.PHONE -> resume.personalInfo.phone
+                    UserInfoTag.LOCATION -> resume.personalInfo.location
+                    UserInfoTag.PROFESSIONAL_SUMMARY -> resume.professionalSummary
+                    else -> element.content
+                }
+                if (newContent.isNotEmpty()) element.copy(content = newContent) else element
+            }
+            is ResumeElement.ImageElement -> {
+                if (tag == UserInfoTag.AVATAR && resume.personalInfo.avatar.isNotEmpty()) {
+                    element.copy(imageUrl = resume.personalInfo.avatar)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.WorkExperienceElement -> {
+                if (tag == UserInfoTag.WORK_EXPERIENCE && resume.workExperiences.isNotEmpty()) {
+                    // Convert form work experience to grid work experience items
+                    val newItems = resume.workExperiences.map { work ->
+                        WorkExperienceItem(
+                            jobTitle = work.jobTitle,
+                            company = work.company,
+                            location = work.location,
+                            startDate = work.startDate?.toString() ?: "",
+                            endDate = work.endDate?.toString() ?: "",
+                            isCurrentRole = work.isCurrentRole,
+                            responsibilities = work.responsibilities.map { ResponsibilityItem(text = it) }
+                        )
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.EducationElement -> {
+                if (tag == UserInfoTag.EDUCATION && resume.education.isNotEmpty()) {
+                    val newItems = resume.education.map { edu ->
+                        EducationItem(
+                            degree = edu.degree,
+                            institution = edu.institution,
+                            location = edu.location,
+                            startDate = edu.startDate?.toString() ?: "",
+                            endDate = edu.endDate?.toString() ?: "",
+                            gpa = edu.gpa,
+                            achievements = edu.achievements.map { AchievementItem(text = it) }
+                        )
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.SkillElement -> {
+                if (tag == UserInfoTag.SKILLS && resume.skills.isNotEmpty()) {
+                    val newItems = resume.skills.map { skill ->
+                        SkillItem(name = skill)
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.ProjectElement -> {
+                if (tag == UserInfoTag.PROJECTS && resume.projects.isNotEmpty()) {
+                    val newItems = resume.projects.map { project ->
+                        ProjectItem(
+                            name = project.title,
+                            description = project.description,
+                            startDate = project.startDate?.toString() ?: "",
+                            endDate = project.endDate?.toString() ?: "",
+                            technologies = project.technologies.joinToString(", "),
+                            link = project.link
+                        )
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.CertificationElement -> {
+                if (tag == UserInfoTag.CERTIFICATIONS && resume.certifications.isNotEmpty()) {
+                    val newItems = resume.certifications.map { cert ->
+                        CertificationItem(
+                            name = cert.name,
+                            issuer = cert.issuer,
+                            issueDate = cert.issueDate?.toString() ?: "",
+                            expiryDate = cert.expiryDate?.toString() ?: "",
+                            credentialId = cert.credentialId
+                        )
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.LanguageElement -> {
+                if (tag == UserInfoTag.LANGUAGES && resume.languages.isNotEmpty()) {
+                    val newItems = resume.languages.map { lang ->
+                        LanguageItem(
+                            name = lang.name,
+                            proficiencyLabel = lang.proficiency.name
+                        )
+                    }
+                    element.copy(items = newItems)
+                } else {
+                    element
+                }
+            }
+            is ResumeElement.ContactElement -> {
+                // Update specific contact items within the element
+                val newItems = element.items.map { item ->
+                    val newValue = when (item.userInfoTag) {
+                        UserInfoTag.EMAIL -> resume.personalInfo.email
+                        UserInfoTag.PHONE -> resume.personalInfo.phone
+                        UserInfoTag.LOCATION -> resume.personalInfo.location
+                        UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
+                        UserInfoTag.GITHUB -> resume.personalInfo.github
+                        UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
+                        else -> item.value
+                    }
+                    if (newValue.isNotEmpty()) item.copy(value = newValue) else item
+                }
+                element.copy(items = newItems)
+            }
+            else -> element
+        }
+    }
+
     // ============================================================================
-    // Undo/Redo
+    // Undo / Redo
     // ============================================================================
 
     /**
      * Undo last action
      */
     fun undo() {
-        if (undoStack.isEmpty()) return
+        if (undoStack.isNotEmpty()) {
+            // Save current state to redo stack
+            redoStack.add(_gridResume.value)
+            if (redoStack.size > maxHistorySize) redoStack.removeAt(0)
 
-        // Save current state to redo stack
-        redoStack.add(0, _gridResume.value)
-        if (redoStack.size > maxHistorySize) {
-            redoStack.removeAt(redoStack.size - 1)
+            // Restore from undo stack
+            val previousState = undoStack.removeAt(undoStack.lastIndex)
+            _gridResume.value = previousState
+
+            triggerAutoSave()
         }
-
-        // Restore from undo stack
-        _gridResume.value = undoStack.removeAt(0)
-        _selectedElement.value = null
     }
 
     /**
      * Redo last undone action
      */
     fun redo() {
-        if (redoStack.isEmpty()) return
+        if (redoStack.isNotEmpty()) {
+            // Save current state to undo stack
+            undoStack.add(_gridResume.value)
+            if (undoStack.size > maxHistorySize) undoStack.removeAt(0)
 
-        // Save current state to undo stack
-        undoStack.add(0, _gridResume.value)
-        if (undoStack.size > maxHistorySize) {
-            undoStack.removeAt(undoStack.size - 1)
+            // Restore from redo stack
+            val nextState = redoStack.removeAt(redoStack.lastIndex)
+            _gridResume.value = nextState
+
+            triggerAutoSave()
         }
-
-        // Restore from redo stack
-        _gridResume.value = redoStack.removeAt(0)
-        _selectedElement.value = null
     }
 
     /**
      * Saves current state to undo stack
      */
     private fun saveToUndoStack() {
-        undoStack.add(0, _gridResume.value)
-        if (undoStack.size > maxHistorySize) {
-            undoStack.removeAt(undoStack.size - 1)
-        }
-        // Clear redo stack when new action is performed
+        undoStack.add(_gridResume.value)
+        if (undoStack.size > maxHistorySize) undoStack.removeAt(0)
         redoStack.clear()
-    }
-
-    // ============================================================================
-    // Helper Functions
-    // ============================================================================
-
-    private fun updatePage(updatedPage: ResumePage) {
-        _gridResume.update { resume ->
-            resume.copy(
-                pages = resume.pages.map { page ->
-                    if (page.id == updatedPage.id) updatedPage else page
-                }
-            )
-        }
-    }
-
-    private fun createDefaultResume(): GridResume {
-        return GridResume(
-            name = "New Resume",
-            pages = listOf(
-                ResumePage(
-                    elements = emptyList()
-                )
-            )
-        )
-    }
-
-    private fun createResumeWithTemplate(template: GridTemplateType): GridResume {
-        // For MVP, just return default
-        // TODO: Implement actual templates
-        return createDefaultResume().copy(
-            name = "Resume - ${template.name} Template"
-        )
-    }
-
-    private fun createElementOfType(
-        type: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType,
-        position: GridPosition
-    ): ResumeElement {
-        return when (type) {
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.TEXT -> {
-                ResumeElement.TextElement(
-                    position = position,
-                    content = "New Text",
-                    textStyle = TextStyle(
-                        fontSize = 14f,
-                        color = 0xFF000000
-                    )
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.IMAGE -> {
-                ResumeElement.ImageElement(
-                    position = position,
-                    imageUrl = "",
-                    contentScale = ImageScale.FIT
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.SHAPE -> {
-                ResumeElement.ShapeElement(
-                    position = position,
-                    shapeType = ShapeType.RECTANGLE,
-                    style = ElementStyle(
-                        backgroundColor = 0xFFE0E0E0
-                    )
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.DIVIDER -> {
-                ResumeElement.ShapeElement(
-                    position = position,
-                    shapeType = ShapeType.DIVIDER,
-                    style = ElementStyle(
-                        backgroundColor = 0xFF000000
-                    ),
-                    customHeightDp = 2f // Thin divider line (2dp)
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CHART -> {
-                ResumeElement.ChartElement(
-                    position = position,
-                    chartType = ChartType.HORIZONTAL_BAR,
-                    data = ChartData()
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CONTAINER -> {
-                ResumeElement.ContainerElement(
-                    position = position
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.ICON -> {
-                ResumeElement.IconElement(
-                    position = position,
-                    iconName = "star",
-                    iconType = IconType.MATERIAL
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CONTACT -> {
-                ResumeElement.ContactElement(
-                    position = position,
-                    items = listOf(
-                        ContactItem(
-                            type = ContactType.PHONE,
-                            value = "+1 (555) 123-4567",
-                            label = "Phone:",
-                            iconName = "phone",
-                            userInfoTag = UserInfoTag.PHONE
-                        ),
-                        ContactItem(
-                            type = ContactType.EMAIL,
-                            value = "email@example.com",
-                            label = "Email:",
-                            iconName = "email",
-                            userInfoTag = UserInfoTag.EMAIL
-                        ),
-                        ContactItem(
-                            type = ContactType.ADDRESS,
-                            value = "City, State",
-                            label = "Location:",
-                            iconName = "location_on",
-                            userInfoTag = UserInfoTag.LOCATION
-                        )
-                    ),
-                    iconStyle = ContactIconStyle.ICON,
-                    spacing = 8f,
-                    orientation = ContactOrientation.VERTICAL,
-                    textStyle = TextStyle(
-                        fontSize = 12f,
-                        color = 0xFF000000
-                    ),
-                    iconSize = 16f
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.WORK_EXPERIENCE -> {
-                ResumeElement.WorkExperienceElement(
-                    position = position,
-                    items = listOf(
-                        WorkExperienceItem(
-                            jobTitle = "Job Title",
-                            company = "Company Name",
-                            location = "Location",
-                            startDate = "2020-01-01",
-                            endDate = "2022-12-31",
-                            isCurrentRole = false,
-                            responsibilities = listOf(
-                                ResponsibilityItem(text = "Responsibility 1"),
-                                ResponsibilityItem(text = "Responsibility 2")
-                            )
-                        )
-                    )
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.EDUCATION -> {
-                ResumeElement.EducationElement(
-                    position = position,
-                    items = listOf(
-                        EducationItem(
-                            degree = "Degree Name",
-                            institution = "University Name",
-                            location = "Location",
-                            startDate = "2016-09-01",
-                            endDate = "2020-05-31",
-                            gpa = "3.8",
-                            achievements = listOf(
-                                AchievementItem(text = "Achievement 1"),
-                                AchievementItem(text = "Achievement 2")
-                            )
-                        )
-                    )
-                )
-            }
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.SKILL -> {
-                ResumeElement.SkillElement(
-                    position = position,
-                    items = listOf(
-                        SkillItem(name = "Kotlin", proficiency = 0.9f, proficiencyLabel = "Expert"),
-                        SkillItem(name = "Android Development", proficiency = 0.85f, proficiencyLabel = "Advanced"),
-                        SkillItem(name = "Jetpack Compose", proficiency = 0.8f, proficiencyLabel = "Advanced"),
-                        SkillItem(name = "Java", proficiency = 0.75f, proficiencyLabel = "Proficient"),
-                        SkillItem(name = "Git", proficiency = 0.7f, proficiencyLabel = "Proficient")
-                    ),
-                    displayStyle = SkillDisplayStyle.LIST
-                )
-            }
-
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.PROJECT -> {
-                ResumeElement.ProjectElement(
-                    position = position,
-                    items = listOf(
-                        ProjectItem(
-                            name = "AI Career Coach App",
-                            description = "Android application for AI-powered career coaching and resume building",
-                            startDate = "2024-01-01",
-                            endDate = "",
-                            isOngoing = true,
-                            technologies = "Kotlin, Jetpack Compose, Android, AI/ML",
-                            link = "https://github.com/example/ai-career-coach",
-                            highlights = listOf(
-                                ProjectHighlight(text = "Built complete resume builder with grid-based editor"),
-                                ProjectHighlight(text = "Integrated AI features for interview preparation"),
-                                ProjectHighlight(text = "Designed modern UI with Material Design 3")
-                            )
-                        )
-                    ),
-                    displayStyle = ProjectDisplayStyle.STANDARD
-                )
-            }
-
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.CERTIFICATION -> {
-                ResumeElement.CertificationElement(
-                    position = position,
-                    items = listOf(
-                        CertificationItem(
-                            name = "Android Associate Developer",
-                            issuer = "Google",
-                            issueDate = "2023-06-01",
-                            expiryDate = "2026-06-01",
-                            credentialId = "ABC123XYZ",
-                            verificationLink = "https://developers.google.com/certification/verify"
-                        ),
-                        CertificationItem(
-                            name = "AWS Certified Developer",
-                            issuer = "Amazon Web Services",
-                            issueDate = "2023-03-15",
-                            expiryDate = "2026-03-15",
-                            credentialId = "DEF456UVW",
-                            verificationLink = "https://aws.amazon.com/certification/verify"
-                        )
-                    ),
-                    displayStyle = CertificationDisplayStyle.STANDARD
-                )
-            }
-
-            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType.LANGUAGE -> {
-                ResumeElement.LanguageElement(
-                    position = position,
-                    items = listOf(
-                        LanguageItem(name = "English", proficiency = 1.0f, proficiencyLabel = "Native", cefrLevel = "C2"),
-                        LanguageItem(name = "Spanish", proficiency = 0.7f, proficiencyLabel = "Intermediate", cefrLevel = "B2"),
-                        LanguageItem(name = "French", proficiency = 0.5f, proficiencyLabel = "Basic", cefrLevel = "A2")
-                    ),
-                    displayStyle = LanguageDisplayStyle.TEXT_LABELS
-                )
-            }
-        }
-    }
-
-    private fun getDefaultElementSize(type: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementType): Pair<Int, Int> {
-        return when (type) {
-            ElementType.TEXT -> Pair(8, 24) // 8 rows, 24 cols
-            ElementType.IMAGE -> Pair(16, 16) // Square
-            ElementType.SHAPE -> Pair(4, 48) // Full width line
-            ElementType.CHART -> Pair(12, 24) // Rectangular
-            ElementType.CONTAINER -> Pair(16, 24)
-            ElementType.ICON -> Pair(4, 4) // Single cell
-            ElementType.DIVIDER -> Pair(4, 48) // Full width thin line
-            ElementType.CONTACT -> Pair(12, 20) // Vertical list of contact items
-            ElementType.WORK_EXPERIENCE -> Pair(20, 48) // Full width with multiple work items
-            ElementType.EDUCATION -> Pair(20, 48) // Full width with multiple education items
-            ElementType.SKILL -> Pair(16, 48) // Full width with skills list
-            ElementType.PROJECT -> Pair(24, 48) // Full width with project details and highlights
-            ElementType.CERTIFICATION -> Pair(18, 48) // Full width with certification entries
-            ElementType.LANGUAGE -> Pair(12, 48) // Full width with language list
-        }
-    }
-
-    private fun updateElementPositionValue(element: ResumeElement, position: GridPosition): ResumeElement {
-        return when (element) {
-            is ResumeElement.TextElement -> element.copy(position = position)
-            is ResumeElement.ImageElement -> element.copy(position = position)
-            is ResumeElement.ShapeElement -> element.copy(position = position)
-            is ResumeElement.ChartElement -> element.copy(position = position)
-            is ResumeElement.ContainerElement -> element.copy(position = position)
-            is ResumeElement.IconElement -> element.copy(position = position)
-            is ResumeElement.ContactElement -> element.copy(position = position)
-            is ResumeElement.WorkExperienceElement -> element.copy(position = position)
-            is ResumeElement.EducationElement -> element.copy(position = position)
-            is ResumeElement.SkillElement -> element.copy(position = position)
-            is ResumeElement.ProjectElement -> element.copy(position = position)
-            is ResumeElement.CertificationElement -> element.copy(position = position)
-            is ResumeElement.LanguageElement -> element.copy(position = position)
-        }
     }
 
     // ============================================================================
@@ -1333,37 +972,110 @@ class GridEditorViewModel(
     // ============================================================================
 
     /**
-     * Export resume to PDF
+     * Exports the resume to PDF
      */
-    fun exportToPdf() {
+    /**
+     * Exports the resume to PDF
+     */
+    fun exportToPdf(file: java.io.File, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
+            _pdfExportState.value = PdfExportState.PreparingImages
             try {
-                val result = pdfExporter.exportToDownloads(_gridResume.value)
-
-                result.onSuccess { exportResult ->
-                    _pdfExportState.value = PdfExportState.Success(exportResult.uri, exportResult.fileSizeBytes)
-                    _events.emit(GridEditorEvent.PdfExportSuccess(exportResult.uri, exportResult.fileSizeBytes))
-                }.onFailure { throwable ->
-                    _pdfExportState.value = PdfExportState.Error(throwable, throwable.message ?: "Unknown error")
-                    _events.emit(GridEditorEvent.PdfExportError(throwable.message ?: "Export failed"))
+                pdfExporter.generatePdf(_gridResume.value, file)
+                // Get file size
+                val fileSize = try {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use {
+                        it.statSize
+                    } ?: 0L
+                } catch (e: Exception) {
+                    0L
                 }
+                _pdfExportState.value = PdfExportState.Success(uri, fileSize)
             } catch (e: Exception) {
+                e.printStackTrace()
                 _pdfExportState.value = PdfExportState.Error(e, e.message ?: "Unknown error")
-                _events.emit(GridEditorEvent.PdfExportError(e.message ?: "Export failed"))
             }
         }
     }
 
     /**
-     * Reset export state
+     * Resets PDF export state
      */
-    fun resetExportState() {
+    fun resetPdfExportState() {
         _pdfExportState.value = PdfExportState.Idle
+    }
+
+    // ============================================================================
+    // Helpers
+    // ============================================================================
+
+    private fun updatePage(page: ResumePage) {
+        val currentPages = _gridResume.value.pages.toMutableList()
+        val pageIndex = currentPages.indexOfFirst { it.id == page.id }
+        if (pageIndex != -1) {
+            currentPages[pageIndex] = page
+            _gridResume.value = _gridResume.value.copy(pages = currentPages)
+        }
+    }
+
+    private fun createDefaultResume(): GridResume {
+        return GridResume(
+            name = "My Resume",
+            pages = listOf(ResumePage())
+        )
+    }
+
+    private fun createResumeWithTemplate(templateType: GridTemplateType): GridResume {
+        // This would typically load from a template repository or factory
+        // For now, we'll just return a basic resume with the template type
+        // In a real app, this would populate elements based on the template
+        return GridResume(
+            name = "My Resume (${templateType.name})",
+            pages = listOf(ResumePage())
+        )
+    }
+
+    private fun getDefaultElementSize(type: ElementType): Pair<Int, Int> {
+        return when (type) {
+            ElementType.TEXT -> Pair(2, 12) // rowSpan, colSpan
+            ElementType.IMAGE -> Pair(8, 8)
+            ElementType.SHAPE -> Pair(4, 4)
+            ElementType.DIVIDER -> Pair(1, 48)
+            ElementType.CHART -> Pair(4, 12)
+            ElementType.ICON -> Pair(2, 2)
+            ElementType.CONTAINER -> Pair(10, 48)
+            ElementType.CONTACT -> Pair(2, 48)
+            ElementType.WORK_EXPERIENCE -> Pair(10, 48)
+            ElementType.EDUCATION -> Pair(8, 48)
+            ElementType.SKILL -> Pair(6, 48)
+            ElementType.PROJECT -> Pair(8, 48)
+            ElementType.CERTIFICATION -> Pair(6, 48)
+            ElementType.LANGUAGE -> Pair(4, 48)
+        }
+    }
+
+    private fun createElementOfType(type: ElementType, position: GridPosition): ResumeElement {
+        return when (type) {
+            ElementType.TEXT -> ResumeElement.TextElement(position = position, content = "New Text")
+            ElementType.IMAGE -> ResumeElement.ImageElement(position = position)
+            ElementType.SHAPE -> ResumeElement.ShapeElement(position = position)
+            ElementType.DIVIDER -> ResumeElement.ShapeElement(position = position, shapeType = ShapeType.DIVIDER)
+            ElementType.CHART -> ResumeElement.ChartElement(position = position)
+            ElementType.ICON -> ResumeElement.IconElement(position = position, iconName = "star")
+            ElementType.CONTAINER -> ResumeElement.ContainerElement(position = position)
+            ElementType.CONTACT -> ResumeElement.ContactElement(position = position)
+            ElementType.WORK_EXPERIENCE -> ResumeElement.WorkExperienceElement(position = position)
+            ElementType.EDUCATION -> ResumeElement.EducationElement(position = position)
+            ElementType.SKILL -> ResumeElement.SkillElement(position = position)
+            ElementType.PROJECT -> ResumeElement.ProjectElement(position = position)
+            ElementType.CERTIFICATION -> ResumeElement.CertificationElement(position = position)
+            ElementType.LANGUAGE -> ResumeElement.LanguageElement(position = position)
+        }
     }
 }
 
 /**
- * Drag state during drag operation
+ * Data class for drag state
  */
 data class DragState(
     val element: ResumeElement,
@@ -1373,13 +1085,12 @@ data class DragState(
 )
 
 /**
- * Events emitted by the ViewModel
+ * Events for UI consumption
  */
 sealed class GridEditorEvent {
     object ResumeLoaded : GridEditorEvent()
     data class SaveSuccess(val message: String) : GridEditorEvent()
     data class SaveError(val message: String) : GridEditorEvent()
     data class TemplateApplied(val template: GridTemplateType) : GridEditorEvent()
-    data class PdfExportSuccess(val uri: Uri, val fileSizeBytes: Long) : GridEditorEvent()
-    data class PdfExportError(val message: String) : GridEditorEvent()
 }
+

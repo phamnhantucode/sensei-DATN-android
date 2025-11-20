@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 
 /**
  * AI-powered responsibility improvement dialog

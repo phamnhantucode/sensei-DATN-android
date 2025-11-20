@@ -17,19 +17,16 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
-
-/**
- * Renders a contact element on the resume
- * Displays a list of contact items (phone, email, address, social links, etc.)
- */
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.font.FontStyle
+import android.widget.ImageView
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.SvgIconLoader
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager
 @Composable
 fun ContactElementRenderer(
     element: ResumeElement.ContactElement,
@@ -151,7 +148,7 @@ fun ContactElementRenderer(
 private fun ContactItemRow(
     item: ContactItem,
     iconStyle: ContactIconStyle,
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     iconSize: Float,
     iconAfterText: Boolean = false,
     verticalAlignment: VerticalAlignment = VerticalAlignment.CENTER,
@@ -194,7 +191,7 @@ private fun ContactItemRow(
 private fun RenderIconOrLabel(
     item: ContactItem,
     iconStyle: ContactIconStyle,
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     iconSize: Float,
     zoomLevel: Float = 1f
 ) {
@@ -279,11 +276,11 @@ private fun SvgIcon(
 /**
  * Converts custom TextStyle to Compose TextStyle
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): TextStyle {
-    return TextStyle(
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): androidx.compose.ui.text.TextStyle {
+    return androidx.compose.ui.text.TextStyle(
         fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
-        fontFamily = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.poppinsFontFamily,
+        fontFamily = FontManager.poppinsFontFamily,
         color = Color(color),
         lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: androidx.compose.ui.unit.TextUnit.Unspecified,
         letterSpacing = (letterSpacing * zoomLevel).sp,

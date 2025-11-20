@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.res.ResourcesCompat
 import com.phamnhantucode.aicareercoach.R
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle
 
 /**
  * Font Manager

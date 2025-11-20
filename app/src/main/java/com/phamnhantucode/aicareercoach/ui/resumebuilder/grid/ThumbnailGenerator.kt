@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Base64
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ColorConverter
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream

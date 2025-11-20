@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 
 /**
  * Renders a grid background for the resume editor

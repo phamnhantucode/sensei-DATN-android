@@ -6,9 +6,9 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridResume
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElementTypeAdapter
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 
 /**
  * Room Entity for storing grid-based resume designs

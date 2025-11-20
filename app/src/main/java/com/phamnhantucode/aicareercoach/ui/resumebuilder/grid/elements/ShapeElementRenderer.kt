@@ -15,8 +15,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ShapeType
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType
 
 /**
  * Renders a shape element on the resume

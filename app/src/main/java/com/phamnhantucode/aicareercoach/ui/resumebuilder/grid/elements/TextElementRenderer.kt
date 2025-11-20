@@ -20,7 +20,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.TextStyle
+// TextStyle conflict resolved - using fully qualified names
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,9 +35,11 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextAlignment
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.VerticalTextAlignment
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementStyle
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextAlignment
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.VerticalTextAlignment
 
 /**
  * Renders a text element on the resume
@@ -123,7 +125,7 @@ fun TextElementRenderer(
  */
 private fun drawElementStyle(
     canvas: android.graphics.Canvas,
-    style: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementStyle,
+    style: ElementStyle,
     bounds: RectF,
     zoomLevel: Float
 ) {
@@ -225,7 +227,7 @@ private fun createTextLayout(
     width: Int,
     alignment: TextAlignment,
     maxLines: Int?,
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle
+    textStyle: TextStyle
 ): StaticLayout {
     val layoutAlignment = when (alignment) {
         TextAlignment.LEFT -> Layout.Alignment.ALIGN_NORMAL
@@ -339,7 +341,7 @@ private fun EditableTextRenderer(
 @Composable
 private fun EditableText(
     text: String,
-    textStyle: TextStyle,
+    textStyle: androidx.compose.ui.text.TextStyle,
     alignment: TextAlignment,
     onContentChange: (String) -> Unit
 ) {
@@ -375,9 +377,9 @@ private fun EditableText(
 /**
  * Converts custom TextStyle to Compose TextStyle
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): TextStyle {
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle.toComposeTextStyle(zoomLevel: Float = 1f): androidx.compose.ui.text.TextStyle {
     val scaledFontSize = (fontSize * zoomLevel).sp
-    return TextStyle(
+    return androidx.compose.ui.text.TextStyle(
         fontSize = scaledFontSize,
         fontWeight = fontWeight,
         fontFamily = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.poppinsFontFamily,

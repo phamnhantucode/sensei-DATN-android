@@ -3,8 +3,8 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ShapeType
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ElementPdfRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordinateMapper
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfRenderContext
@@ -209,7 +209,7 @@ class ShapeElementPdfRenderer : ElementPdfRenderer<ResumeElement.ShapeElement> {
     private fun drawShadow(
         canvas: Canvas,
         bounds: RectF,
-        style: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementStyle,
+        style: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementStyle,
         cornerRadius: Float,
         mapper: GridCoordinateMapper,
         context: PdfRenderContext

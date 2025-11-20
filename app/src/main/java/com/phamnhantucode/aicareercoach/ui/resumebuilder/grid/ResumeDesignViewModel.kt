@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
 import com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

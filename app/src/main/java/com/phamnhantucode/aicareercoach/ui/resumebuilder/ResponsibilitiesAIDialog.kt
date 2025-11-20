@@ -24,9 +24,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.data.ai.ResponsibilityAIRepository
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.OptionType
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResponsibilityAIState
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResponsibilityImprovementOptions
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.OptionType
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityAIState
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

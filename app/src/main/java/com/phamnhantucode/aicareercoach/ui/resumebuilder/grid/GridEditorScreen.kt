@@ -45,6 +45,8 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElem
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.SkillElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.WorkExperienceElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -297,10 +299,18 @@ fun GridEditorScreen(
             exportState = pdfExportState,
             onDismiss = {
                 showExportDialog = false
-                viewModel.resetExportState()
+                viewModel.resetPdfExportState()
             },
             onExport = {
-                viewModel.exportToPdf()
+                // Create a temporary file URI for the PDF
+                val fileName = "resume_${System.currentTimeMillis()}.pdf"
+                val file = java.io.File(context.cacheDir, fileName)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                viewModel.exportToPdf(file, uri)
             },
             onShare = { uri ->
                 // Share the PDF using Android share sheet
@@ -1197,25 +1207,6 @@ private fun PdfExportDialog(
     )
 }
 
-/**
- * Element type enum for adding new elements
- */
-enum class ElementType {
-    TEXT,
-    IMAGE,
-    SHAPE,
-    DIVIDER,
-    CHART,
-    CONTAINER,
-    ICON,
-    CONTACT,
-    WORK_EXPERIENCE,
-    EDUCATION,
-    SKILL,
-    PROJECT,
-    CERTIFICATION,
-    LANGUAGE
-}
 
 // Icon aliases for missing icons (using available Material Icons)
 private object IconAliases {

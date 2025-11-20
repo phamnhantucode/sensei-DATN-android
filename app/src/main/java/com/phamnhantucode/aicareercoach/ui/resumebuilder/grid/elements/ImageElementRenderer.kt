@@ -23,8 +23,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ImageScale
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ImageScale
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 
 /**
  * Renders an image element on the resume

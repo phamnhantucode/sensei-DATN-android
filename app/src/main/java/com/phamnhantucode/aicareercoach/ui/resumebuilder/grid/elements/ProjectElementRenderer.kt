@@ -20,13 +20,14 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
+// TextStyle conflict resolved - using fully qualified names
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -284,7 +285,7 @@ private fun drawNameAndDateRow(
 private fun drawText(
     canvas: android.graphics.Canvas,
     text: String,
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     context: android.content.Context,
     width: Float,
     yOffset: Float,
@@ -429,7 +430,7 @@ private fun drawHighlights(
  * Create text paint with styling (no zoom applied, zoom handled by canvas scale)
  */
 private fun createTextPaint(
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     context: android.content.Context
 ): TextPaint {
     val density = context.resources.displayMetrics.density
@@ -438,11 +439,7 @@ private fun createTextPaint(
         textSize = textStyle.fontSize * density
         color = textStyle.color.toInt()
         
-        typeface = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.getPoppinsTypeface(
-            context,
-            textStyle.fontWeight,
-            textStyle.isItalic
-        )
+        typeface = FontManager.getPoppinsTypeface(context, textStyle)
         
         isUnderlineText = textStyle.isUnderlined
         letterSpacing = textStyle.letterSpacing
@@ -549,13 +546,13 @@ private fun formatDate(dateString: String, dateFormat: DateFormat): String {
 /**
  * Convert custom TextStyle to Compose TextStyle (kept for compatibility)
  */
-private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle.toComposeTextStyle(
+private fun com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle.toComposeTextStyle(
     zoomLevel: Float = 1f
-): TextStyle {
-    return TextStyle(
+): androidx.compose.ui.text.TextStyle {
+    return androidx.compose.ui.text.TextStyle(
         fontSize = (fontSize * zoomLevel).sp,
         fontWeight = fontWeight,
-        fontFamily = com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager.poppinsFontFamily,
+        fontFamily = FontManager.poppinsFontFamily,
         color = Color(color),
         lineHeight = lineHeight?.let { (it * zoomLevel).sp } ?: TextUnit.Unspecified,
         letterSpacing = (letterSpacing * zoomLevel).sp,

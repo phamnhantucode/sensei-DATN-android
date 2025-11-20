@@ -2,7 +2,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export
 
 import android.graphics.Canvas
 import android.graphics.RectF
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 
 /**
  * Base interface for rendering resume elements to PDF canvas

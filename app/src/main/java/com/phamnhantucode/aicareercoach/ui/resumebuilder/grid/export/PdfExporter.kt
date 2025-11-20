@@ -2,7 +2,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export
 
 import android.content.Context
 import android.net.Uri
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.File

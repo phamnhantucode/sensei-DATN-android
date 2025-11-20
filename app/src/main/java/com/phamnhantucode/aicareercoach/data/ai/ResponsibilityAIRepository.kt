@@ -1,8 +1,8 @@
 package com.phamnhantucode.aicareercoach.data.ai
 
 import com.phamnhantucode.aicareercoach.BuildConfig
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResponsibilityImprovementOptions
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResponsibilityImprovementResult
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementOptions
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl

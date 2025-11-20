@@ -5,7 +5,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ElementPdfRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordinateMapper
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfRenderContext

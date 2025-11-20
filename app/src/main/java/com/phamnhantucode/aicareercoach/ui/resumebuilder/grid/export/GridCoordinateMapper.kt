@@ -1,8 +1,8 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export
 
 import android.graphics.RectF
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridConfig
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridPosition
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
 
 /**
  * Grid Coordinate Mapper

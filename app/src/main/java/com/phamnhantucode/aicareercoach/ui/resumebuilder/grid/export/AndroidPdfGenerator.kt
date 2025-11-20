@@ -8,8 +8,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridResume
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -164,7 +164,7 @@ class AndroidPdfGenerator(
     private suspend fun renderElements(
         canvas: android.graphics.Canvas,
         elements: List<ResumeElement>,
-        gridConfig: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridConfig
+        gridConfig: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig
     ) {
         val mapper = GridCoordinateMapper(gridConfig, config)
         android.util.Log.d("PDF_Export", "GridCoordinateMapper config:\n${mapper.toString()}")

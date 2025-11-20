@@ -1,6 +1,7 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import com.google.gson.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import java.lang.reflect.Type
 
 /**

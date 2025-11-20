@@ -30,6 +30,7 @@ import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlinx.coroutines.launch
 
 /**

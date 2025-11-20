@@ -5,7 +5,7 @@ import android.util.Log
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
 import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

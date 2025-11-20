@@ -39,6 +39,7 @@ import android.text.TextPaint
 import android.text.StaticLayout
 import android.text.Layout
 import androidx.compose.ui.platform.LocalContext
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 
 /**
  * A draggable element on the grid
@@ -1049,7 +1050,7 @@ private fun calculateWorkExperienceContentHeight(
  * Create text paint for work experience fields
  */
 private fun createWorkExperienceTextPaint(
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     density: Float,
     context: android.content.Context
 ): TextPaint {
@@ -1058,11 +1059,7 @@ private fun createWorkExperienceTextPaint(
         textSize = textStyle.fontSize * density
         color = textStyle.color.toInt()
         
-        typeface = FontManager.getPoppinsTypeface(
-            context,
-            textStyle.fontWeight,
-            textStyle.isItalic
-        )
+        typeface = FontManager.getPoppinsTypeface(context, textStyle)
         
         isUnderlineText = textStyle.isUnderlined
         letterSpacing = textStyle.letterSpacing

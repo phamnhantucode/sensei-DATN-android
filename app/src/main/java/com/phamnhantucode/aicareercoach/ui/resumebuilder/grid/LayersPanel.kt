@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 
 /**
  * Panel for managing layers (elements)
@@ -120,7 +121,7 @@ private fun LayerItem(
     dragModifier: Modifier = Modifier
 ) {
     val backgroundColor = when {
-        isDragging -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        isDragging -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         else -> Color.Transparent
     }

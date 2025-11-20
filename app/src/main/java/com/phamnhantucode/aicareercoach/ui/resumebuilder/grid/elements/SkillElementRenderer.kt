@@ -18,7 +18,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.FontManager
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlin.math.roundToInt
 
 /**
@@ -524,7 +525,7 @@ private fun drawSkillGrouped(
  * Create text paint for drawing text on canvas
  */
 private fun createTextPaint(
-    textStyle: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.TextStyle,
+    textStyle: TextStyle,
     context: android.content.Context
 ): TextPaint {
     return TextPaint().apply {
@@ -533,11 +534,7 @@ private fun createTextPaint(
         textSize = textStyle.fontSize * density
         color = textStyle.color.toInt()
         
-        typeface = FontManager.getPoppinsTypeface(
-            context,
-            textStyle.fontWeight,
-            textStyle.isItalic
-        )
+        typeface = FontManager.getPoppinsTypeface(context, textStyle)
         
         isUnderlineText = textStyle.isUnderlined
         

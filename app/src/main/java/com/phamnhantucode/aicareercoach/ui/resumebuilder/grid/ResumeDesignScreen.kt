@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import java.text.SimpleDateFormat
 import java.util.*
 

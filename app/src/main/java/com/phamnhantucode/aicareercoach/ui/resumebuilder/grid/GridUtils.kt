@@ -2,6 +2,9 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import kotlin.math.roundToInt
 
 /**

@@ -1,8 +1,8 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers
 
 import android.graphics.*
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ImageScale
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ImageScale
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ElementPdfRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordinateMapper
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportException
@@ -248,7 +248,7 @@ class ImageElementPdfRenderer : ElementPdfRenderer<ResumeElement.ImageElement> {
      */
     private fun drawElementStyle(
         canvas: Canvas,
-        style: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ElementStyle,
+        style: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementStyle,
         bounds: RectF,
         mapper: GridCoordinateMapper,
         context: PdfRenderContext,
