@@ -96,7 +96,8 @@ sealed class ResumeElement {
         override val isVisible: Boolean = true,
         val children: List<String> = emptyList(), // Child element IDs
         val padding: Padding = Padding(),
-        val clipContent: Boolean = false
+        val clipContent: Boolean = false,
+        val layoutMode: LayoutMode = LayoutMode.GRID // How children are positioned
     ) : ResumeElement()
 
     /**

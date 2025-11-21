@@ -148,13 +148,21 @@ object GridUtils {
      * @param position Position to check
      * @param elements List of existing elements
      * @param excludeId ID of element to exclude from collision check (for moving elements)
+     * @param layoutMode Layout mode that determines collision behavior (null = GRID)
      * @return True if collision detected
      */
     fun hasCollision(
         position: GridPosition,
         elements: List<ResumeElement>,
-        excludeId: String? = null
+        excludeId: String? = null,
+        layoutMode: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode? = null
     ): Boolean {
+        // In FREE layout mode, elements can overlap freely
+        if (layoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.FREE) {
+            return false
+        }
+        
+        // In GRID mode (or default), check for collisions
         return elements.any { element ->
             element.id != excludeId && element.position.overlaps(position)
         }

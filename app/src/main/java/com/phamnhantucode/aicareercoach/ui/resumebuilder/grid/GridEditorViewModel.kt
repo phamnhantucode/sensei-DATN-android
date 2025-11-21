@@ -133,7 +133,7 @@ class GridEditorViewModel(
                         val result = gridResumeRepository.getDesign(designId)
                         val gridResume = result.getOrNull()
                         if (gridResume != null) {
-                            _gridResume.value = gridResume
+                            _gridResume.value = migrateToFreeLayoutMode(gridResume)
                             linkedResumeId = null // Grid designs are separate from form resumes
                             android.util.Log.d("GridEditorViewModel", "Loaded design: $designId")
                         } else {
@@ -178,7 +178,8 @@ class GridEditorViewModel(
                             // Load from SharedPreferences
                             try {
                                 val savedGridResume = gson.fromJson(savedGridResumeJson, GridResume::class.java)
-                                _gridResume.value = savedGridResume
+                                // Migrate to FREE layout mode for all pages
+                                _gridResume.value = migrateToFreeLayoutMode(savedGridResume)
                                 // Restore the linked resume ID
                                 linkedResumeId = savedResumeId
                             } catch (e: Exception) {
@@ -191,7 +192,7 @@ class GridEditorViewModel(
                                 if (formResume != null) {
                                     // Convert form resume to grid resume - this preserves user data
                                     android.util.Log.d("GridEditorViewModel", "Recovered resume from database after SharedPreferences parse failure")
-                                    _gridResume.value = formResume.toGridResume()
+                                    _gridResume.value = migrateToFreeLayoutMode(formResume.toGridResume())
                                     linkedResumeId = formResume.id
                                 } else {
                                     // Only fall back to empty resume if repository also has no data
@@ -207,7 +208,7 @@ class GridEditorViewModel(
 
                             if (formResume != null) {
                                 // Convert form resume to grid resume
-                                _gridResume.value = formResume.toGridResume()
+                                _gridResume.value = migrateToFreeLayoutMode(formResume.toGridResume())
                                 // Store the resume ID so we update this record instead of creating new ones
                                 linkedResumeId = formResume.id
                             } else {
@@ -680,11 +681,13 @@ class GridEditorViewModel(
         val currentPage = _gridResume.value.pages.firstOrNull() ?: return
 
         // Check if position is valid
+        // Use page's layout mode to determine collision behavior
         val isValid = GridUtils.isValidPosition(newPosition, _gridResume.value.gridConfig) &&
                       !GridUtils.hasCollision(
                           position = newPosition,
                           elements = currentPage.elements,
-                          excludeId = currentDrag.element.id
+                          excludeId = currentDrag.element.id,
+                          layoutMode = currentPage.layoutMode  // Pass page layout mode
                       )
 
         _draggedElement.value = currentDrag.copy(
@@ -1195,6 +1198,17 @@ class GridEditorViewModel(
             ElementType.CERTIFICATION -> ResumeElement.CertificationElement(position = position)
             ElementType.LANGUAGE -> ResumeElement.LanguageElement(position = position)
         }
+    }
+
+    /**
+     * Migrates old resumes to FREE layout mode
+     * This ensures loaded resumes allow element overlapping
+     */
+    private fun migrateToFreeLayoutMode(resume: GridResume): GridResume {
+        val updatedPages = resume.pages.map { page ->
+            page.copy(layoutMode = LayoutMode.FREE)
+        }
+        return resume.copy(pages = updatedPages)
     }
 }
 

@@ -208,3 +208,12 @@ enum class GridTemplateType {
     ACADEMIC,
     TECHNICAL
 }
+
+/**
+ * Layout mode for container elements
+ * Determines how child elements are positioned and whether they can overlap
+ */
+enum class LayoutMode {
+    FREE,  // Elements can freely overlap, no collision detection within container
+    GRID   // Elements snap to grid and cannot overlap (default behavior)
+}

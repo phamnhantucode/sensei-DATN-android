@@ -31,7 +31,8 @@ data class GridResume(
 data class ResumePage(
     val id: String = UUID.randomUUID().toString(),
     val elements: List<ResumeElement> = emptyList(),
-    val backgroundColor: Long = 0xFFFFFFFF
+    val backgroundColor: Long = 0xFFFFFFFF,
+    val layoutMode: LayoutMode = LayoutMode.FREE // Page-level layout mode - FREE by default
 )
 
 /**
