@@ -47,6 +47,17 @@ class AndroidPdfGenerator(
     private val projectRenderer = ProjectElementPdfRenderer()
     private val certificationRenderer = CertificationElementPdfRenderer()
     private val languageRenderer = LanguageElementPdfRenderer()
+    
+    // Container renderer with recursive child rendering callback
+    private val containerRenderer = ContainerElementPdfRenderer { canvas, container ->
+        // This callback renders the children of a container
+        renderContainerChildren(canvas, container)
+    }
+    
+    // Store current render state for recursive rendering
+    private var currentElements: List<ResumeElement> = emptyList()
+    private lateinit var currentMapper: GridCoordinateMapper
+    private lateinit var currentRenderContext: PdfRenderContext
 
     override fun generatePdf(resume: GridResume, outputFile: File): Flow<PdfExportState> = flow {
         try {
@@ -170,6 +181,11 @@ class AndroidPdfGenerator(
         android.util.Log.d("PDF_Export", "GridCoordinateMapper config:\n${mapper.toString()}")
         android.util.Log.d("PDF_Export", "Device density: ${context.resources.displayMetrics.density}, scaledDensity: ${context.resources.displayMetrics.scaledDensity}")
         val renderContext = PdfRenderContext(context, config, imageCache, colorConverter)
+        
+        // Store current state for recursive container rendering
+        currentElements = elements
+        currentMapper = mapper
+        currentRenderContext = renderContext
 
         elements.forEach { element ->
             try {
@@ -243,8 +259,8 @@ class AndroidPdfGenerator(
                     }
 
                     is ResumeElement.ContainerElement -> {
-                        // Containers are just layout helpers, skip rendering
-                        // Their children are rendered separately
+                        val bounds = mapper.gridToPdfRect(element.position)
+                        containerRenderer.render(canvas, element, bounds, mapper, renderContext)
                     }
                 }
             } catch (e: Exception) {
@@ -314,4 +330,104 @@ class AndroidPdfGenerator(
             context.contentResolver.update(uri, completedValues, null, null)
         }
     }
+    
+    /**
+     * Render children of a container element
+     * This is called by the ContainerElementPdfRenderer's callback
+     */
+    private suspend fun renderContainerChildren(
+        canvas: android.graphics.Canvas,
+        container: ResumeElement.ContainerElement
+    ) {
+        // Find child elements by their IDs
+        val childElements = currentElements.filter { element ->
+            container.children.contains(element.id)
+        }.sortedBy { it.zIndex }
+        
+        // Render each child element
+        childElements.forEach { child ->
+            try {
+                when (child) {
+                    is ResumeElement.TextElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        textRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ShapeElement -> {
+                        val bounds = if (child.customWidthDp != null || child.customHeightDp != null) {
+                            currentMapper.customSizeToRect(
+                                child.position,
+                                child.customWidthDp,
+                                child.customHeightDp
+                            )
+                        } else {
+                            currentMapper.gridToPdfRect(child.position)
+                        }
+                        shapeRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ImageElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        imageRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ChartElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        chartRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.IconElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        iconRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ContactElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        contactRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.WorkExperienceElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        workExperienceRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.EducationElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        educationRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.SkillElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        skillRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ProjectElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        projectRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.CertificationElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        certificationRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.LanguageElement -> {
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        languageRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                    
+                    is ResumeElement.ContainerElement -> {
+                        // Nested container - render recursively
+                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        containerRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
+                    }
+                }
+            } catch (e: Exception) {
+                // Log error but continue rendering other children
+                android.util.Log.e("PDF_Export", "Error rendering container child: ${child.id}", e)
+                e.printStackTrace()
+            }
+        }
+    }
 }
+

@@ -424,7 +424,8 @@ private fun CommonPropertiesSection(
                 checked = element.position.heightMode == SizeMode.WRAP_CONTENT,
                 onCheckedChange = { wrapHeight ->
                     val newMode = if (wrapHeight) SizeMode.WRAP_CONTENT else SizeMode.FIXED
-                    val newPosition = element.position.copy(heightMode = newMode)
+                    // Clear cached height when changing mode so it recalculates
+                    val newPosition = element.position.copy(heightMode = newMode, cachedHeightDp = null)
                     onUpdateElement(updateElementPosition(element, newPosition))
                 }
             )

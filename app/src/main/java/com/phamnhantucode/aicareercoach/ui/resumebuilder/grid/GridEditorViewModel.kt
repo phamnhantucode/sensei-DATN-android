@@ -543,6 +543,115 @@ class GridEditorViewModel(
         triggerAutoSave()
     }
 
+    /**
+     * Moves an element into a container
+     */
+    fun moveElementToContainer(elementId: String, containerId: String) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val element = currentPage.elements.find { it.id == elementId } ?: return
+        val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement ?: return
+
+        // Prevent circular dependency
+        if (elementId == containerId) return
+        if (element is ResumeElement.ContainerElement && isAncestor(element, containerId, currentPage.elements)) return
+
+        // Remove from old parent if any
+        val updatedElements = currentPage.elements.map { el ->
+            if (el is ResumeElement.ContainerElement && el.children.contains(elementId)) {
+                el.copy(children = el.children - elementId)
+            } else {
+                el
+            }
+        }.toMutableList()
+
+        // Update container with new child
+        val updatedContainerIndex = updatedElements.indexOfFirst { it.id == containerId }
+        if (updatedContainerIndex != -1) {
+            val updatedContainer = (updatedElements[updatedContainerIndex] as ResumeElement.ContainerElement).let {
+                it.copy(children = it.children + elementId)
+            }
+            updatedElements[updatedContainerIndex] = updatedContainer
+        }
+
+        // Update element position to be relative to container
+        // We need to calculate the relative position
+        // For now, let's just reset to 0,0 or keep absolute if we can't calculate
+        // Ideally: relativeRow = elementRow - containerRow
+        val newRow = (element.position.row - container.position.row).coerceAtLeast(0)
+        val newCol = (element.position.col - container.position.col).coerceAtLeast(0)
+        
+        val updatedElement = element.update(
+            position = element.position.copy(row = newRow, col = newCol)
+        )
+        
+        val elementIndex = updatedElements.indexOfFirst { it.id == elementId }
+        if (elementIndex != -1) {
+            updatedElements[elementIndex] = updatedElement
+        }
+
+        val updatedPage = currentPage.copy(elements = updatedElements)
+        updatePage(updatedPage)
+        
+        triggerAutoSave()
+    }
+
+    /**
+     * Moves an element out of a container (to top level)
+     */
+    fun moveElementOut(elementId: String) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val element = currentPage.elements.find { it.id == elementId } ?: return
+
+        // Find parent first to calculate absolute position
+        val parent = currentPage.elements.find { 
+            it is ResumeElement.ContainerElement && it.children.contains(elementId) 
+        } as? ResumeElement.ContainerElement
+
+        // Remove from parent(s)
+        val updatedElements = currentPage.elements.map { el ->
+            if (el is ResumeElement.ContainerElement && el.children.contains(elementId)) {
+                el.copy(children = el.children - elementId)
+            } else {
+                el
+            }
+        }.toMutableList()
+
+        if (parent != null) {
+            val absoluteRow = parent.position.row + element.position.row
+            val absoluteCol = parent.position.col + element.position.col
+            
+            val updatedElement = element.update(
+                position = element.position.copy(row = absoluteRow, col = absoluteCol)
+            )
+            
+            val elementIndex = updatedElements.indexOfFirst { it.id == elementId }
+            if (elementIndex != -1) {
+                updatedElements[elementIndex] = updatedElement
+            }
+        }
+
+        val updatedPage = currentPage.copy(elements = updatedElements)
+        updatePage(updatedPage)
+        
+        triggerAutoSave()
+    }
+
+    private fun isAncestor(potentialAncestor: ResumeElement.ContainerElement, targetId: String, allElements: List<ResumeElement>): Boolean {
+        if (potentialAncestor.children.contains(targetId)) return true
+        
+        for (childId in potentialAncestor.children) {
+            val child = allElements.find { it.id == childId }
+            if (child is ResumeElement.ContainerElement) {
+                if (isAncestor(child, targetId, allElements)) return true
+            }
+        }
+        return false
+    }
+
     // ============================================================================
     // Drag & Drop
     // ============================================================================
@@ -979,18 +1088,33 @@ class GridEditorViewModel(
      */
     fun exportToPdf(file: java.io.File, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            _pdfExportState.value = PdfExportState.PreparingImages
             try {
-                pdfExporter.generatePdf(_gridResume.value, file)
-                // Get file size
-                val fileSize = try {
-                    context.contentResolver.openFileDescriptor(uri, "r")?.use {
-                        it.statSize
-                    } ?: 0L
-                } catch (e: Exception) {
-                    0L
+                // Collect the flow to actually execute the PDF generation
+                pdfExporter.generatePdf(_gridResume.value, file).collect { state ->
+                    when (state) {
+                        is PdfExportState.Idle,
+                        is PdfExportState.PreparingImages,
+                        is PdfExportState.RenderingPage,
+                        is PdfExportState.SavingFile -> {
+                            // Emit progress states
+                            _pdfExportState.value = state
+                        }
+                        is PdfExportState.Success -> {
+                            // Override state with our URI (generatePdf returns File URI, we want the MediaStore URI)
+                            val fileSize = try {
+                                context.contentResolver.openFileDescriptor(uri, "r")?.use {
+                                    it.statSize
+                                } ?: state.fileSizeBytes
+                            } catch (e: Exception) {
+                                state.fileSizeBytes
+                            }
+                            _pdfExportState.value = PdfExportState.Success(uri, fileSize)
+                        }
+                        is PdfExportState.Error -> {
+                            _pdfExportState.value = state
+                        }
+                    }
                 }
-                _pdfExportState.value = PdfExportState.Success(uri, fileSize)
             } catch (e: Exception) {
                 e.printStackTrace()
                 _pdfExportState.value = PdfExportState.Error(e, e.message ?: "Unknown error")

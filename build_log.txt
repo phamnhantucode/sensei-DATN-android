@@ -1,0 +1,96 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :reorderable:preBuild UP-TO-DATE
+> Task :reorderable:preDebugBuild UP-TO-DATE
+> Task :reorderable:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :reorderable:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :reorderable:generateDebugResValues UP-TO-DATE
+> Task :reorderable:generateDebugResources UP-TO-DATE
+> Task :reorderable:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :reorderable:extractDeepLinksDebug UP-TO-DATE
+> Task :reorderable:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :reorderable:compileDebugLibraryResources UP-TO-DATE
+> Task :reorderable:parseDebugLocalResources UP-TO-DATE
+> Task :reorderable:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :reorderable:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :reorderable:compileDebugKotlin UP-TO-DATE
+> Task :reorderable:javaPreCompileDebug UP-TO-DATE
+> Task :reorderable:compileDebugJavaWithJavac NO-SOURCE
+> Task :reorderable:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :reorderable:mergeDebugShaders UP-TO-DATE
+> Task :reorderable:compileDebugShaders NO-SOURCE
+> Task :reorderable:generateDebugAssets UP-TO-DATE
+> Task :reorderable:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :reorderable:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :reorderable:processDebugJavaRes UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :reorderable:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :reorderable:mergeDebugJniLibFolders UP-TO-DATE
+> Task :reorderable:mergeDebugNativeLibs NO-SOURCE
+> Task :reorderable:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :reorderable:checkDebugAarMetadata UP-TO-DATE
+> Task :reorderable:stripDebugDebugSymbols NO-SOURCE
+> Task :reorderable:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :reorderable:extractDebugAnnotations UP-TO-DATE
+> Task :reorderable:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :reorderable:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :reorderable:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :reorderable:prepareDebugArtProfile UP-TO-DATE
+> Task :reorderable:prepareLintJarForPublish UP-TO-DATE
+> Task :reorderable:mergeDebugJavaResource UP-TO-DATE
+> Task :reorderable:syncDebugLibJars UP-TO-DATE
+> Task :reorderable:bundleDebugAar UP-TO-DATE
+> Task :reorderable:assembleDebug UP-TO-DATE
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/LayersPanel.kt:105:50 Unresolved reference 'listState'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 12s
+63 actionable tasks: 2 executed, 61 up-to-date

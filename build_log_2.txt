@@ -1,0 +1,154 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :reorderable:preBuild UP-TO-DATE
+> Task :reorderable:preDebugBuild UP-TO-DATE
+> Task :reorderable:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :reorderable:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :reorderable:generateDebugResValues UP-TO-DATE
+> Task :reorderable:generateDebugResources UP-TO-DATE
+> Task :reorderable:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :reorderable:extractDeepLinksDebug UP-TO-DATE
+> Task :reorderable:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :reorderable:compileDebugLibraryResources UP-TO-DATE
+> Task :reorderable:parseDebugLocalResources UP-TO-DATE
+> Task :reorderable:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :reorderable:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :reorderable:compileDebugKotlin UP-TO-DATE
+> Task :reorderable:javaPreCompileDebug UP-TO-DATE
+> Task :reorderable:compileDebugJavaWithJavac NO-SOURCE
+> Task :reorderable:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :reorderable:mergeDebugShaders UP-TO-DATE
+> Task :reorderable:compileDebugShaders NO-SOURCE
+> Task :reorderable:generateDebugAssets UP-TO-DATE
+> Task :reorderable:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :reorderable:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :reorderable:processDebugJavaRes UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :reorderable:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :reorderable:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :reorderable:mergeDebugNativeLibs NO-SOURCE
+> Task :reorderable:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :reorderable:checkDebugAarMetadata UP-TO-DATE
+> Task :reorderable:stripDebugDebugSymbols NO-SOURCE
+> Task :reorderable:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :reorderable:extractDebugAnnotations UP-TO-DATE
+> Task :reorderable:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :reorderable:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :reorderable:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :reorderable:prepareDebugArtProfile UP-TO-DATE
+> Task :reorderable:prepareLintJarForPublish UP-TO-DATE
+> Task :reorderable:mergeDebugJavaResource UP-TO-DATE
+> Task :reorderable:syncDebugLibJars UP-TO-DATE
+> Task :reorderable:bundleDebugAar UP-TO-DATE
+> Task :reorderable:assembleDebug UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/data/coverletter/CoverLetterRepository.kt:351:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/data/industry/IndustryInsightsRepository.kt:206:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/data/interview/InterviewPrepRepository.kt:294:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/data/local/AppDatabase.kt:42:22 'fun fallbackToDestructiveMigration(): RoomDatabase.Builder<AppDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/accountsettings/AccountSettingsScreen.kt:109:57 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/coverletter/CoverLetterScreen.kt:131:60 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/coverletter/CoverLetterScreen.kt:357:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/coverletter/editor/CoverLetterEditorScreen.kt:76:28 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/coverletter/editor/CoverLetterEditorScreen.kt:118:56 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/coverletter/editor/CoverLetterEditorScreen.kt:320:48 'val Icons.Filled.FormatListBulleted: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FormatListBulleted.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/industryinsights/IndustryInsights.kt:614:48 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/industryinsights/IndustryInsights.kt:671:48 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/industryinsights/IndustryInsights.kt:1037:48 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/industryinsights/IndustryInsights.kt:1039:48 'val Icons.Filled.TrendingDown: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingDown.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/InterviewPrepScreen.kt:289:57 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/InterviewPrepScreen.kt:474:38 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/InterviewScreens.kt:43:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/ProgressAndTipsScreens.kt:45:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/ProgressAndTipsScreens.kt:318:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/ProgressAndTipsScreens.kt:533:33 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/ProgressAndTipsScreens.kt:536:33 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/ProgressAndTipsScreens.kt:537:34 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/interviewprep/QuizScreens.kt:43:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/liveinterview/LiveInterviewResultsScreen.kt:36:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/liveinterview/LiveInterviewSetupScreen.kt:61:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/login/LoginScreen.kt:424:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/login/LoginScreen.kt:431:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/onboarding/OnboardingScreen.kt:589:18 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/onboarding/OnboardingScreen.kt:632:18 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResponsibilitiesAIDialog.kt:243:38 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResponsibilitiesAIDialog.kt:263:38 'val Icons.Filled.Article: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Article.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResponsibilitiesAIDialog.kt:288:38 'val Icons.Filled.FormatListBulleted: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FormatListBulleted.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResumeBuilderScreen.kt:180:64 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResumePreviewScreen.kt:45:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResumePreviewScreen.kt:265:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ResumePreviewScreen.kt:268:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ThemeCustomizationDialog.kt:416:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ThemeCustomizationDialog.kt:486:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/ThemeCustomizationDialog.kt:503:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/ColorPickerDialog.kt:654:29 This extension is shadowed by a member: 'fun minus(other: Offset): Offset' defined in 'androidx/compose/ui/geometry/Offset'.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/GridEditorScreen.kt:372:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/GridEditorScreen.kt:1268:30 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/GridEditorScreen.kt:1269:30 'val Icons.Filled.ArrowForward: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowForward.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/LayersPanel.kt:102:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/LayersPanel.kt:161:29 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:205:9 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:233:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:308:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:316:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:497:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:521:30 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:898:22 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:1113:22 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:1157:22 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:1407:22 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:1543:26 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:1598:26 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/PropertyPanel.kt:2254:18 'fun Modifier.menuAnchor(): Modifier' is deprecated. Use overload that takes MenuAnchorType and enabled parameters.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/ResponsibilityAIDialog.kt:252:38 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/ResponsibilityAIDialog.kt:272:38 'val Icons.Filled.Article: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Article.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/ResponsibilityAIDialog.kt:297:38 'val Icons.Filled.FormatListBulleted: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FormatListBulleted.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/export/AndroidPdfGenerator.kt:171:154 'field scaledDensity: Float' is deprecated. Deprecated in Java.
+w: file:///D:/Workspace/Android/AICareerCoach/app/src/main/java/com/phamnhantucode/aicareercoach/ui/theme/Theme.kt:86:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 1m 23s
+71 actionable tasks: 7 executed, 64 up-to-date

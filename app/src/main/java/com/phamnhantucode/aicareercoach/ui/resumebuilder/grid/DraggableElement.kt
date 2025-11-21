@@ -99,9 +99,40 @@ fun DraggableElement(
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
     } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
-        // Calculate actual content height for wrap content mode
-        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
-        actualContentHeight ?: (element.position.rowSpan * cellSizePx) // Fallback to rowSpan if calculation fails
+        // Store in local variable to allow smart cast
+        val cachedHeight = element.position.cachedHeightDp
+        
+        // Check if we have a cached height
+        if (cachedHeight != null) {
+            // Use cached height
+            cachedHeight * density * zoomLevel
+        } else {
+            // Calculate actual content height for wrap content mode
+            val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+            val fallbackHeight = element.position.rowSpan * cellSizePx
+            
+            val finalHeight = actualContentHeight ?: fallbackHeight
+            
+            // Store the calculated height back into the element's position
+            // Convert from pixels back to dp for storage
+            val heightInDp = finalHeight / (density * zoomLevel)
+            
+            // Calculate equivalent rowSpan for the calculated height
+            // This ensures when user turns wrap content OFF, it keeps the calculated height
+            val newRowSpan = (heightInDp / gridConfig.cellSizeDp).roundToInt().coerceAtLeast(1)
+            
+            val newPosition = element.position.copy(
+                cachedHeightDp = heightInDp,
+                rowSpan = newRowSpan  // Update rowSpan to match calculated height
+            )
+            
+            // Trigger onResize to save this cached height
+            if (actualContentHeight != null) {
+                onResize(element, newPosition)
+            }
+            
+            finalHeight
+        }
     } else {
         element.position.rowSpan * cellSizePx
     }

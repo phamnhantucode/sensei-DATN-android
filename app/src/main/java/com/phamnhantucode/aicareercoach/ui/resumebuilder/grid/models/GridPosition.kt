@@ -8,6 +8,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models
  * @param colSpan Number of columns to span
  * @param widthMode How to calculate width (FIXED or WRAP_CONTENT)
  * @param heightMode How to calculate height (FIXED or WRAP_CONTENT)
+ * @param cachedHeightDp Cached calculated height in dp when heightMode is WRAP_CONTENT (null means not yet calculated)
  */
 data class GridPosition(
     val row: Int = 0,
@@ -15,7 +16,8 @@ data class GridPosition(
     val rowSpan: Int = 1,
     val colSpan: Int = 1,
     val widthMode: SizeMode = SizeMode.FIXED,
-    val heightMode: SizeMode = SizeMode.FIXED
+    val heightMode: SizeMode = SizeMode.FIXED,
+    val cachedHeightDp: Float? = null
 ) {
     fun overlaps(other: GridPosition): Boolean {
         val thisEndRow = row + rowSpan

@@ -45,6 +45,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElem
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.SkillElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.WorkExperienceElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContainerElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
 import kotlinx.coroutines.CoroutineScope
@@ -238,6 +239,8 @@ fun GridEditorScreen(
                         onToggleVisibility = { viewModel.toggleElementVisibility(it) },
                         onToggleLock = { viewModel.toggleElementLock(it) },
                         onMoveLayer = { from, to -> viewModel.moveElementLayer(from, to) },
+                        onMoveToContainer = { elementId, containerId -> viewModel.moveElementToContainer(elementId, containerId) },
+                        onMoveOut = { elementId -> viewModel.moveElementOut(elementId) },
                         onClose = { showLayersPanel = false }
                     )
                 }
@@ -830,8 +833,15 @@ private fun GridCanvas(
 
                     // Elements
                     gridResume.pages.firstOrNull()?.let { page ->
+                        // Identify children to exclude from top-level rendering
+                        val childIds = remember(page.elements) {
+                            page.elements.filterIsInstance<ResumeElement.ContainerElement>()
+                                .flatMap { it.children }
+                                .toSet()
+                        }
+
                         page.elementsByZIndex()
-                            .filter { it.isVisible } // Only render visible elements
+                            .filter { it.isVisible && !childIds.contains(it.id) } // Only render visible top-level elements
                             .forEach { element ->
                             key(element.id) {
                                 val isSelected = selectedElement?.id == element.id
@@ -910,6 +920,49 @@ private fun GridCanvas(
                                             LanguageElementRenderer(
                                                 element = element,
                                                 zoomLevel = currentZoom
+                                            )
+                                        }
+                                        is ResumeElement.ContainerElement -> {
+                                            // Resolve children
+                                            val children = remember(element.children, page.elements) {
+                                                element.children.mapNotNull { childId ->
+                                                    page.elements.find { it.id == childId }
+                                                }
+                                            }
+                                            
+                                            ContainerElementRenderer(
+                                                element = element,
+                                                children = children,
+                                                gridConfig = gridResume.gridConfig,
+                                                zoomLevel = currentZoom,
+                                                renderChild = { child ->
+                                                    // Recursive rendering for children
+                                                    // Note: We don't support nested dragging inside canvas yet, only via Layers Panel
+                                                    // So we just render the child content
+                                                    when (child) {
+                                                        is ResumeElement.TextElement -> TextElementRenderer(
+                                                            element = child,
+                                                            isEditing = false,
+                                                            zoomLevel = currentZoom
+                                                        )
+                                                        is ResumeElement.ImageElement -> ImageElementRenderer(child)
+                                                        is ResumeElement.ShapeElement -> ShapeElementRenderer(child)
+                                                        is ResumeElement.ContactElement -> ContactElementRenderer(child, currentZoom)
+                                                        is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(child, currentZoom)
+                                                        is ResumeElement.EducationElement -> EducationElementRenderer(child, currentZoom)
+                                                        is ResumeElement.SkillElement -> SkillElementRenderer(child, currentZoom)
+                                                        is ResumeElement.ProjectElement -> ProjectElementRenderer(child, currentZoom)
+                                                        is ResumeElement.CertificationElement -> CertificationElementRenderer(child, currentZoom)
+                                                        is ResumeElement.LanguageElement -> LanguageElementRenderer(child, currentZoom)
+                                                        // Handle nested containers if needed (recursion)
+                                                        is ResumeElement.ContainerElement -> {
+                                                            // Simple recursion for nested containers
+                                                            // Note: This might hit recursion depth limits if circular, but ViewModel prevents circular
+                                                            Box(modifier = Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.5f)))
+                                                        }
+                                                        else -> Box(modifier = Modifier.fillMaxSize())
+                                                    }
+                                                }
                                             )
                                         }
                                         else -> {
@@ -1069,8 +1122,8 @@ private fun ElementTypeButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, contentDescription = null)
             Text(label, fontSize = 16.sp)
