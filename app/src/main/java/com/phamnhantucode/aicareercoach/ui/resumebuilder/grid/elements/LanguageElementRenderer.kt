@@ -35,14 +35,19 @@ fun LanguageElementRenderer(
             val density = context.resources.displayMetrics.density
             
             // Calculate base dimensions (unscaled)
-            val basePadding = 8f * density
-            val baseWidth = (size.width / zoomLevel) - (basePadding * 2)
-            val baseHeight = (size.height / zoomLevel) - (basePadding * 2)
+            val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+            val paddingLeft = safePadding.left * density
+            val paddingTop = safePadding.top * density
+            val paddingRight = safePadding.right * density
+            val paddingBottom = safePadding.bottom * density
+
+            val baseWidth = (size.width / zoomLevel) - (paddingLeft + paddingRight)
+            val baseHeight = (size.height / zoomLevel) - (paddingTop + paddingBottom)
             
             // Apply zoom via Canvas scaling
             nativeCanvas.save()
             nativeCanvas.scale(zoomLevel, zoomLevel)
-            nativeCanvas.translate(basePadding, basePadding)
+            nativeCanvas.translate(paddingLeft, paddingTop)
             
             // Clip to content bounds
             nativeCanvas.clipRect(0f, 0f, baseWidth, baseHeight)

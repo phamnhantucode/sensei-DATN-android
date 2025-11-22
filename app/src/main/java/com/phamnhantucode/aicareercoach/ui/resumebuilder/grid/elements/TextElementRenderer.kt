@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementStyle
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.Padding
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextAlignment
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.TextStyle
@@ -70,9 +71,15 @@ fun TextElementRenderer(
                 // Calculate base dimensions (unscaled) for text layout
                 // This ensures consistent line breaks regardless of zoom level
                 val density = context.resources.displayMetrics.density
-                val basePadding = 8f * density // 8dp in pixels
-                val baseWidth = (size.width / zoomLevel) - (basePadding * 2)
-                val baseHeight = (size.height / zoomLevel) - (basePadding * 2)
+                // Use element padding instead of hardcoded 8dp
+                val safePadding = element.padding ?: Padding()
+                val paddingLeft = safePadding.left * density
+                val paddingTop = safePadding.top * density
+                val paddingRight = safePadding.right * density
+                val paddingBottom = safePadding.bottom * density
+                
+                val baseWidth = (size.width / zoomLevel) - (paddingLeft + paddingRight)
+                val baseHeight = (size.height / zoomLevel) - (paddingTop + paddingBottom)
 
                 // Create text paint with base text size (no zoom)
                 val textPaint = createTextPaint(element, 1f, context)
@@ -105,8 +112,8 @@ fun TextElementRenderer(
                 // Scale the canvas to apply zoom
                 nativeCanvas.scale(zoomLevel, zoomLevel)
 
-                // Translate to position with base padding
-                nativeCanvas.translate(basePadding, basePadding + yOffset)
+                // Translate to position with padding
+                nativeCanvas.translate(paddingLeft, paddingTop + yOffset)
 
                 // Clip to base content bounds
                 nativeCanvas.clipRect(0f, 0f, baseWidth, baseHeight)
@@ -304,7 +311,12 @@ private fun EditableTextRenderer(
                     Modifier
                 }
             )
-            .padding(8.dp),
+            .padding(
+                start = (element.padding?.left ?: 0f).dp,
+                top = (element.padding?.top ?: 0f).dp,
+                end = (element.padding?.right ?: 0f).dp,
+                bottom = (element.padding?.bottom ?: 0f).dp
+            ),
         contentAlignment = (element.verticalAlignment ?: VerticalTextAlignment.CENTER).toAlignment()
     ) {
         BoxWithConstraints(

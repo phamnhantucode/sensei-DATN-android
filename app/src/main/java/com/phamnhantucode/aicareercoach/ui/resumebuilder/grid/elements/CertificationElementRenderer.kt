@@ -71,7 +71,12 @@ fun CertificationElementRenderer(
                     Modifier
                 }
             )
-            .padding((8  * zoomLevel).dp)
+            .padding(
+                start = ((element.padding?.left ?: 8f) * zoomLevel).dp,
+                top = ((element.padding?.top ?: 8f) * zoomLevel).dp,
+                end = ((element.padding?.right ?: 8f) * zoomLevel).dp,
+                bottom = ((element.padding?.bottom ?: 8f) * zoomLevel).dp
+            )
     ) {
         // Map alignment enums to Compose alignment values
         val horizontalAlignmentForColumn = when (element.horizontalAlignment ?: HorizontalAlignment.START) {

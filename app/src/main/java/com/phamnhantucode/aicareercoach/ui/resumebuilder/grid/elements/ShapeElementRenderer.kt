@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.Padding
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType
 
@@ -50,6 +52,12 @@ fun ShapeElementRenderer(
                         Modifier.fillMaxSize()
                     }
                 }
+            )
+            .padding(
+                start = (element.padding?.left ?: 0f).dp,
+                top = (element.padding?.top ?: 0f).dp,
+                end = (element.padding?.right ?: 0f).dp,
+                bottom = (element.padding?.bottom ?: 0f).dp
             )
             .then(
                 if (element.style.shadowBlur > 0) {

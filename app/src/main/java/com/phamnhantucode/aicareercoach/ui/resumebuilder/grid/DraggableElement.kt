@@ -54,8 +54,9 @@ fun DraggableElement(
     isDragging: Boolean = false,
     enabled: Boolean = true,
     useRelativePositioning: Boolean = false,
+    animationOffsetY: Float = 0f,  // Animated Y offset for vertical reordering
     onDragStart: (ResumeElement) -> Unit = { _ -> },
-    onDrag: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
+    onDrag: (ResumeElement, GridPosition, Float) -> Unit = { _, _, _ -> },  // Third param is offsetY in pixels
     onDragEnd: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onResize: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onSelect: (ResumeElement) -> Unit = { _ -> },
@@ -82,9 +83,14 @@ fun DraggableElement(
     var lastPosition by remember(element.id) { mutableStateOf(element.position) }
 
     // When element position changes, reset offsets synchronously
+    // When element position changes, reset offsets synchronously
     if (element.position != lastPosition) {
-        offsetX = 0f
-        offsetY = 0f
+        // Only reset offsets if we're not currently dragging
+        // This prevents the drag offset from being lost when the element is reordered (position changes) during a drag
+        if (!isDragging) {
+            offsetX = 0f
+            offsetY = 0f
+        }
         lastPosition = element.position
     }
 
@@ -167,13 +173,30 @@ fun DraggableElement(
         height
     }
 
+    // Determine Z-Index to ensure non-container elements are selectable when overlapping containers
+    // Map integer zIndex to float, but split the 0 level to prioritize content over containers
+    val baseZIndex = when {
+        element.zIndex > 0 -> element.zIndex.toFloat()
+        element.zIndex < 0 -> element.zIndex.toFloat()
+        else -> if (element is ResumeElement.ContainerElement) 0f else 0.5f
+    }
+    val selectionBoost = if (isSelected) 0.1f else 0f
+    val draggingZIndex = if (isDragging) 100f else (baseZIndex + selectionBoost)
+
     Box(
         modifier = Modifier
+            .zIndex(draggingZIndex)
             .then(
                 if (useRelativePositioning) {
                     Modifier
                         .fillMaxWidth()
                         .height(GridUtils.pxToDp(interactionHeight, density))
+                        .offset {
+                            IntOffset(
+                                x = 0,
+                                y = animationOffsetY.roundToInt()
+                            )
+                        }
                 } else {
                     Modifier
                         .offset {
@@ -243,36 +266,56 @@ fun DraggableElement(
                                     val dragAmount = change.positionChange()
                                     change.consume()
 
-                                    offsetX += dragAmount.x
-                                    offsetY += dragAmount.y
+                                    // For vertical layout with relative positioning, only allow Y movement
+                                    if (useRelativePositioning) {
+                                        // Vertical layout - only track Y offset
+                                        offsetY += dragAmount.y
 
-                                    // Calculate grid bounds in pixels
-                                    val maxX = (maxColumns - element.position.colSpan) * cellSizePx
-                                    val maxY = (maxRows - element.position.rowSpan) * cellSizePx
+                                        // Calculate target row index based on Y offset
+                                        // Use cellSizePx as a reasonable average height estimate
+                                        // This provides approximate positioning during drag
+                                        // The ViewModel will recalculate the exact index on drop using actual child heights
+                                        val totalOffsetY = offsetY
+                                        val targetRow = (totalOffsetY / cellSizePx).roundToInt().coerceAtLeast(0)
 
-                                    // Clamp offsets to keep element within bounds
-                                    val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
-                                    val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
+                                        currentDragPosition = element.position.copy(
+                                            row = element.position.row + targetRow,
+                                            col = 0  // Column doesn't matter in vertical layout
+                                        )
+                                    } else {
+                                        // Normal grid-based dragging
+                                        offsetX += dragAmount.x
+                                        offsetY += dragAmount.y
 
-                                    // Update offsets to clamped values
-                                    offsetX = clampedX - baseX
-                                    offsetY = clampedY - baseY
+                                        // Calculate grid bounds in pixels
+                                        val maxX = (maxColumns - element.position.colSpan) * cellSizePx
+                                        val maxY = (maxRows - element.position.rowSpan) * cellSizePx
 
-                                    // Calculate current grid position with snap
-                                    val (newRow, newCol) = GridUtils.offsetToGridPosition(
-                                        offsetX = clampedX,
-                                        offsetY = clampedY,
-                                        cellSizePx = cellSizePx,
-                                        snapEnabled = gridConfig.snapToGrid,
-                                        threshold = gridConfig.snapThreshold
-                                    )
+                                        // Clamp offsets to keep element within bounds
+                                        val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
+                                        val clampedY = (baseY + offsetY).coerceIn(0f, maxY)
 
-                                    currentDragPosition = element.position.copy(
-                                        row = newRow,
-                                        col = newCol
-                                    )
+                                        // Update offsets to clamped values
+                                        offsetX = clampedX - baseX
+                                        offsetY = clampedY - baseY
 
-                                    onDrag(element, currentDragPosition)
+                                        // Calculate current grid position with snap
+                                        val (newRow, newCol) = GridUtils.offsetToGridPosition(
+                                            offsetX = clampedX,
+                                            offsetY = clampedY,
+                                            cellSizePx = cellSizePx,
+                                            snapEnabled = gridConfig.snapToGrid,
+                                            threshold = gridConfig.snapThreshold
+                                        )
+
+                                        currentDragPosition = element.position.copy(
+                                            row = newRow,
+                                            col = newCol
+                                        )
+                                    }
+
+                                    // Pass offsetY for accurate vertical container reordering
+                                    onDrag(element, currentDragPosition, offsetY)
                                 }
                             } else {
                                 // Element is locked - consume the drag gesture without allowing movement
@@ -314,6 +357,14 @@ fun DraggableElement(
                                 }
 
                                 onDragEnd(element, finalPosition)
+                                
+                                // Reset offsets after drag ends
+                                if (useRelativePositioning) {
+                                    offsetY = 0f
+                                } else {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
                             }
                         }
                     }
@@ -631,17 +682,27 @@ fun DragGhost(
     gridConfig: GridConfig,
     zoomLevel: Float = 1f,
     isValid: Boolean = true,
+    useVerticalLayout: Boolean = false,
+    containerWidthPx: Float? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
+    // For vertical layout, Y position is already calculated by parent offset
+    // For grid layout, use position.row
     val x = position.col * cellSizePx
-    val y = position.row * cellSizePx
+    val y = if (useVerticalLayout) {
+        0f  // Y position is handled by parent offset in GridEditorScreen
+    } else {
+        position.row * cellSizePx
+    }
 
     // Calculate width and height, respecting custom dimensions for ShapeElements
-    val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
+    val width = if (useVerticalLayout && containerWidthPx != null) {
+        containerWidthPx
+    } else if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
         element.customWidthDp * density * zoomLevel
     } else {
         position.colSpan * cellSizePx
@@ -873,6 +934,18 @@ private fun calculateContentHeight(
         }
         is ResumeElement.ProjectElement -> {
             calculateProjectContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.SkillElement -> {
+            calculateSkillContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.ContactElement -> {
+            calculateContactContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.LanguageElement -> {
+            calculateLanguageContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.EducationElement -> {
+            calculateEducationContentHeight(element, width, density, zoomLevel, context)
         }
         // Add more element types as needed
         else -> null
@@ -1459,5 +1532,676 @@ private fun formatProjectDateRange(item: ProjectItem): String {
         start.isNotEmpty() -> start
         end.isNotEmpty() -> end
         else -> ""
+    }
+}
+
+/**
+ * Calculate skill content height using StaticLayout (matching renderer logic)
+ */
+private fun calculateSkillContentHeight(
+    element: ResumeElement.SkillElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled) - matching SkillElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
+    
+    // Create text paints (no zoom applied)
+    val skillTextPaint = createWorkExperienceTextPaint(element.skillStyle, density, context)
+    val categoryTextPaint = createWorkExperienceTextPaint(element.categoryStyle, density, context)
+    
+    val spacing = element.spacing * density
+    
+    var totalHeight = 0f
+    
+    when (element.displayStyle) {
+        SkillDisplayStyle.LIST -> {
+            // Calculate layouts for all items
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
+                    val text = bullet + item.name
+                    
+                    val layout = createSimpleLayout(text, skillTextPaint, baseWidth)
+                    totalHeight += layout.height.toFloat()
+                }
+            }
+            
+            if (element.items.size > 1) {
+                totalHeight += spacing * (element.items.size - 1)
+            }
+        }
+        
+        SkillDisplayStyle.TAGS -> {
+            val tagPadding = 12f * density
+            
+            // Group tags into rows
+            var currentRowWidth = 0f
+            val rowHeight = skillTextPaint.textSize + tagPadding * 2
+            var rowCount = 0
+            
+            element.items.forEach { item ->
+                if (item.name.isEmpty()) return@forEach
+                val textWidth = skillTextPaint.measureText(item.name)
+                val tagWidth = textWidth + tagPadding * 2
+                
+                if (currentRowWidth + tagWidth > baseWidth && currentRowWidth > 0f) {
+                    // Start new row
+                    rowCount++
+                    currentRowWidth = tagWidth + spacing
+                } else {
+                    if (currentRowWidth > 0f) {
+                        currentRowWidth += spacing
+                    }
+                    currentRowWidth += tagWidth
+                }
+            }
+            
+            if (currentRowWidth > 0f) {
+                rowCount++ // Count the last row
+            }
+            
+            totalHeight = (rowHeight * rowCount) + (spacing * (rowCount - 1).coerceAtLeast(0))
+        }
+        
+        SkillDisplayStyle.PROGRESS_BARS -> {
+            val barHeight = element.progressBarHeight * density
+            
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    totalHeight += skillTextPaint.textSize + 4f * density + barHeight + spacing
+                }
+            }
+            totalHeight -= spacing // Remove last spacing
+        }
+        
+        SkillDisplayStyle.DOTS -> {
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.name, skillTextPaint, baseWidth)
+                    totalHeight += layout.height.toFloat()
+                }
+            }
+            
+            if (element.items.size > 1) {
+                totalHeight += spacing * (element.items.size - 1)
+            }
+        }
+        
+        SkillDisplayStyle.GROUPED -> {
+            val groupSpacing = element.groupSpacing * density
+            val groups = element.items.groupBy { it.category }
+            
+            groups.entries.forEachIndexed { groupIndex, entry ->
+                val category = entry.key
+                val skills = entry.value
+                
+                // Category header
+                if (category.isNotEmpty()) {
+                    val categoryLayout = createSimpleLayout(category, categoryTextPaint, baseWidth)
+                    totalHeight += categoryLayout.height.toFloat() + 4f * density
+                }
+                
+                // Skills in this group
+                skills.forEach { item ->
+                    if (item.name.isNotEmpty()) {
+                        val bullet = if (element.showBullets) getBulletCharacter(element.bulletStyle) + " " else ""
+                        val text = bullet + item.name
+                        
+                        val layout = createSimpleLayout(text, skillTextPaint, baseWidth)
+                        totalHeight += layout.height.toFloat()
+                    }
+                }
+                
+                if (skills.size > 1) {
+                    totalHeight += spacing * (skills.size - 1)
+                }
+                
+                if (groupIndex < groups.size - 1) {
+                    totalHeight += groupSpacing
+                }
+            }
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Calculate education content height using text measurements (matching renderer logic)
+ */
+private fun calculateEducationContentHeight(
+    element: ResumeElement.EducationElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled) - matching EducationElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
+    
+    // Create text paints for different styles (no zoom applied)
+    val degreeTextPaint = createWorkExperienceTextPaint(element.degreeStyle, density, context)
+    val institutionTextPaint = createWorkExperienceTextPaint(element.institutionStyle, density, context)
+    val dateTextPaint = createWorkExperienceTextPaint(element.dateStyle, density, context)
+    val locationTextPaint = createWorkExperienceTextPaint(element.locationStyle, density, context)
+    val gpaTextPaint = createWorkExperienceTextPaint(element.gpaStyle, density, context)
+    val achievementTextPaint = createWorkExperienceTextPaint(element.achievementStyle, density, context)
+    
+    val spacing = element.spacing * density
+    val itemSpacing = element.itemSpacing * density
+    val achievementSpacing = element.achievementSpacing * density
+    
+    var totalHeight = 0f
+    
+    when (element.orientation) {
+        EducationOrientation.VERTICAL -> {
+            // In vertical mode, items are stacked
+            element.items.forEachIndexed { index, item ->
+                var itemHeight = 0f
+                
+                when (element.displayStyle) {
+                    EducationDisplayStyle.STANDARD -> {
+                        // Degree
+                        if (item.degree.isNotEmpty()) {
+                            val layout = createSimpleLayout(item.degree, degreeTextPaint, baseWidth)
+                            itemHeight += layout.height.toFloat() + itemSpacing
+                        }
+                        
+                        // Institution and Date Row (use max height)
+                        var rowHeight = 0f
+                        if (item.institution.isNotEmpty()) {
+                            val layout = createSimpleLayout(item.institution, institutionTextPaint, baseWidth * 0.6f)
+                            rowHeight = maxOf(rowHeight, layout.height.toFloat())
+                        }
+                        if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+                            rowHeight = maxOf(rowHeight, dateTextPaint.textSize)
+                        }
+                        if (rowHeight > 0f) {
+                            itemHeight += rowHeight + itemSpacing
+                        }
+                        
+                        // Location
+                        if (element.showLocation && item.location.isNotEmpty()) {
+                            val layout = createSimpleLayout(item.location, locationTextPaint, baseWidth)
+                            itemHeight += layout.height.toFloat() + itemSpacing
+                        }
+                        
+                        // GPA
+                        if (element.showGPA && item.gpa.isNotEmpty()) {
+                            itemHeight += gpaTextPaint.textSize + itemSpacing
+                        }
+                    }
+                    
+                    EducationDisplayStyle.COMPACT -> {
+                        // Degree + Institution Row
+                        val degreeInstitution = buildString {
+                            if (item.degree.isNotEmpty()) append(item.degree)
+                            if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
+                            if (item.institution.isNotEmpty()) append(item.institution)
+                        }
+                        if (degreeInstitution.isNotEmpty()) {
+                            val layout = createSimpleLayout(degreeInstitution, degreeTextPaint, baseWidth * 0.7f)
+                            itemHeight += layout.height.toFloat() + itemSpacing
+                        }
+                        
+                        // Location and GPA Row
+                        var rowHeight = 0f
+                        if (element.showLocation && item.location.isNotEmpty()) {
+                            rowHeight = maxOf(rowHeight, locationTextPaint.textSize)
+                        }
+                        if (element.showGPA && item.gpa.isNotEmpty()) {
+                            rowHeight = maxOf(rowHeight, gpaTextPaint.textSize)
+                        }
+                        if (rowHeight > 0f) {
+                            itemHeight += rowHeight + itemSpacing
+                        }
+                    }
+                    
+                    EducationDisplayStyle.DETAILED -> {
+                        // Degree
+                        if (item.degree.isNotEmpty()) {
+                            val layout = createSimpleLayout(item.degree, degreeTextPaint, baseWidth)
+                            itemHeight += layout.height.toFloat() + itemSpacing
+                        }
+                        
+                        // Institution
+                        if (item.institution.isNotEmpty()) {
+                            val layout = createSimpleLayout(item.institution, institutionTextPaint, baseWidth)
+                            itemHeight += layout.height.toFloat() + itemSpacing
+                        }
+                        
+                        // Location and Dates Row
+                        var rowHeight = 0f
+                        if (element.showLocation && item.location.isNotEmpty()) {
+                            rowHeight = maxOf(rowHeight, locationTextPaint.textSize)
+                        }
+                        if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+                            rowHeight = maxOf(rowHeight, dateTextPaint.textSize)
+                        }
+                        if (rowHeight > 0f) {
+                            itemHeight += rowHeight + itemSpacing
+                        }
+                        
+                        // GPA
+                        if (element.showGPA && item.gpa.isNotEmpty()) {
+                            itemHeight += gpaTextPaint.textSize + itemSpacing
+                        }
+                    }
+                }
+                
+                // Add achievements
+                if (item.achievements.isNotEmpty()) {
+                    item.achievements.forEach { achievement ->
+                        if (achievement.text.isNotEmpty()) {
+                            val bullet = getBulletCharacter(element.bulletStyle, 0, achievement)
+                            val bulletWidth = achievementTextPaint.measureText("$bullet ")
+                            val textWidth = baseWidth - bulletWidth
+                            
+                            val layout = createSimpleLayout(achievement.text, achievementTextPaint, textWidth)
+                            itemHeight += layout.height.toFloat()
+                        }
+                    }
+                    
+                    // Add spacing between achievements
+                    if (item.achievements.size > 1) {
+                        itemHeight += achievementSpacing * (item.achievements.size - 1)
+                    }
+                }
+                
+                totalHeight += itemHeight
+                
+                // Add spacing between items (but not after last item)
+                if (index < element.items.size - 1) {
+                    totalHeight += spacing
+                }
+            }
+        }
+        
+        EducationOrientation.HORIZONTAL -> {
+            // In horizontal mode, all items are side by side
+            // Height is the tallest item
+            var maxItemHeight = 0f
+            
+            element.items.forEach { item ->
+                var itemHeight = calculateSingleEducationItemHeight(
+                    item, element, baseWidth / element.items.size, density,
+                    degreeTextPaint, institutionTextPaint, dateTextPaint,
+                    locationTextPaint, gpaTextPaint, achievementTextPaint,
+                    itemSpacing, achievementSpacing
+                )
+                maxItemHeight = maxOf(maxItemHeight, itemHeight)
+            }
+            
+            totalHeight = maxItemHeight
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Helper function to calculate height of a single education item
+ */
+private fun calculateSingleEducationItemHeight(
+    item: EducationItem,
+    element: ResumeElement.EducationElement,
+    itemWidth: Float,
+    density: Float,
+    degreeTextPaint: TextPaint,
+    institutionTextPaint: TextPaint,
+    dateTextPaint: TextPaint,
+    locationTextPaint: TextPaint,
+    gpaTextPaint: TextPaint,
+    achievementTextPaint: TextPaint,
+    itemSpacing: Float,
+    achievementSpacing: Float
+): Float {
+    var itemHeight = 0f
+    
+    when (element.displayStyle) {
+        EducationDisplayStyle.STANDARD -> {
+            if (item.degree.isNotEmpty()) {
+                val layout = createSimpleLayout(item.degree, degreeTextPaint, itemWidth)
+                itemHeight += layout.height.toFloat() + itemSpacing
+            }
+            
+            var rowHeight = 0f
+            if (item.institution.isNotEmpty()) {
+                rowHeight = maxOf(rowHeight, institutionTextPaint.textSize)
+            }
+            if (element.showDates) {
+                rowHeight = maxOf(rowHeight, dateTextPaint.textSize)
+            }
+            if (rowHeight > 0f) {
+                itemHeight += rowHeight + itemSpacing
+            }
+            
+            if (element.showLocation && item.location.isNotEmpty()) {
+                itemHeight += locationTextPaint.textSize + itemSpacing
+            }
+            
+            if (element.showGPA && item.gpa.isNotEmpty()) {
+                itemHeight += gpaTextPaint.textSize + itemSpacing
+            }
+        }
+        
+        EducationDisplayStyle.COMPACT -> {
+            val degreeInstitution = buildString {
+                if (item.degree.isNotEmpty()) append(item.degree)
+                if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
+                if (item.institution.isNotEmpty()) append(item.institution)
+            }
+            if (degreeInstitution.isNotEmpty()) {
+                itemHeight += degreeTextPaint.textSize + itemSpacing
+            }
+            
+            var rowHeight = 0f
+            if (element.showLocation && item.location.isNotEmpty()) {
+                rowHeight = maxOf(rowHeight, locationTextPaint.textSize)
+            }
+            if (element.showGPA && item.gpa.isNotEmpty()) {
+                rowHeight = maxOf(rowHeight, gpaTextPaint.textSize)
+            }
+            if (rowHeight > 0f) {
+                itemHeight += rowHeight + itemSpacing
+            }
+        }
+        
+        EducationDisplayStyle.DETAILED -> {
+            if (item.degree.isNotEmpty()) {
+                itemHeight += degreeTextPaint.textSize + itemSpacing
+            }
+            if (item.institution.isNotEmpty()) {
+                itemHeight += institutionTextPaint.textSize + itemSpacing
+            }
+            
+            var rowHeight = 0f
+            if (element.showLocation && item.location.isNotEmpty()) {
+                rowHeight = maxOf(rowHeight, locationTextPaint.textSize)
+            }
+            if (element.showDates) {
+                rowHeight = maxOf(rowHeight, dateTextPaint.textSize)
+            }
+            if (rowHeight > 0f) {
+                itemHeight += rowHeight + itemSpacing
+            }
+            
+            if (element.showGPA && item.gpa.isNotEmpty()) {
+                itemHeight += gpaTextPaint.textSize + itemSpacing
+            }
+        }
+    }
+    
+    // Add achievements
+    if (item.achievements.isNotEmpty()) {
+        item.achievements.forEach { achievement ->
+            if (achievement.text.isNotEmpty()) {
+                itemHeight += achievementTextPaint.textSize
+            }
+        }
+        
+        if (item.achievements.size > 1) {
+            itemHeight += achievementSpacing * (item.achievements.size - 1)
+        }
+    }
+    
+    return itemHeight
+}
+
+/**
+ * Get bullet character for education achievements
+ */
+private fun getBulletCharacter(
+    bulletStyle: BulletStyle,
+    index: Int,
+    achievement: AchievementItem
+): String {
+    return when (bulletStyle) {
+        BulletStyle.DISC -> "•"
+        BulletStyle.DASH -> "-"
+        BulletStyle.ARROW -> "→"
+        BulletStyle.CHEVRON -> "›"
+        BulletStyle.NUMBERED -> "${index + 1}."
+        BulletStyle.CUSTOM_ICON -> achievement.customBullet ?: "•"
+        BulletStyle.NONE -> ""
+    }
+}
+
+/**
+ * Calculate language content height using text measurements (matching renderer logic)
+ */
+private fun calculateLanguageContentHeight(
+    element: ResumeElement.LanguageElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled) - matching LanguageElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
+    
+    // Create text paints (no zoom applied)
+    val languageTextPaint = createWorkExperienceTextPaint(element.languageStyle, density, context)
+    val proficiencyTextPaint = createWorkExperienceTextPaint(element.proficiencyLabelStyle, density, context)
+    
+    val spacing = element.spacing * density
+    
+    var totalHeight = 0f
+    
+    when (element.displayStyle) {
+        LanguageDisplayStyle.TEXT_LABELS -> {
+            // Simple text layout (Language - Proficiency)
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    val itemHeight = languageTextPaint.textSize.coerceAtLeast(proficiencyTextPaint.textSize)
+                    totalHeight += itemHeight
+                }
+            }
+            
+            if (element.items.size > 1) {
+                totalHeight += spacing * (element.items.size - 1)
+            }
+        }
+        
+        LanguageDisplayStyle.PROGRESS_BARS -> {
+            val barHeight = element.progressBarHeight * density
+            
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    totalHeight += languageTextPaint.textSize + 2f * density + barHeight
+                }
+            }
+            
+            if (element.items.size > 1) {
+                totalHeight += spacing * (element.items.size - 1)
+            }
+        }
+        
+        LanguageDisplayStyle.DOTS -> {
+            // Dots layout
+            element.items.forEach { item ->
+                if (item.name.isNotEmpty()) {
+                    totalHeight += languageTextPaint.textSize
+                }
+            }
+            
+            if (element.items.size > 1) {
+                totalHeight += spacing * (element.items.size - 1)
+            }
+        }
+        
+        LanguageDisplayStyle.TAGS -> {
+            val tagPadding = 12f * density
+            
+            // Group tags into rows
+            var currentRowWidth = 0f
+            var maxRowHeight = 0f
+            var currentMaxHeight = 0f
+            var rowCount = 0
+            
+            element.items.forEach { item ->
+                if (item.name.isEmpty()) return@forEach
+                
+                val proficiencyText = when (element.proficiencyType) {
+                    LanguageProficiencyType.TEXT -> item.proficiencyLabel
+                    LanguageProficiencyType.CEFR -> item.cefrLevel ?: item.proficiencyLabel
+                    LanguageProficiencyType.NUMERIC -> "${(item.proficiency * 100).toInt()}%"
+                }
+                
+                val nameWidth = languageTextPaint.measureText(item.name)
+                val proficiencyWidth = if (proficiencyText.isNotEmpty()) proficiencyTextPaint.measureText(proficiencyText) else 0f
+                val textWidth = nameWidth.coerceAtLeast(proficiencyWidth)
+                
+                val tagWidth = textWidth + tagPadding * 2
+                val tagHeight = languageTextPaint.textSize + 
+                    (if (proficiencyText.isNotEmpty()) proficiencyTextPaint.textSize + 2f * density else 0f) + 
+                    tagPadding * 2
+                
+                if (currentRowWidth + tagWidth > baseWidth && currentRowWidth > 0f) {
+                    // Start new row
+                    rowCount++
+                    maxRowHeight = maxOf(maxRowHeight, currentMaxHeight)
+                    currentRowWidth = tagWidth + spacing
+                    currentMaxHeight = tagHeight
+                } else {
+                    if (currentRowWidth > 0f) {
+                        currentRowWidth += spacing
+                    }
+                    currentRowWidth += tagWidth
+                    currentMaxHeight = maxOf(currentMaxHeight, tagHeight)
+                }
+            }
+            
+            if (currentRowWidth > 0f) {
+                rowCount++ // Count the last row
+                maxRowHeight = maxOf(maxRowHeight, currentMaxHeight)
+            }
+            
+            totalHeight = (maxRowHeight * rowCount) + (spacing * (rowCount - 1).coerceAtLeast(0))
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Calculate contact content height using text measurements (matching renderer logic)
+ */
+private fun calculateContactContentHeight(
+    element: ResumeElement.ContactElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context
+): Float {
+    if (element.items.isEmpty()) {
+        return 16f * density * zoomLevel // Minimum height for empty content
+    }
+
+    // Calculate base dimensions (unscaled) - matching ContactElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
+    
+    // Create text paint (no zoom applied)
+    val textPaint = createWorkExperienceTextPaint(element.textStyle, density, context)
+    
+    val itemSpacing = 4f * density // Spacing between items in vertical mode
+    
+    var totalHeight = 0f
+    
+    when (element.orientation) {
+        ContactOrientation.VERTICAL -> {
+            // In vertical mode, items are stacked, so we add each item's height
+            element.items.forEach { item ->
+                if (item.value.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.value, textPaint, baseWidth)
+                    totalHeight += layout.height.toFloat()
+                }
+            }
+            
+            // Add spacing between items
+            if (element.items.size > 1) {
+                totalHeight += itemSpacing * (element.items.size - 1)
+            }
+        }
+        ContactOrientation.HORIZONTAL -> {
+            // In horizontal mode, all items are in one row, height is just text height
+            // Find the tallest item
+            var maxItemHeight = 0f
+            element.items.forEach { item ->
+                if (item.value.isNotEmpty()) {
+                    val layout = createSimpleLayout(item.value, textPaint, baseWidth)
+                    maxItemHeight = maxOf(maxItemHeight, layout.height.toFloat())
+                }
+            }
+            totalHeight = maxItemHeight
+        }
+    }
+    
+    // Add padding and apply zoom
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
+    
+    return finalHeight
+}
+
+/**
+ * Get bullet character for skills
+ */
+private fun getBulletCharacter(bulletStyle: BulletStyle): String {
+    return when (bulletStyle) {
+        BulletStyle.DISC -> "•"
+        BulletStyle.DASH -> "-"
+        BulletStyle.ARROW -> "→"
+        BulletStyle.CHEVRON -> "›"
+        BulletStyle.NUMBERED -> "1."
+        BulletStyle.CUSTOM_ICON -> "•"
+        BulletStyle.NONE -> ""
     }
 }

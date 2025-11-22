@@ -10,6 +10,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -334,6 +336,13 @@ class AndroidPdfGenerator(
     /**
      * Render children of a container element
      * This is called by the ContainerElementPdfRenderer's callback
+     * 
+     * IMPORTANT: The canvas has already been translated to the container's top-left position
+     * by ContainerElementPdfRenderer.
+     * 
+     * Position handling depends on container layout mode:
+     * - VERTICAL layout: Children store RELATIVE positions (matching UI's useRelativePositioning=true)
+     * - GRID/FREE layout: Children store ABSOLUTE positions (no useRelativePositioning in UI)
      */
     private suspend fun renderContainerChildren(
         canvas: android.graphics.Canvas,
@@ -344,81 +353,101 @@ class AndroidPdfGenerator(
             container.children.contains(element.id)
         }.sortedBy { it.zIndex }
         
+        // Check if container uses vertical layout
+        val isVerticalLayout = container.effectiveLayoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.VERTICAL
+        
         // Render each child element
         childElements.forEach { child ->
             try {
+                // Determine position based on layout mode
+                val renderPosition = if (isVerticalLayout) {
+                    // VERTICAL layout: children already have relative positions, use as-is
+                    child.position
+                } else {
+                    // GRID/FREE layout: children have absolute positions, convert to relative
+                    GridPosition(
+                        row = child.position.row - container.position.row,
+                        col = child.position.col - container.position.col,
+                        rowSpan = child.position.rowSpan,
+                        colSpan = child.position.colSpan,
+                        widthMode = child.position.widthMode,
+                        heightMode = child.position.heightMode,
+                        cachedHeightDp = child.position.cachedHeightDp
+                    )
+                }
+                
                 when (child) {
                     is ResumeElement.TextElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         textRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ShapeElement -> {
                         val bounds = if (child.customWidthDp != null || child.customHeightDp != null) {
                             currentMapper.customSizeToRect(
-                                child.position,
+                                renderPosition,
                                 child.customWidthDp,
                                 child.customHeightDp
                             )
                         } else {
-                            currentMapper.gridToPdfRect(child.position)
+                            currentMapper.gridToPdfRect(renderPosition)
                         }
                         shapeRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ImageElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         imageRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ChartElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         chartRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.IconElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         iconRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ContactElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         contactRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.WorkExperienceElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         workExperienceRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.EducationElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         educationRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.SkillElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         skillRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ProjectElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         projectRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.CertificationElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         certificationRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.LanguageElement -> {
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         languageRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                     
                     is ResumeElement.ContainerElement -> {
-                        // Nested container - render recursively
-                        val bounds = currentMapper.gridToPdfRect(child.position)
+                        // Nested container - also needs same position handling
+                        val bounds = currentMapper.gridToPdfRect(renderPosition)
                         containerRenderer.render(canvas, child, bounds, currentMapper, currentRenderContext)
                     }
                 }

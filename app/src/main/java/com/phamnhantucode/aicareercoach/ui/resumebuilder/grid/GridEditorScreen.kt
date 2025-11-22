@@ -1,5 +1,8 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -246,9 +249,35 @@ fun GridEditorScreen(
                     isMoveMode = isMoveMode,
                     onElementSelect = { viewModel.selectElement(it) },
                     onElementDeselect = { viewModel.deselectElement() },
-                    onDragStart = { viewModel.startDrag(it) },
-                    onDrag = { element, position ->
-                        viewModel.updateDragPosition(position)
+                    onDragStart = { element -> 
+                        // Calculate originalY for vertical layout to ensure smooth dragging
+                        var originalY = 0f
+                        val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                        val parent = allElements.filterIsInstance<ResumeElement.ContainerElement>()
+                            .find { it.children.contains(element.id) }
+                            
+                        if (parent != null && parent.effectiveLayoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.VERTICAL) {
+                             val currentIndex = parent.children.indexOf(element.id)
+                             for (i in 0 until currentIndex) {
+                                val childId = parent.children[i]
+                                val childElement = allElements.find { it.id == childId }
+                                if (childElement != null) {
+                                    val childCellSizePx = gridResume.gridConfig.cellSizeDp * density * zoomLevel
+                                    val childHeightPx = if (childElement.position.heightMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.SizeMode.WRAP_CONTENT) {
+                                        val cachedHeight = childElement.position.cachedHeightDp
+                                        cachedHeight?.let { it * density * zoomLevel } ?: (childElement.position.rowSpan * childCellSizePx)
+                                    } else {
+                                        childElement.position.rowSpan * childCellSizePx
+                                    }
+                                    originalY += childHeightPx
+                                }
+                             }
+                        }
+                        viewModel.startDrag(element, originalY) 
+                    },
+                    onDrag = { element: ResumeElement, position: GridPosition, offsetY: Float ->
+                        // Pass offsetY and density for accurate vertical container reordering
+                        viewModel.updateDragPosition(position, offsetY, density)
 
                         // Check if dragging over any unlocked container
                         val currentPage = gridResume.pages.firstOrNull()
@@ -350,8 +379,14 @@ fun GridEditorScreen(
                             modifier = Modifier.fillMaxSize(),
                             tonalElevation = 2.dp
                         ) {
+                            // Find parent container
+                            val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                            val parentContainer = allElements.filterIsInstance<ResumeElement.ContainerElement>()
+                                .find { it.children.contains(selectedElement!!.id) }
+
                             PropertyPanel(
                                 element = selectedElement!!,
+                                parentContainer = parentContainer,
                                 onUpdateElement = { viewModel.updateElement(it) },
                                 onClose = {
                                     showPropertyPanel = false
@@ -678,7 +713,7 @@ private fun GridCanvas(
     onElementSelect: (ResumeElement) -> Unit,
     onElementDeselect: () -> Unit,
     onDragStart: (ResumeElement) -> Unit,
-    onDrag: (ResumeElement, GridPosition) -> Unit,
+    onDrag: (ResumeElement, GridPosition, Float) -> Unit,  // Added Float parameter for offsetY
     onDragEnd: (ResumeElement, GridPosition) -> Unit,
     onResize: (ResumeElement, GridPosition) -> Unit,
     onOpenProperties: () -> Unit,
@@ -1061,8 +1096,66 @@ private fun GridCanvas(
                                                         element = element,
                                                         hoverProgress = hoverProgress
                                                     ) {
-                                                        for (child in children) {
+                                                        // Check if currently dragging a child of this container
+                                                        val isDraggingChild = draggedElement?.let { drag ->
+                                                            element.children.contains(drag.element.id)
+                                                        } ?: false
+
+                                                        val targetIndex = draggedElement?.targetInsertionIndex
+                                                        val draggedChildId = if (isDraggingChild) draggedElement?.element?.id else null
+
+                                                        for ((index, child) in children.withIndex()) {
                                                             val isInteractive = element.locked
+
+                                                            // Calculate animation offset for this child
+                                                            val animationOffset = if (isDraggingChild && draggedChildId != null && child.id != draggedChildId && targetIndex != null) {
+                                                                // Find original index of dragged element
+                                                                val draggedOriginalIndex = element.children.indexOf(draggedChildId)
+                                                                val currentChildIndex = element.children.indexOf(child.id)
+
+                                                                // If target is lower (moving down) and this child is between original and target
+                                                                if (targetIndex > draggedOriginalIndex && currentChildIndex > draggedOriginalIndex && currentChildIndex <= targetIndex) {
+                                                                    // Shift this element up (negative offset)
+                                                                    val draggedElement = children.find { it.id == draggedChildId }
+                                                                    if (draggedElement != null) {
+                                                                        val cellSizePx = gridResume.gridConfig.cellSizeDp * density * currentZoom
+                                                                        val draggedHeightPx = if (draggedElement.position.heightMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.SizeMode.WRAP_CONTENT) {
+                                                                            draggedElement.position.cachedHeightDp?.let { it * density * currentZoom } ?: (draggedElement.position.rowSpan * cellSizePx)
+                                                                        } else {
+                                                                            draggedElement.position.rowSpan * cellSizePx
+                                                                        }
+                                                                        -draggedHeightPx
+                                                                    } else 0f
+                                                                }
+                                                                // If target is higher (moving up) and this child is between target and original
+                                                                else if (targetIndex < draggedOriginalIndex && currentChildIndex >= targetIndex && currentChildIndex < draggedOriginalIndex) {
+                                                                    // Shift this element down (positive offset)
+                                                                    val draggedElement = children.find { it.id == draggedChildId }
+                                                                    if (draggedElement != null) {
+                                                                        val cellSizePx = gridResume.gridConfig.cellSizeDp * density * currentZoom
+                                                                        val draggedHeightPx = if (draggedElement.position.heightMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.SizeMode.WRAP_CONTENT) {
+                                                                            draggedElement.position.cachedHeightDp?.let { it * density * currentZoom } ?: (draggedElement.position.rowSpan * cellSizePx)
+                                                                        } else {
+                                                                            draggedElement.position.rowSpan * cellSizePx
+                                                                        }
+                                                                        draggedHeightPx
+                                                                    } else 0f
+                                                                } else {
+                                                                    0f
+                                                                }
+                                                            } else {
+                                                                0f
+                                                            }
+
+                                                            // Animate the offset smoothly
+                                                            val animatedOffsetY by animateFloatAsState(
+                                                                targetValue = animationOffset,
+                                                                animationSpec = tween(
+                                                                    durationMillis = 300,
+                                                                    easing = FastOutSlowInEasing
+                                                                ),
+                                                                label = "childReorderOffset_${child.id}"
+                                                            )
 
                                                             key(child.id) {
                                                                 DraggableElement(
@@ -1073,6 +1166,7 @@ private fun GridCanvas(
                                                                     isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
                                                                     enabled = isInteractive && !isMoveMode,
                                                                     useRelativePositioning = true,
+                                                                    animationOffsetY = animatedOffsetY,
                                                                     onDragStart = onDragStart,
                                                                     onDrag = onDrag,
                                                                     onDragEnd = onDragEnd,
@@ -1256,12 +1350,24 @@ private fun GridCanvas(
                                             is ResumeElement.ChartElement -> Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
+                                                    .padding(
+                                                        start = ((element.padding?.left ?: 8f) * currentZoom).dp,
+                                                        top = ((element.padding?.top ?: 8f) * currentZoom).dp,
+                                                        end = ((element.padding?.right ?: 8f) * currentZoom).dp,
+                                                        bottom = ((element.padding?.bottom ?: 8f) * currentZoom).dp
+                                                    )
                                                     .background(Color.LightGray)
                                             )
 
                                             is ResumeElement.IconElement -> Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
+                                                    .padding(
+                                                        start = ((element.padding?.left ?: 8f) * currentZoom).dp,
+                                                        top = ((element.padding?.top ?: 8f) * currentZoom).dp,
+                                                        end = ((element.padding?.right ?: 8f) * currentZoom).dp,
+                                                        bottom = ((element.padding?.bottom ?: 8f) * currentZoom).dp
+                                                    )
                                                     .background(Color.Cyan)
                                             )
 
@@ -1281,6 +1387,26 @@ private fun GridCanvas(
 
                         var accumulatedCol = 0
                         var accumulatedRow = 0
+                        
+                        // Check if immediate parent is vertical layout
+                        val isInVerticalContainer = parent?.effectiveLayoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.VERTICAL
+
+                        // For vertical containers, calculate Y offset differently
+                        var verticalOffsetY = 0f
+                        var containerWidthPx: Float? = null
+                        
+                        if (isInVerticalContainer && parent != null) {
+                            // Use the captured original Y position + drag offset
+                            // This ensures the ghost follows the cursor smoothly even when elements are reordered
+                            verticalOffsetY = drag.originalCaptureY + drag.dragOffsetY
+                            
+                            // Calculate container width for ghost
+                            val effectiveCellSizePx = cellSizePx * currentZoom
+                            val parentWidthPx = parent.position.colSpan * effectiveCellSizePx
+                            val paddingLeftPx = parent.padding.left * density * currentZoom
+                            val paddingRightPx = parent.padding.right * density * currentZoom
+                            containerWidthPx = parentWidthPx - paddingLeftPx - paddingRightPx
+                        }
 
                         while (parent != null) {
                             accumulatedCol += parent.position.col
@@ -1293,7 +1419,11 @@ private fun GridCanvas(
 
                         val effectiveCellSizePx = cellSizePx * currentZoom
                         val parentOffsetX = accumulatedCol * effectiveCellSizePx
-                        val parentOffsetY = accumulatedRow * effectiveCellSizePx
+                        val parentOffsetY = if (isInVerticalContainer) {
+                            (accumulatedRow * effectiveCellSizePx) + verticalOffsetY
+                        } else {
+                            accumulatedRow * effectiveCellSizePx
+                        }
 
                         Box(
                             modifier = Modifier.offset {
@@ -1308,7 +1438,9 @@ private fun GridCanvas(
                                 position = drag.currentPosition,
                                 gridConfig = gridResume.gridConfig,
                                 zoomLevel = currentZoom,
-                                isValid = drag.isValidPosition
+                                isValid = drag.isValidPosition,
+                                useVerticalLayout = isInVerticalContainer,
+                                containerWidthPx = containerWidthPx
                             ) {}
                         }
                     }

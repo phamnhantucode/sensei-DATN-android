@@ -30,7 +30,8 @@ sealed class ResumeElement {
         val textStyle: TextStyle = TextStyle(),
         val alignment: TextAlignment = TextAlignment.LEFT,
         val verticalAlignment: VerticalTextAlignment? = VerticalTextAlignment.CENTER,
-        val maxLines: Int? = null
+        val maxLines: Int? = null,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -48,7 +49,8 @@ sealed class ResumeElement {
         val contentScale: ImageScale = ImageScale.FIT,
         val cornerRadius: Float = 0f,
         val isCircle: Boolean = false, // If true, crops image to circle
-        val description: String = "" // Alt text
+        val description: String = "", // Alt text
+        val padding: Padding? = Padding(0f, 0f, 0f, 0f)
     ) : ResumeElement()
 
     /**
@@ -65,7 +67,8 @@ sealed class ResumeElement {
         val shapeType: ShapeType = ShapeType.RECTANGLE,
         val cornerRadius: Float = 0f,
         val customHeightDp: Float? = null, // Custom height for dividers (overrides rowSpan)
-        val customWidthDp: Float? = null  // Custom width if needed
+        val customWidthDp: Float? = null,  // Custom width if needed
+        val padding: Padding? = Padding(0f, 0f, 0f, 0f)
     ) : ResumeElement()
 
     /**
@@ -80,7 +83,8 @@ sealed class ResumeElement {
         override val userInfoTag: UserInfoTag? = null,
         override val isVisible: Boolean = true,
         val chartType: ChartType = ChartType.HORIZONTAL_BAR,
-        val data: ChartData = ChartData()
+        val data: ChartData = ChartData(),
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -115,7 +119,8 @@ sealed class ResumeElement {
         override val userInfoTag: UserInfoTag? = null,
         override val isVisible: Boolean = true,
         val iconName: String = "", // Material icon name or emoji
-        val iconType: IconType = IconType.MATERIAL
+        val iconType: IconType = IconType.MATERIAL,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -137,7 +142,8 @@ sealed class ResumeElement {
         val textStyle: TextStyle = TextStyle(),
         val iconSize: Float = 16f, // Size of icons in dp
         val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
-        val verticalAlignment: VerticalAlignment? = VerticalAlignment.CENTER
+        val verticalAlignment: VerticalAlignment? = VerticalAlignment.CENTER,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -169,7 +175,8 @@ sealed class ResumeElement {
         val responsibilityStyle: TextStyle = TextStyle(fontSize = 12f),
         val dateFormat: DateFormat = DateFormat.MMM_YYYY,
         val dateSeparator: String = " - ",
-        val bulletStyle: BulletStyle = BulletStyle.DISC
+        val bulletStyle: BulletStyle = BulletStyle.DISC,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -203,7 +210,8 @@ sealed class ResumeElement {
         val achievementStyle: TextStyle = TextStyle(fontSize = 12f),
         val dateFormat: DateFormat = DateFormat.MMM_YYYY,
         val dateSeparator: String = " - ",
-        val bulletStyle: BulletStyle = BulletStyle.DISC
+        val bulletStyle: BulletStyle = BulletStyle.DISC,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -242,7 +250,8 @@ sealed class ResumeElement {
         val progressBarBackgroundColor: Long? = 0xFFE0E0E0,
         // Dot rating properties
         val maxDots: Int = 5,
-        val dotSize: Float = 8f
+        val dotSize: Float = 8f,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -282,7 +291,8 @@ sealed class ResumeElement {
         val technologyTagBackgroundColor: Long? = 0xFFE3F2FD,
         val technologyTagBorderColor: Long? = null,
         val technologyTagBorderWidth: Float = 0f,
-        val technologyTagCornerRadius: Float = 12f
+        val technologyTagCornerRadius: Float = 12f,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -316,7 +326,8 @@ sealed class ResumeElement {
         val expiryStatusStyle: TextStyle = TextStyle(fontSize = 11f, fontWeight = FontWeight.Medium),
         val dateFormat: DateFormat = DateFormat.MMM_YYYY,
         val activeStatusColor: Long = 0xFF4CAF50, // Green for active
-        val expiredStatusColor: Long = 0xFFFF5722 // Red for expired
+        val expiredStatusColor: Long = 0xFFFF5722, // Red for expired
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
     /**
@@ -351,7 +362,8 @@ sealed class ResumeElement {
         val progressBarBackgroundColor: Long? = 0xFFE0E0E0,
         // Dot rating properties (for DOTS display style)
         val maxDots: Int = 5,
-        val dotSize: Float = 8f
+        val dotSize: Float = 8f,
+        val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 }
 

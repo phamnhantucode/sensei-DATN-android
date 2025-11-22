@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ImageScale
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.Padding
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 
 /**
@@ -85,6 +86,12 @@ fun ImageElementRenderer(
                 } else {
                     Modifier
                 }
+            )
+            .padding(
+                start = (element.padding?.left ?: 0f).dp,
+                top = (element.padding?.top ?: 0f).dp,
+                end = (element.padding?.right ?: 0f).dp,
+                bottom = (element.padding?.bottom ?: 0f).dp
             )
     ) {
         if (element.imageUrl.isNotEmpty()) {

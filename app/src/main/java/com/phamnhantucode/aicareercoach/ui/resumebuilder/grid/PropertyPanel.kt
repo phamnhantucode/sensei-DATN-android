@@ -45,6 +45,7 @@ fun PropertyPanel(
     onClose: () -> Unit,
     onRemoveElement: () -> Unit,
     onUpdateContainerLayoutMode: ((ResumeElement.ContainerElement, LayoutMode) -> Unit)? = null,
+    parentContainer: ResumeElement.ContainerElement? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -238,67 +239,78 @@ fun PropertyPanel(
                 is ResumeElement.TextElement -> {
                     TextElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ImageElement -> {
                     ImageElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ShapeElement -> {
                     ShapeElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ChartElement -> {
                     ChartElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ContactElement -> {
                     ContactElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.WorkExperienceElement -> {
                     WorkExperienceElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.EducationElement -> {
                     EducationElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.SkillElement -> {
                     SkillElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ProjectElement -> {
                     ProjectElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.CertificationElement -> {
                     CertificationElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.LanguageElement -> {
                     LanguageElementProperties(
                         element = element,
-                        onUpdateElement = onUpdateElement
+                        onUpdateElement = onUpdateElement,
+                        parentContainer = parentContainer
                     )
                 }
                 is ResumeElement.ContainerElement -> {
@@ -860,7 +872,8 @@ private fun CommonPropertiesSection(
 @Composable
 private fun TextElementProperties(
     element: ResumeElement.TextElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Text Content") {
         // Content
@@ -975,6 +988,16 @@ private fun TextElementProperties(
             }
         }
 
+        // Padding controls - only show if inside a vertical container
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
+
         // Text color (simplified color picker)
         ColorPicker(
             label = "Text Color",
@@ -1004,7 +1027,8 @@ private fun TextElementProperties(
 @Composable
 private fun ImageElementProperties(
     element: ResumeElement.ImageElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -1143,6 +1167,17 @@ private fun ImageElementProperties(
                 }
             }
         }
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 }
 
@@ -1152,7 +1187,8 @@ private fun ImageElementProperties(
 @Composable
 private fun ShapeElementProperties(
     element: ResumeElement.ShapeElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Shape") {
         // Shape type dropdown
@@ -1221,6 +1257,17 @@ private fun ShapeElementProperties(
                 }
             )
         }
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 }
 
@@ -1230,10 +1277,22 @@ private fun ShapeElementProperties(
 @Composable
 private fun ChartElementProperties(
     element: ResumeElement.ChartElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Chart") {
         Text("Chart properties coming soon...")
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 }
 
@@ -1243,7 +1302,8 @@ private fun ChartElementProperties(
 @Composable
 private fun ContactElementProperties(
     element: ResumeElement.ContactElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1385,6 +1445,17 @@ private fun ContactElementProperties(
                 valueRange = 8f..48f,
                 onValueChange = { newSize ->
                     onUpdateElement(element.copy(iconSize = newSize))
+                }
+            )
+        }
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
                 }
             )
         }
@@ -1673,7 +1744,8 @@ private fun ContactItemEditor(
 @Composable
 private fun WorkExperienceElementProperties(
     element: ResumeElement.WorkExperienceElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Work Experience Items") {
         // Work experience items list
@@ -1837,6 +1909,17 @@ private fun WorkExperienceElementProperties(
                 onUpdateElement(element.copy(responsibilitySpacing = newSpacing))
             }
         )
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 
     PropertySection(title = "Date & Bullet Settings") {
@@ -2548,7 +2631,8 @@ private fun ColorPicker(
 @Composable
 private fun EducationElementProperties(
     element: ResumeElement.EducationElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Education Items") {
         // Education items list
@@ -2724,6 +2808,17 @@ private fun EducationElementProperties(
                 onUpdateElement(element.copy(achievementSpacing = newSpacing))
             }
         )
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 
     PropertySection(title = "Date & Bullet Settings") {
@@ -2948,7 +3043,8 @@ private fun AchievementItemEditor(
 @Composable
 private fun SkillElementProperties(
     element: ResumeElement.SkillElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Skill Items") {
         // Skill items list
@@ -3013,6 +3109,17 @@ private fun SkillElementProperties(
             valueRange = 0f..32f,
             onValueChange = { onUpdateElement(element.copy(spacing = it)) }
         )
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 }
 
@@ -3093,7 +3200,8 @@ private fun SkillItemEditor(
 @Composable
 private fun ProjectElementProperties(
     element: ResumeElement.ProjectElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Project Items") {
         // Project items list
@@ -3189,6 +3297,17 @@ private fun ProjectElementProperties(
             Switch(
                 checked = element.showLink,
                 onCheckedChange = { onUpdateElement(element.copy(showLink = it)) }
+            )
+        }
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
             )
         }
     }
@@ -3363,7 +3482,8 @@ private fun ProjectHighlightEditor(
 @Composable
 private fun CertificationElementProperties(
     element: ResumeElement.CertificationElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Certification Items") {
         // Certification items list
@@ -3487,6 +3607,17 @@ private fun CertificationElementProperties(
                 )
             }
         )
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
+        }
     }
 }
 
@@ -3587,7 +3718,8 @@ private fun CertificationItemEditor(
 @Composable
 private fun LanguageElementProperties(
     element: ResumeElement.LanguageElement,
-    onUpdateElement: (ResumeElement) -> Unit
+    onUpdateElement: (ResumeElement) -> Unit,
+    parentContainer: ResumeElement.ContainerElement? = null
 ) {
     PropertySection(title = "Language Items") {
         // Language items list
@@ -3660,6 +3792,17 @@ private fun LanguageElementProperties(
                     label = { Text(type.name) }
                 )
             }
+        }
+
+        // Padding (only if inside vertical container)
+        if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            PaddingControl(
+                padding = element.padding ?: Padding(),
+                onPaddingChange = { newPadding ->
+                    onUpdateElement(element.copy(padding = newPadding))
+                }
+            )
         }
     }
 }
@@ -3813,53 +3956,12 @@ private fun ContainerElementProperties(
         }
         
         // Padding controls
-        Text("Padding", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(
-                label = "Top",
-                value = element.padding.top.toInt(),
-                onValueChange = { value ->
-                    onUpdateElement(element.copy(
-                        padding = element.padding.copy(top = value.toFloat())
-                    ))
-                },
-                modifier = Modifier.weight(1f)
-            )
-            NumberField(
-                label = "Bottom",
-                value = element.padding.bottom.toInt(),
-                onValueChange = { value ->
-                    onUpdateElement(element.copy(
-                        padding = element.padding.copy(bottom = value.toFloat())
-                    ))
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(
-                label = "Left",
-                value = element.padding.left.toInt(),
-                onValueChange = { value ->
-                    onUpdateElement(element.copy(
-                        padding = element.padding.copy(left = value.toFloat())
-                    ))
-                },
-                modifier = Modifier.weight(1f)
-            )
-            NumberField(
-                label = "Right",
-                value = element.padding.right.toInt(),
-                onValueChange = { value ->
-                    onUpdateElement(element.copy(
-                        padding = element.padding.copy(right = value.toFloat())
-                    ))
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
+        PaddingControl(
+            padding = element.padding,
+            onPaddingChange = { newPadding ->
+                onUpdateElement(element.copy(padding = newPadding))
+            }
+        )
     }
 }
 
@@ -3952,4 +4054,117 @@ private fun updateElementTag(element: ResumeElement, tag: UserInfoTag?): ResumeE
         is ResumeElement.CertificationElement -> element.copy(userInfoTag = tag)
         is ResumeElement.LanguageElement -> element.copy(userInfoTag = tag)
     }
+}
+
+/**
+ * Padding control with multiple modes (All, Symmetric, Individual)
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PaddingControl(
+    padding: Padding,
+    onPaddingChange: (Padding) -> Unit
+) {
+    var mode by remember { mutableStateOf(PaddingMode.ALL) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Padding", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+        // Mode selector
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            PaddingMode.values().forEach { m ->
+                FilterChip(
+                    selected = mode == m,
+                    onClick = { mode = m },
+                    label = { Text(m.label) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        when (mode) {
+            PaddingMode.ALL -> {
+                // Single slider/input for all sides
+                // Assuming top is representative
+                NumberField(
+                    label = "All Sides",
+                    value = padding.top.toInt(),
+                    onValueChange = { value ->
+                        val fValue = value.toFloat()
+                        onPaddingChange(Padding(fValue, fValue, fValue, fValue))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            PaddingMode.SYMMETRIC -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(
+                        label = "Vertical",
+                        value = padding.top.toInt(),
+                        onValueChange = { value ->
+                            val fValue = value.toFloat()
+                            onPaddingChange(padding.copy(top = fValue, bottom = fValue))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NumberField(
+                        label = "Horizontal",
+                        value = padding.left.toInt(),
+                        onValueChange = { value ->
+                            val fValue = value.toFloat()
+                            onPaddingChange(padding.copy(left = fValue, right = fValue))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            PaddingMode.INDIVIDUAL -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(
+                        label = "Top",
+                        value = padding.top.toInt(),
+                        onValueChange = { value ->
+                            onPaddingChange(padding.copy(top = value.toFloat()))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NumberField(
+                        label = "Bottom",
+                        value = padding.bottom.toInt(),
+                        onValueChange = { value ->
+                            onPaddingChange(padding.copy(bottom = value.toFloat()))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(
+                        label = "Left",
+                        value = padding.left.toInt(),
+                        onValueChange = { value ->
+                            onPaddingChange(padding.copy(left = value.toFloat()))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NumberField(
+                        label = "Right",
+                        value = padding.right.toInt(),
+                        onValueChange = { value ->
+                            onPaddingChange(padding.copy(right = value.toFloat()))
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class PaddingMode(val label: String) {
+    ALL("All"),
+    SYMMETRIC("Sym"),
+    INDIVIDUAL("Indiv")
 }

@@ -392,8 +392,13 @@ class GridEditorViewModel(
             gridConfig = _gridResume.value.gridConfig
         ) ?: GridPosition(0, 0, elementSize.first, elementSize.second)
 
+        // Calculate next z-index to ensure new element appears on top
+        val maxZIndex = currentPage.elements.maxOfOrNull { it.zIndex } ?: -1
+        val newZIndex = maxZIndex + 1
+
         // Create new element based on type
         val newElement = createElementOfType(elementType, position)
+            .update(zIndex = newZIndex)
 
         // Add to page
         val updatedPage = currentPage.addElement(newElement)
@@ -769,7 +774,7 @@ class GridEditorViewModel(
     /**
      * Starts dragging an element
      */
-    fun startDrag(element: ResumeElement) {
+    fun startDrag(element: ResumeElement, originalY: Float = 0f) {
         // Get the latest version of the element from the page to ensure we have all recent changes
         val currentPage = _gridResume.value.pages.firstOrNull()
         val latestElement = currentPage?.elements?.find { it.id == element.id } ?: element
@@ -778,16 +783,40 @@ class GridEditorViewModel(
             element = latestElement,
             originalPosition = latestElement.position,
             currentPosition = latestElement.position,
-            isValidPosition = true
+            isValidPosition = true,
+            originalCaptureY = originalY
         )
     }
 
     /**
      * Updates drag position during drag
      */
-    fun updateDragPosition(newPosition: GridPosition) {
+    fun updateDragPosition(newPosition: GridPosition, offsetYPx: Float? = null, density: Float = 1f) {
         val currentDrag = _draggedElement.value ?: return
         val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+
+        // Check if element is a child of a vertical layout container
+        val parentContainer = currentPage.elements.find { element ->
+            element is ResumeElement.ContainerElement &&
+            element.children.contains(currentDrag.element.id)
+        } as? ResumeElement.ContainerElement
+
+        // Calculate target insertion index for vertical containers
+        val targetInsertionIndex = if (parentContainer != null &&
+                                       parentContainer.effectiveLayoutMode == LayoutMode.VERTICAL &&
+                                       offsetYPx != null) {
+            // Use cumulative height calculation for accurate targeting
+            calculateVerticalTargetIndex(
+                parentContainer = parentContainer,
+                draggedElementId = currentDrag.element.id,
+                offsetYPx = offsetYPx,
+                density = density,
+                zoom = _zoomLevel.value,
+                allElements = currentPage.elements
+            )
+        } else {
+            null
+        }
 
         // Check if position is valid
         // Use page's layout mode to determine collision behavior
@@ -801,8 +830,95 @@ class GridEditorViewModel(
 
         _draggedElement.value = currentDrag.copy(
             currentPosition = newPosition,
-            isValidPosition = isValid
+            isValidPosition = isValid,
+            targetInsertionIndex = targetInsertionIndex,
+            dragOffsetY = offsetYPx ?: 0f
         )
+    }
+
+    /**
+     * Calculates the target insertion index for vertical container reordering
+     * based on the actual cumulative heights of children and the Y offset.
+     *
+     * Uses the "half-height" rule: when the dragged element crosses the midpoint
+     * of a sibling element, the target index changes to create space at that position.
+     */
+    private fun calculateVerticalTargetIndex(
+        parentContainer: ResumeElement.ContainerElement,
+        draggedElementId: String,
+        offsetYPx: Float,
+        density: Float,
+        zoom: Float,
+        allElements: List<ResumeElement>
+    ): Int {
+        val currentIndex = parentContainer.children.indexOf(draggedElementId)
+        if (currentIndex == -1) return 0
+
+        val cellSizePx = _gridResume.value.gridConfig.cellSizeDp * density * zoom
+
+        // Build a list of child heights (excluding the dragged element)
+        val childHeights = mutableListOf<Pair<Int, Float>>() // Pair of (originalIndex, height)
+
+        for ((index, childId) in parentContainer.children.withIndex()) {
+            if (childId == draggedElementId) continue
+
+            val childElement = allElements.find { it.id == childId } ?: continue
+
+            // Calculate child height using same logic as ghost positioning
+            val childHeightPx = if (childElement.position.heightMode == SizeMode.WRAP_CONTENT) {
+                val cachedHeight = childElement.position.cachedHeightDp
+                cachedHeight?.let { it * density * zoom } ?: (childElement.position.rowSpan * cellSizePx)
+            } else {
+                childElement.position.rowSpan * cellSizePx
+            }
+
+            childHeights.add(index to childHeightPx)
+        }
+
+        // Determine target index based on offsetYPx
+        var cumulativeHeight = 0f
+        var targetIndex = currentIndex // Initialize to current index, not 0
+
+        if (offsetYPx > 0) {
+            // Moving down
+            for ((originalIndex, height) in childHeights) {
+                // Only consider children after the current position
+                if (originalIndex <= currentIndex) {
+                    continue
+                }
+
+                // Check if we've crossed the midpoint of this child
+                // cumulativeHeight tracks the height of intervening siblings we've already passed
+                if (offsetYPx >= cumulativeHeight + (height / 2f)) {
+                    targetIndex = originalIndex
+                    cumulativeHeight += height
+                } else {
+                    break
+                }
+            }
+        } else if (offsetYPx < 0) {
+            // Moving up - work backwards from current position
+            val childrenBeforeCurrent = childHeights.filter { it.first < currentIndex }.reversed()
+
+            var negativeOffset = 0f
+            targetIndex = currentIndex
+
+            for ((originalIndex, height) in childrenBeforeCurrent) {
+                // Check if we've crossed the midpoint of this child (going upward)
+                // We need to move up past half of this child's height
+                if (offsetYPx <= negativeOffset - (height / 2f)) {
+                    targetIndex = originalIndex
+                    negativeOffset -= height
+                } else {
+                    break
+                }
+            }
+        } else {
+            // No movement
+            targetIndex = currentIndex
+        }
+
+        return targetIndex.coerceIn(0, parentContainer.children.size)
     }
 
     /**
@@ -812,8 +928,9 @@ class GridEditorViewModel(
         val dragState = _draggedElement.value ?: return
 
         // Check if hovering over a container - if so, add to container immediately
-        if (dragState.hoveredContainerId != null) {
-            // Auto-add element to container
+        // Check if hovering over a container AND the hover timer has completed (progress >= 1.0)
+        if (dragState.hoveredContainerId != null && dragState.hoverProgress >= 1.0f) {
+            // Add element to container
             moveElementToContainer(dragState.element.id, dragState.hoveredContainerId!!)
 
             // Cancel hover timer and cleanup
@@ -826,24 +943,23 @@ class GridEditorViewModel(
         
         // Check if element is a child of a vertical layout container
         val parentContainer = currentPage.elements.find { element ->
-            element is ResumeElement.ContainerElement && 
+            element is ResumeElement.ContainerElement &&
             element.children.contains(dragState.element.id)
         } as? ResumeElement.ContainerElement
-        
+
         // If parent is a vertical container, handle reordering
         if (parentContainer != null && parentContainer.effectiveLayoutMode == LayoutMode.VERTICAL) {
-            val newRow = finalPosition.row
             val currentIndex = parentContainer.children.indexOf(dragState.element.id)
-            
-            // Calculate new index based on row position
-            // Clamp to valid range
-            val newIndex = newRow.coerceIn(0, parentContainer.children.size - 1)
-            
-            if (newIndex != currentIndex) {
+
+            // Use the target index that was calculated during drag with accurate cumulative heights
+            // This ensures the drop position matches the visual feedback shown during drag
+            val targetIndex = dragState.targetInsertionIndex ?: currentIndex
+
+            if (targetIndex != currentIndex) {
                 // Reorder within container
-                reorderChildInContainer(parentContainer.id, dragState.element.id, newIndex)
+                reorderChildInContainer(parentContainer.id, dragState.element.id, targetIndex)
             }
-            
+
             // Cleanup
             cancelHoverTimer()
             _draggedElement.value = null
@@ -1481,7 +1597,10 @@ data class DragState(
     val currentPosition: GridPosition,
     val isValidPosition: Boolean,
     val hoveredContainerId: String? = null,  // Container being hovered over
-    val hoverProgress: Float = 0f             // 0.0 to 1.0 progress towards auto-add
+    val hoverProgress: Float = 0f,            // 0.0 to 1.0 progress towards auto-add
+    val targetInsertionIndex: Int? = null,     // Target index for vertical container reordering
+    val dragOffsetY: Float = 0f,              // Vertical drag offset in pixels
+    val originalCaptureY: Float = 0f          // Original Y position in pixels (captured at drag start)
 )
 
 /**

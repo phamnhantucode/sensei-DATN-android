@@ -71,7 +71,12 @@ fun ContactElementRenderer(
                     Modifier
                 }
             )
-            .padding((8 * zoomLevel).dp)
+            .padding(
+                start = ((element.padding?.left ?: 8f) * zoomLevel).dp,
+                top = ((element.padding?.top ?: 8f) * zoomLevel).dp,
+                end = ((element.padding?.right ?: 8f) * zoomLevel).dp,
+                bottom = ((element.padding?.bottom ?: 8f) * zoomLevel).dp
+            )
     ) {
         // Map alignment enums to Compose alignment values (with null safety for backward compatibility)
         val horizontalArrangement = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
