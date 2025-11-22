@@ -44,6 +44,7 @@ fun PropertyPanel(
     onUpdateElement: (ResumeElement) -> Unit,
     onClose: () -> Unit,
     onRemoveElement: () -> Unit,
+    onUpdateContainerLayoutMode: ((ResumeElement.ContainerElement, LayoutMode) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -298,6 +299,13 @@ fun PropertyPanel(
                     LanguageElementProperties(
                         element = element,
                         onUpdateElement = onUpdateElement
+                    )
+                }
+                is ResumeElement.ContainerElement -> {
+                    ContainerElementProperties(
+                        element = element,
+                        onUpdateElement = onUpdateElement,
+                        onUpdateLayoutMode = onUpdateContainerLayoutMode
                     )
                 }
                 else -> {
@@ -3722,6 +3730,134 @@ private fun LanguageItemEditor(
                 value = item.proficiency,
                 onValueChange = { onUpdate(item.copy(proficiency = it)) },
                 valueRange = 0f..1f
+            )
+        }
+    }
+}
+
+/**
+ * Container element properties
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ContainerElementProperties(
+    element: ResumeElement.ContainerElement,
+    onUpdateElement: (ResumeElement) -> Unit,
+    onUpdateLayoutMode: ((ResumeElement.ContainerElement, LayoutMode) -> Unit)? = null
+) {
+    PropertySection(title = "Container Layout") {
+        // Layout Mode selector
+        Text("Layout Mode", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            LayoutMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = element.effectiveLayoutMode == mode,
+                    onClick = {
+                        // Use dedicated callback if provided, otherwise fall back to standard update
+                        if (onUpdateLayoutMode != null) {
+                            onUpdateLayoutMode(element, mode)
+                        } else {
+                            onUpdateElement(element.copy(layoutMode = mode))
+                        }
+                    },
+                    label = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(mode.name)
+                            Text(
+                                text = when (mode) {
+                                    LayoutMode.FREE -> "Overlap allowed"
+                                    LayoutMode.GRID -> "Grid-based"
+                                    LayoutMode.VERTICAL -> "Stack vertically"
+                                },
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                )
+            }
+        }
+        
+        // Description based on selected mode
+        val description = when (element.effectiveLayoutMode) {
+            LayoutMode.FREE -> "Children can overlap freely with no collision detection"
+            LayoutMode.GRID -> "Children snap to grid and cannot overlap (default)"
+            LayoutMode.VERTICAL -> "Children stack vertically with full width and wrap height"
+        }
+        
+        Text(
+            text = description,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+    
+    PropertySection(title = "Container Settings") {
+        // Clip Content toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Clip Content")
+            Switch(
+                checked = element.clipContent,
+                onCheckedChange = { clip ->
+                    onUpdateElement(element.copy(clipContent = clip))
+                }
+            )
+        }
+        
+        // Padding controls
+        Text("Padding", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(
+                label = "Top",
+                value = element.padding.top.toInt(),
+                onValueChange = { value ->
+                    onUpdateElement(element.copy(
+                        padding = element.padding.copy(top = value.toFloat())
+                    ))
+                },
+                modifier = Modifier.weight(1f)
+            )
+            NumberField(
+                label = "Bottom",
+                value = element.padding.bottom.toInt(),
+                onValueChange = { value ->
+                    onUpdateElement(element.copy(
+                        padding = element.padding.copy(bottom = value.toFloat())
+                    ))
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(
+                label = "Left",
+                value = element.padding.left.toInt(),
+                onValueChange = { value ->
+                    onUpdateElement(element.copy(
+                        padding = element.padding.copy(left = value.toFloat())
+                    ))
+                },
+                modifier = Modifier.weight(1f)
+            )
+            NumberField(
+                label = "Right",
+                value = element.padding.right.toInt(),
+                onValueChange = { value ->
+                    onUpdateElement(element.copy(
+                        padding = element.padding.copy(right = value.toFloat())
+                    ))
+                },
+                modifier = Modifier.weight(1f)
             )
         }
     }

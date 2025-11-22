@@ -1,8 +1,10 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,7 @@ import kotlin.math.roundToInt
  * Panel for managing layers (elements)
  * Allows reordering, toggling visibility, and locking elements
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LayersPanel(
     elements: List<ResumeElement>,
@@ -43,6 +46,7 @@ fun LayersPanel(
     onMoveLayer: (Int, Int) -> Unit,
     onMoveToContainer: (String, String) -> Unit,
     onMoveOut: (String) -> Unit,
+    onOpenProperties: (ResumeElement) -> Unit,
     onClose: () -> Unit
 ) {
     // Helper to build the tree structure
@@ -128,6 +132,7 @@ fun LayersPanel(
                             allElements = elements,
                             onMoveToContainer = onMoveToContainer,
                             onMoveOut = onMoveOut,
+                            onOpenProperties = onOpenProperties,
                             onSelectElement = onSelectElement,
                             selectedElementId = selectedElementId,
                             onDragStart = { id, localOffset -> 
@@ -190,6 +195,7 @@ fun LayersPanel(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LayerItem(
     element: ResumeElement,
@@ -204,6 +210,7 @@ private fun LayerItem(
     allElements: List<ResumeElement> = emptyList(),
     onMoveToContainer: (String, String) -> Unit = { _, _ -> },
     onMoveOut: (String) -> Unit = {},
+    onOpenProperties: (ResumeElement) -> Unit = {},
     onSelectElement: (ResumeElement) -> Unit = {},
     selectedElementId: String? = null,
     onDragStart: (String, Offset) -> Unit = { _, _ -> },
@@ -227,7 +234,13 @@ private fun LayerItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(backgroundColor)
-                .clickable(onClick = onSelect)
+                .combinedClickable(
+                    onClick = onSelect,
+                    onDoubleClick = {
+                        onSelect()
+                        onOpenProperties(element)
+                    }
+                )
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .padding(start = (depth * 16).dp), // Indentation
             verticalAlignment = Alignment.CenterVertically
@@ -356,6 +369,7 @@ private fun LayerItem(
                         allElements = allElements,
                         onMoveToContainer = onMoveToContainer,
                         onMoveOut = onMoveOut,
+                        onOpenProperties = onOpenProperties,
                         onSelectElement = onSelectElement,
                         selectedElementId = selectedElementId,
                         onDragStart = onDragStart,

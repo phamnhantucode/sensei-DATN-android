@@ -215,5 +215,6 @@ enum class GridTemplateType {
  */
 enum class LayoutMode {
     FREE,  // Elements can freely overlap, no collision detection within container
-    GRID   // Elements snap to grid and cannot overlap (default behavior)
+    GRID,  // Elements snap to grid and cannot overlap (default behavior)
+    VERTICAL // Elements are stacked vertically, width matches container, height wraps content
 }

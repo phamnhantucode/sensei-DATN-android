@@ -425,6 +425,112 @@ class GridEditorViewModel(
     }
 
     /**
+     * Updates a container's layout mode and adjusts child elements accordingly
+     * When switching to VERTICAL mode, children are repositioned to stack vertically
+     */
+    fun updateContainerLayoutMode(container: ResumeElement.ContainerElement, newMode: LayoutMode) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        
+        // Update the container's layout mode
+        val updatedContainer = container.copy(layoutMode = newMode)
+        
+        // If switching to VERTICAL mode, reposition all children
+        val updatedElements = if (newMode == LayoutMode.VERTICAL) {
+            currentPage.elements.map { element ->
+                if (element.id == container.id) {
+                    // Return the updated container
+                    updatedContainer
+                } else if (container.children.contains(element.id)) {
+                    // Reposition child: stack vertically, full width, wrap height
+                    val childIndex = container.children.indexOf(element.id)
+                    element.update(
+                        position = element.position.copy(
+                            row = childIndex, // Stack vertically by index
+                            col = 0, // Start at column 0
+                            colSpan = container.position.colSpan, // Full width of container
+                            widthMode = SizeMode.FIXED, // Use fixed width mode
+                            heightMode = SizeMode.WRAP_CONTENT, // Wrap height to content
+                            cachedHeightDp = null // Clear cached height to recalculate
+                        )
+                    )
+                } else {
+                    element
+                }
+            }
+        } else {
+            // For FREE or GRID modes, just update the container
+            currentPage.elements.map { element ->
+                if (element.id == container.id) updatedContainer else element
+            }
+        }
+        
+        val updatedPage = currentPage.copy(elements = updatedElements)
+        updatePage(updatedPage)
+        
+        // Update selection if this is the selected element
+        if (_selectedElement.value?.id == container.id) {
+            _selectedElement.value = updatedContainer
+        }
+        
+        triggerAutoSave()
+    }
+
+    /**
+     * Reorders a child element within its container
+     * Used for drag-and-drop reordering in vertical layout containers
+     */
+    fun reorderChildInContainer(containerId: String, childId: String, newIndex: Int) {
+        saveToUndoStack()
+
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement ?: return
+
+        // Check if child exists in container
+        if (!container.children.contains(childId)) return
+
+        // Remove child from old position and insert at new position
+        val oldIndex = container.children.indexOf(childId)
+        if (oldIndex == newIndex) return // No change needed
+
+        val mutableChildren = container.children.toMutableList()
+        mutableChildren.removeAt(oldIndex)
+        val clampedIndex = newIndex.coerceIn(0, mutableChildren.size)
+        mutableChildren.add(clampedIndex, childId)
+
+        // Update container with new children order
+        val updatedContainer = container.copy(children = mutableChildren)
+
+        // If vertical layout, reposition all children based on new order
+        val updatedElements = if (container.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            currentPage.elements.map { element ->
+                if (element.id == containerId) {
+                    updatedContainer
+                } else if (mutableChildren.contains(element.id)) {
+                    // Reposition child based on new index
+                    val childIndex = mutableChildren.indexOf(element.id)
+                    element.update(
+                        position = element.position.copy(row = childIndex)
+                    )
+                } else {
+                    element
+                }
+            }
+        } else {
+            // For non-vertical layouts, just update the container
+            currentPage.elements.map { element ->
+                if (element.id == containerId) updatedContainer else element
+            }
+        }
+
+        val updatedPage = currentPage.copy(elements = updatedElements)
+        updatePage(updatedPage)
+
+        triggerAutoSave()
+    }
+
+    /**
      * Removes an element
      */
     fun removeElement(elementId: String) {
@@ -716,14 +822,40 @@ class GridEditorViewModel(
             return
         }
 
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        
+        // Check if element is a child of a vertical layout container
+        val parentContainer = currentPage.elements.find { element ->
+            element is ResumeElement.ContainerElement && 
+            element.children.contains(dragState.element.id)
+        } as? ResumeElement.ContainerElement
+        
+        // If parent is a vertical container, handle reordering
+        if (parentContainer != null && parentContainer.effectiveLayoutMode == LayoutMode.VERTICAL) {
+            val newRow = finalPosition.row
+            val currentIndex = parentContainer.children.indexOf(dragState.element.id)
+            
+            // Calculate new index based on row position
+            // Clamp to valid range
+            val newIndex = newRow.coerceIn(0, parentContainer.children.size - 1)
+            
+            if (newIndex != currentIndex) {
+                // Reorder within container
+                reorderChildInContainer(parentContainer.id, dragState.element.id, newIndex)
+            }
+            
+            // Cleanup
+            cancelHoverTimer()
+            _draggedElement.value = null
+            return
+        }
+
         // Normal drag end - update position
         // Clamp position to ensure it's within bounds
         val clampedPosition = GridUtils.clampPosition(finalPosition, _gridResume.value.gridConfig)
 
         if (clampedPosition != dragState.originalPosition) {
             saveToUndoStack()
-
-            val currentPage = _gridResume.value.pages.firstOrNull() ?: return
 
             // IMPORTANT: Get the latest element from the page, not from dragState
             // This ensures we preserve any property changes made during the drag

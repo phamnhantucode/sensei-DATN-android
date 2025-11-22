@@ -101,6 +101,7 @@ import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.CertificationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContainerElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContainerElementRendererWithLayout
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.EducationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.LanguageElementRenderer
@@ -310,56 +311,62 @@ fun GridEditorScreen(
                 }
             }
 
-            // Layers Panel (right side) - shown when toggled
-            if (showLayersPanel) {
-                Surface(
+            // Right side panels (Layers and Properties)
+            if (showLayersPanel || (showPropertyPanel && selectedElement != null)) {
+                Box(
                     modifier = Modifier
                         .width(300.dp)
-                        .fillMaxHeight(),
-                    tonalElevation = 2.dp
+                        .fillMaxHeight()
                 ) {
-                    LayersPanel(
-                        elements = gridResume.pages.firstOrNull()?.elements ?: emptyList(),
-                        selectedElementId = selectedElement?.id,
-                        onSelectElement = { viewModel.selectElement(it) },
-                        onToggleVisibility = { viewModel.toggleElementVisibility(it) },
-                        onToggleLock = { viewModel.toggleElementLock(it) },
-                        onMoveLayer = { from, to -> viewModel.moveElementLayer(from, to) },
-                        onMoveToContainer = { elementId, containerId ->
-                            viewModel.moveElementToContainer(
-                                elementId,
-                                containerId
+                    // Layers Panel
+                    if (showLayersPanel) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            tonalElevation = 2.dp
+                        ) {
+                            LayersPanel(
+                                elements = gridResume.pages.firstOrNull()?.elements ?: emptyList(),
+                                selectedElementId = selectedElement?.id,
+                                onSelectElement = { viewModel.selectElement(it) },
+                                onToggleVisibility = { viewModel.toggleElementVisibility(it) },
+                                onToggleLock = { viewModel.toggleElementLock(it) },
+                                onMoveLayer = { from, to -> viewModel.moveElementLayer(from, to) },
+                                onMoveToContainer = { elementId, containerId ->
+                                    viewModel.moveElementToContainer(
+                                        elementId,
+                                        containerId
+                                    )
+                                },
+                                onMoveOut = { elementId -> viewModel.moveElementOut(elementId) },
+                                onOpenProperties = { showPropertyPanel = true },
+                                onClose = { showLayersPanel = false }
                             )
-                        },
-                        onMoveOut = { elementId -> viewModel.moveElementOut(elementId) },
-                        onClose = { showLayersPanel = false }
-                    )
-                }
-            }
-
-            // Property panel (right side) - shown when element is selected
-            // Only show if Layers Panel is NOT shown (to avoid clutter), or stack them?
-            // Let's show Property Panel only if Layers Panel is hidden, or maybe allow side-by-side?
-            // For mobile/tablet, side-by-side might be too much. Let's prioritize Layers Panel if open.
-            if (showPropertyPanel && selectedElement != null && !showLayersPanel) {
-                Surface(
-                    modifier = Modifier
-                        .width(300.dp)
-                        .fillMaxHeight(),
-                    tonalElevation = 2.dp
-                ) {
-                    PropertyPanel(
-                        element = selectedElement!!,
-                        onUpdateElement = { viewModel.updateElement(it) },
-                        onClose = {
-                            showPropertyPanel = false
-                            viewModel.deselectElement()
-                        },
-                        onRemoveElement = {
-                            viewModel.removeElement(selectedElement!!.id)
-                            showPropertyPanel = false
                         }
-                    )
+                    }
+
+                    // Property panel - overlays layers if both are open
+                    if (showPropertyPanel && selectedElement != null) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            tonalElevation = 2.dp
+                        ) {
+                            PropertyPanel(
+                                element = selectedElement!!,
+                                onUpdateElement = { viewModel.updateElement(it) },
+                                onClose = {
+                                    showPropertyPanel = false
+                                    viewModel.deselectElement()
+                                },
+                                onRemoveElement = {
+                                    viewModel.removeElement(selectedElement!!.id)
+                                    showPropertyPanel = false
+                                },
+                                onUpdateContainerLayoutMode = { container, mode ->
+                                    viewModel.updateContainerLayoutMode(container, mode)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1045,97 +1052,200 @@ private fun GridCanvas(
                                                         0f
                                                     }
 
-                                                ContainerElementRenderer(
-                                                    element = element,
-                                                    hoverProgress = hoverProgress
-                                                ) {
-                                                    // Render children manually here
-                                                    children.forEach { child ->
-                                                        // Enable interaction ONLY if container is locked
-                                                        val isInteractive = element.locked
+                                                // Check if vertical layout mode
+                                                val isVerticalLayout = element.effectiveLayoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.VERTICAL
 
-                                                        key(child.id) {
-                                                            DraggableElement(
-                                                                element = child,
-                                                                gridConfig = gridResume.gridConfig,
-                                                                zoomLevel = currentZoom,
-                                                                isSelected = selectedElement?.id == child.id && !isMoveMode,
-                                                                isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
-                                                                enabled = isInteractive && !isMoveMode,
-                                                                onDragStart = onDragStart,
-                                                                onDrag = onDrag,
-                                                                onDragEnd = onDragEnd,
-                                                                onResize = onResize,
-                                                                onSelect = onElementSelect,
-                                                                onDeselect = onElementDeselect,
-                                                                onOpenProperties = { _ -> onOpenProperties() },
-                                                                maxColumns = element.position.colSpan,
-                                                                maxRows = element.position.rowSpan
-                                                            ) {
-                                                                // Render child content
-                                                                when (child) {
-                                                                    is ResumeElement.TextElement -> TextElementRenderer(
-                                                                        element = child,
-                                                                        isEditing = false,
-                                                                        zoomLevel = currentZoom
-                                                                    )
+                                                if (isVerticalLayout) {
+                                                    // Vertical layout mode - stack children vertically
+                                                    ContainerElementRendererWithLayout(
+                                                        element = element,
+                                                        hoverProgress = hoverProgress
+                                                    ) {
+                                                        for (child in children) {
+                                                            val isInteractive = element.locked
 
-                                                                    is ResumeElement.ImageElement -> ImageElementRenderer(
-                                                                        child
-                                                                    )
-
-                                                                    is ResumeElement.ShapeElement -> ShapeElementRenderer(
-                                                                        child
-                                                                    )
-
-                                                                    is ResumeElement.ContactElement -> ContactElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.EducationElement -> EducationElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.SkillElement -> SkillElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.ProjectElement -> ProjectElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.CertificationElement -> CertificationElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.LanguageElement -> LanguageElementRenderer(
-                                                                        child,
-                                                                        currentZoom
-                                                                    )
-
-                                                                    is ResumeElement.ContainerElement -> {
-                                                                        Box(
-                                                                            modifier = Modifier
-                                                                                .fillMaxSize()
-                                                                                .background(
-                                                                                    Color.LightGray.copy(
-                                                                                        alpha = 0.5f
-                                                                                    )
-                                                                                )
+                                                            key(child.id) {
+                                                                DraggableElement(
+                                                                    element = child,
+                                                                    gridConfig = gridResume.gridConfig,
+                                                                    zoomLevel = currentZoom,
+                                                                    isSelected = selectedElement?.id == child.id && !isMoveMode,
+                                                                    isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
+                                                                    enabled = isInteractive && !isMoveMode,
+                                                                    useRelativePositioning = true,
+                                                                    onDragStart = onDragStart,
+                                                                    onDrag = onDrag,
+                                                                    onDragEnd = onDragEnd,
+                                                                    onResize = onResize,
+                                                                    onSelect = onElementSelect,
+                                                                    onDeselect = onElementDeselect,
+                                                                    onOpenProperties = { _ -> onOpenProperties() },
+                                                                    maxColumns = element.position.colSpan,
+                                                                    maxRows = element.position.rowSpan
+                                                                ) {
+                                                                    // Render child content
+                                                                    when (child) {
+                                                                        is ResumeElement.TextElement -> TextElementRenderer(
+                                                                            element = child,
+                                                                            isEditing = false,
+                                                                            zoomLevel = currentZoom
                                                                         )
-                                                                    }
 
-                                                                    else -> Box(modifier = Modifier.fillMaxSize())
+                                                                        is ResumeElement.ImageElement -> ImageElementRenderer(
+                                                                            child
+                                                                        )
+
+                                                                        is ResumeElement.ShapeElement -> ShapeElementRenderer(
+                                                                            child
+                                                                        )
+
+                                                                        is ResumeElement.ContactElement -> ContactElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.EducationElement -> EducationElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.SkillElement -> SkillElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.ProjectElement -> ProjectElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.CertificationElement -> CertificationElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.LanguageElement -> LanguageElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.ContainerElement -> {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .fillMaxSize()
+                                                                                    .background(
+                                                                                        Color.LightGray.copy(
+                                                                                            alpha = 0.5f
+                                                                                        )
+                                                                                    )
+                                                                            )
+                                                                        }
+
+                                                                        else -> Box(modifier = Modifier.fillMaxSize())
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    // Grid or Free layout mode - absolute positioning
+                                                    ContainerElementRenderer(
+                                                        element = element,
+                                                        hoverProgress = hoverProgress
+                                                    ) {
+                                                        // Render children manually here
+                                                        children.forEach { child ->
+                                                            // Enable interaction ONLY if container is locked
+                                                            val isInteractive = element.locked
+
+                                                            key(child.id) {
+                                                                DraggableElement(
+                                                                    element = child,
+                                                                    gridConfig = gridResume.gridConfig,
+                                                                    zoomLevel = currentZoom,
+                                                                    isSelected = selectedElement?.id == child.id && !isMoveMode,
+                                                                    isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
+                                                                    enabled = isInteractive && !isMoveMode,
+                                                                    onDragStart = onDragStart,
+                                                                    onDrag = onDrag,
+                                                                    onDragEnd = onDragEnd,
+                                                                    onResize = onResize,
+                                                                    onSelect = onElementSelect,
+                                                                    onDeselect = onElementDeselect,
+                                                                    onOpenProperties = { _ -> onOpenProperties() },
+                                                                    maxColumns = element.position.colSpan,
+                                                                    maxRows = element.position.rowSpan
+                                                                ) {
+                                                                    // Render child content
+                                                                    when (child) {
+                                                                        is ResumeElement.TextElement -> TextElementRenderer(
+                                                                            element = child,
+                                                                            isEditing = false,
+                                                                            zoomLevel = currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.ImageElement -> ImageElementRenderer(
+                                                                            child
+                                                                        )
+
+                                                                        is ResumeElement.ShapeElement -> ShapeElementRenderer(
+                                                                            child
+                                                                        )
+
+                                                                        is ResumeElement.ContactElement -> ContactElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.EducationElement -> EducationElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.SkillElement -> SkillElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.ProjectElement -> ProjectElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.CertificationElement -> CertificationElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.LanguageElement -> LanguageElementRenderer(
+                                                                            child,
+                                                                            currentZoom
+                                                                        )
+
+                                                                        is ResumeElement.ContainerElement -> {
+                                                                            Box(
+                                                                                modifier = Modifier
+                                                                                    .fillMaxSize()
+                                                                                    .background(
+                                                                                        Color.LightGray.copy(
+                                                                                            alpha = 0.5f
+                                                                                        )
+                                                                                    )
+                                                                            )
+                                                                        }
+
+                                                                        else -> Box(modifier = Modifier.fillMaxSize())
+                                                                    }
                                                                 }
                                                             }
                                                         }

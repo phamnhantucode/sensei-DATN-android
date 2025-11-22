@@ -26,38 +26,38 @@ fun ContainerElementRenderer(
     val backgroundColor = element.style.backgroundColor?.let { Color(it) } ?: Color.Transparent
     val borderColor = element.style.borderColor?.let { Color(it) }
     
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (backgroundColor != Color.Transparent) {
-                    Modifier.background(
-                        color = backgroundColor,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (borderColor != null && element.style.borderWidth > 0) {
-                    Modifier.border(
-                        width = element.style.borderWidth.dp,
-                        color = borderColor,
-                        shape = RoundedCornerShape(element.style.borderRadius.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (element.clipContent) {
-                    Modifier.clip(RoundedCornerShape(element.style.borderRadius.dp))
-                } else {
-                    Modifier
-                }
-            )
-    ) {
+    val baseModifier = modifier
+        .fillMaxSize()
+        .then(
+            if (backgroundColor != Color.Transparent) {
+                Modifier.background(
+                    color = backgroundColor,
+                    shape = RoundedCornerShape(element.style.borderRadius.dp)
+                )
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (borderColor != null && element.style.borderWidth > 0) {
+                Modifier.border(
+                    width = element.style.borderWidth.dp,
+                    color = borderColor,
+                    shape = RoundedCornerShape(element.style.borderRadius.dp)
+                )
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (element.clipContent) {
+                Modifier.clip(RoundedCornerShape(element.style.borderRadius.dp))
+            } else {
+                Modifier
+            }
+        )
+    
+    Box(modifier = baseModifier) {
         // Render content (children)
         content()
 
@@ -70,6 +70,83 @@ fun ContainerElementRenderer(
             )
         }
     }
+}
+
+/**
+ * Container renderer with vertical layout mode support
+ */
+@Composable
+fun ContainerElementRendererWithLayout(
+    element: ResumeElement.ContainerElement,
+    modifier: Modifier = Modifier,
+    hoverProgress: Float = 0f,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val backgroundColor = element.style.backgroundColor?.let { Color(it) } ?: Color.Transparent
+    val borderColor = element.style.borderColor?.let { Color(it) }
+    
+    val baseModifier = modifier
+        .fillMaxSize()
+        .then(
+            if (backgroundColor != Color.Transparent) {
+                Modifier.background(
+                    color = backgroundColor,
+                    shape = RoundedCornerShape(element.style.borderRadius.dp)
+                )
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (borderColor != null && element.style.borderWidth > 0) {
+                Modifier.border(
+                    width = element.style.borderWidth.dp,
+                    color = borderColor,
+                    shape = RoundedCornerShape(element.style.borderRadius.dp)
+                )
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (element.clipContent) {
+                Modifier.clip(RoundedCornerShape(element.style.borderRadius.dp))
+            } else {
+                Modifier
+            }
+        )
+    
+    Box(modifier = baseModifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(element.padding.toDp()),
+            verticalArrangement = Arrangement.Top
+        ) {
+            content()
+        }
+
+        // Hover progress overlay - shows when dragging element over this container
+        if (hoverProgress > 0f) {
+            HoverProgressOverlay(
+                progress = hoverProgress,
+                cornerRadius = element.style.borderRadius,
+                modifier = Modifier.matchParentSize()
+            )
+        }
+    }
+}
+
+/**
+ * Convert Padding to Compose Dp values
+ */
+private fun Padding.toDp(): androidx.compose.foundation.layout.PaddingValues {
+    return androidx.compose.foundation.layout.PaddingValues(
+        start = this.left.dp,
+        top = this.top.dp,
+        end = this.right.dp,
+        bottom = this.bottom.dp
+    )
 }
 
 /**

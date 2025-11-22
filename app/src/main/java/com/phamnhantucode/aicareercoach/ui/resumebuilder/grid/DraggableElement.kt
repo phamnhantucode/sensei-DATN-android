@@ -53,6 +53,7 @@ fun DraggableElement(
     isSelected: Boolean = false,
     isDragging: Boolean = false,
     enabled: Boolean = true,
+    useRelativePositioning: Boolean = false,
     onDragStart: (ResumeElement) -> Unit = { _ -> },
     onDrag: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
     onDragEnd: (ResumeElement, GridPosition) -> Unit = { _, _ -> },
@@ -98,6 +99,11 @@ fun DraggableElement(
         element.position.colSpan * cellSizePx
     }
 
+    // Track if we need to update cached height
+    var pendingHeightUpdate by remember(element.id, element.position.cachedHeightDp) { 
+        mutableStateOf<Pair<Float, Int>?>(null) 
+    }
+    
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
     } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
@@ -123,20 +129,31 @@ fun DraggableElement(
             // This ensures when user turns wrap content OFF, it keeps the calculated height
             val newRowSpan = (heightInDp / gridConfig.cellSizeDp).roundToInt().coerceAtLeast(1)
             
-            val newPosition = element.position.copy(
-                cachedHeightDp = heightInDp,
-                rowSpan = newRowSpan  // Update rowSpan to match calculated height
-            )
-            
-            // Trigger onResize to save this cached height
-            if (actualContentHeight != null) {
-                onResize(element, newPosition)
+            // Store pending update to be applied in LaunchedEffect
+            if (actualContentHeight != null && pendingHeightUpdate == null) {
+                pendingHeightUpdate = heightInDp to newRowSpan
             }
             
             finalHeight
         }
     } else {
         element.position.rowSpan * cellSizePx
+    }
+    
+    // Apply pending height updates after composition
+    LaunchedEffect(pendingHeightUpdate) {
+        pendingHeightUpdate?.let { (heightInDp, newRowSpan) ->
+            val newPosition = element.position.copy(
+                cachedHeightDp = heightInDp,
+                rowSpan = newRowSpan  // Update rowSpan to match calculated height
+            )
+            
+            // Trigger onResize to save this cached height
+            onResize(element, newPosition)
+            
+            // Clear pending update
+            pendingHeightUpdate = null
+        }
     }
 
     // For thin elements (like dividers), use a minimum interaction height to make selection easier
@@ -152,15 +169,24 @@ fun DraggableElement(
 
     Box(
         modifier = Modifier
-            .offset {
-                IntOffset(
-                    x = (baseX + offsetX).roundToInt(),
-                    y = (baseY + offsetY).roundToInt()
-                )
-            }
-            .size(
-                width = GridUtils.pxToDp(width, density),
-                height = GridUtils.pxToDp(interactionHeight, density)
+            .then(
+                if (useRelativePositioning) {
+                    Modifier
+                        .fillMaxWidth()
+                        .height(GridUtils.pxToDp(interactionHeight, density))
+                } else {
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                x = (baseX + offsetX).roundToInt(),
+                                y = (baseY + offsetY).roundToInt()
+                            )
+                        }
+                        .size(
+                            width = GridUtils.pxToDp(width, density),
+                            height = GridUtils.pxToDp(interactionHeight, density)
+                        )
+                }
             )
             .graphicsLayer {
                 // Scale up slightly when dragging for visual feedback
