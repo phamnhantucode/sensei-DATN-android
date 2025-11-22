@@ -56,6 +56,9 @@ class GridEditorViewModel(
     private val _draggedElement = MutableStateFlow<DragState?>(null)
     val draggedElement: StateFlow<DragState?> = _draggedElement.asStateFlow()
 
+    // Hover timer for auto-add to container
+    private var hoverTimerJob: Job? = null
+
     // Loading states
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -702,6 +705,18 @@ class GridEditorViewModel(
     fun endDrag(finalPosition: GridPosition) {
         val dragState = _draggedElement.value ?: return
 
+        // Check if hovering over a container - if so, add to container immediately
+        if (dragState.hoveredContainerId != null) {
+            // Auto-add element to container
+            moveElementToContainer(dragState.element.id, dragState.hoveredContainerId!!)
+
+            // Cancel hover timer and cleanup
+            cancelHoverTimer()
+            _draggedElement.value = null
+            return
+        }
+
+        // Normal drag end - update position
         // Clamp position to ensure it's within bounds
         val clampedPosition = GridUtils.clampPosition(finalPosition, _gridResume.value.gridConfig)
 
@@ -732,7 +747,120 @@ class GridEditorViewModel(
             triggerAutoSave()
         }
 
+        // Cleanup hover state and drag state
+        cancelHoverTimer()
         _draggedElement.value = null
+    }
+
+    /**
+     * Called when dragging over a container - starts hover timer for auto-add
+     */
+    fun onDragOverContainer(containerId: String, context: android.content.Context) {
+        val dragState = _draggedElement.value ?: return
+        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+
+        // Find the container element
+        val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement
+        if (container == null) return
+
+        // Only trigger for locked containers
+        if (!container.locked) {
+            cancelHoverTimer()
+            return
+        }
+
+        // Don't trigger if element is already a child of this container
+        if (container.children.contains(dragState.element.id)) {
+            cancelHoverTimer()
+            return
+        }
+
+        // If already hovering over this container, do nothing (timer continues)
+        if (dragState.hoveredContainerId == containerId) {
+            return
+        }
+
+        // Hovering over a new container - cancel old timer and start new one
+        cancelHoverTimer()
+
+        // Update drag state with new hovered container
+        // Start with a small progress to show immediate visual feedback
+        _draggedElement.value = dragState.copy(
+            hoveredContainerId = containerId,
+            hoverProgress = 0.1f
+        )
+
+        // Start 1.5 second timer with progress updates
+        hoverTimerJob = viewModelScope.launch {
+            val totalDuration = 1500L // 1.5 seconds
+            val updateInterval = 16L // ~60fps
+            val steps = (totalDuration / updateInterval).toInt()
+
+            for (i in 1..steps) {
+                delay(updateInterval)
+
+                val currentDrag = _draggedElement.value
+                // Check if still dragging over the same container
+                if (currentDrag == null || currentDrag.hoveredContainerId != containerId) {
+                    break
+                }
+
+                // Map remaining progress (0.1 to 1.0)
+                val rawProgress = i.toFloat() / steps
+                val progress = 0.1f + (rawProgress * 0.9f)
+                
+                _draggedElement.value = currentDrag.copy(hoverProgress = progress.coerceIn(0f, 1f))
+
+                // Trigger haptic feedback when timer completes
+                if (progress >= 1.0f) {
+                    triggerHapticFeedback(context)
+                    break
+                }
+            }
+        }
+    }
+
+    /**
+     * Cancels the hover timer (when drag exits container or drag ends)
+     */
+    fun cancelHoverTimer() {
+        hoverTimerJob?.cancel()
+        hoverTimerJob = null
+
+        val currentDrag = _draggedElement.value ?: return
+        if (currentDrag.hoveredContainerId != null || currentDrag.hoverProgress > 0f) {
+            _draggedElement.value = currentDrag.copy(
+                hoveredContainerId = null,
+                hoverProgress = 0f
+            )
+        }
+    }
+
+    /**
+     * Triggers device haptic feedback
+     */
+    private fun triggerHapticFeedback(context: android.content.Context) {
+        try {
+            val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
+                vibratorManager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vibrator.vibrate(
+                    android.os.VibrationEffect.createOneShot(50, android.os.VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(50)
+            }
+        } catch (e: Exception) {
+            // Ignore vibration errors (permission not granted or device doesn't support)
+            e.printStackTrace()
+        }
     }
 
     // ============================================================================
@@ -1219,7 +1347,9 @@ data class DragState(
     val element: ResumeElement,
     val originalPosition: GridPosition,
     val currentPosition: GridPosition,
-    val isValidPosition: Boolean
+    val isValidPosition: Boolean,
+    val hoveredContainerId: String? = null,  // Container being hovered over
+    val hoverProgress: Float = 0f             // 0.0 to 1.0 progress towards auto-add
 )
 
 /**

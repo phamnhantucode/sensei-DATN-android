@@ -859,7 +859,12 @@ private fun TextElementProperties(
         OutlinedTextField(
             value = element.content,
             onValueChange = { newContent ->
-                onUpdateElement(element.copy(content = newContent))
+                onUpdateElement(
+                    element.copy(
+                        content = newContent,
+                        position = element.position.copy(cachedHeightDp = null)
+                    )
+                )
             },
             label = { Text("Content") },
             modifier = Modifier.fillMaxWidth(),
@@ -875,7 +880,8 @@ private fun TextElementProperties(
             onValueChange = { newSize ->
                 onUpdateElement(
                     element.copy(
-                        textStyle = element.textStyle.copy(fontSize = newSize)
+                        textStyle = element.textStyle.copy(fontSize = newSize),
+                        position = element.position.copy(cachedHeightDp = null)
                     )
                 )
             }
@@ -916,7 +922,8 @@ private fun TextElementProperties(
                         onClick = {
                             onUpdateElement(
                                 element.copy(
-                                    textStyle = element.textStyle.copy(fontWeight = weight)
+                                    textStyle = element.textStyle.copy(fontWeight = weight),
+                                    position = element.position.copy(cachedHeightDp = null)
                                 )
                             )
                             showFontWeightMenu = false

@@ -97,8 +97,11 @@ sealed class ResumeElement {
         val children: List<String> = emptyList(), // Child element IDs
         val padding: Padding = Padding(),
         val clipContent: Boolean = false,
-        val layoutMode: LayoutMode = LayoutMode.GRID // How children are positioned
-    ) : ResumeElement()
+        val layoutMode: LayoutMode? = LayoutMode.GRID // How children are positioned
+    ) : ResumeElement() {
+        val effectiveLayoutMode: LayoutMode
+            get() = layoutMode ?: LayoutMode.GRID
+    }
 
     /**
      * Icon element - displays an icon/emoji

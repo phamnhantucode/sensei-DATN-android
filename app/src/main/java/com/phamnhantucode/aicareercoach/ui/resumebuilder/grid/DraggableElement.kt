@@ -60,6 +60,8 @@ fun DraggableElement(
     onSelect: (ResumeElement) -> Unit = { _ -> },
     onDeselect: () -> Unit = {},
     onOpenProperties: (ResumeElement) -> Unit = { _ -> },
+    maxColumns: Int = gridConfig.columns,
+    maxRows: Int = gridConfig.rows,
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
@@ -176,10 +178,12 @@ fun DraggableElement(
                 }
             }
             .then(
-                if (enabled) {
+                // Disable pointer input for locked containers to allow click-through
+                if (enabled && !(element.locked && element is ResumeElement.ContainerElement)) {
                     Modifier.pointerInput(element.id, element.position.row, element.position.col, gridConfig, isSelected, width, interactionHeight) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
+
                             // Consume down event to prevent parent from handling it
                             down.consume()
 
@@ -217,8 +221,8 @@ fun DraggableElement(
                                     offsetY += dragAmount.y
 
                                     // Calculate grid bounds in pixels
-                                    val maxX = (gridConfig.columns - element.position.colSpan) * cellSizePx
-                                    val maxY = (gridConfig.rows - element.position.rowSpan) * cellSizePx
+                                    val maxX = (maxColumns - element.position.colSpan) * cellSizePx
+                                    val maxY = (maxRows - element.position.rowSpan) * cellSizePx
 
                                     // Clamp offsets to keep element within bounds
                                     val clampedX = (baseX + offsetX).coerceIn(0f, maxX)
@@ -810,10 +814,17 @@ fun calculateResizedPosition(
     }
 
     // Clamp to grid bounds if gridConfig is provided
-    return if (gridConfig != null) {
+    val clampedPosition = if (gridConfig != null) {
         GridUtils.clampPosition(newPosition, gridConfig)
     } else {
         newPosition
+    }
+
+    // If width changed (colSpan), invalidate cached height so it can be recalculated
+    return if (clampedPosition.colSpan != originalPosition.colSpan) {
+        clampedPosition.copy(cachedHeightDp = null)
+    } else {
+        clampedPosition
     }
 }
 

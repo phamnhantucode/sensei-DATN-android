@@ -3,40 +3,104 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.CropSquare
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.HorizontalRule
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.positionChange
-import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.CertificationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContactElementRenderer
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContainerElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.EducationElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ImageElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.LanguageElementRenderer
@@ -45,11 +109,14 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ShapeElem
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.SkillElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.TextElementRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.WorkExperienceElementRenderer
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.elements.ContainerElementRenderer
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
-import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
-import kotlinx.coroutines.CoroutineScope
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementType
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.elementsByZIndex
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Main grid-based resume editor screen
@@ -60,7 +127,7 @@ fun GridEditorScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPreview: () -> Unit,
     onSwitchToFormEditor: () -> Unit,
-    viewModel: GridEditorViewModel = viewModel()
+    viewModel: GridEditorViewModel = viewModel(),
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val density = LocalDensity.current.density
@@ -181,13 +248,32 @@ fun GridEditorScreen(
                     onDragStart = { viewModel.startDrag(it) },
                     onDrag = { element, position ->
                         viewModel.updateDragPosition(position)
+
+                        // Check if dragging over any unlocked container
+                        val currentPage = gridResume.pages.firstOrNull()
+                        if (currentPage != null) {
+                            val hoveredContainer = currentPage.elements
+                                .filterIsInstance<ResumeElement.ContainerElement>()
+                                .filter { it.locked && it.id != element.id }
+                                .firstOrNull { container ->
+                                    // Check if drag position overlaps with container position
+                                    position.overlaps(container.position)
+                                }
+
+                            if (hoveredContainer != null) {
+                                viewModel.onDragOverContainer(hoveredContainer.id, context)
+                            } else {
+                                viewModel.cancelHoverTimer()
+                            }
+                        }
                     },
                     onDragEnd = { element, position ->
                         viewModel.endDrag(position)
                     },
                     onResize = { element, newPosition ->
                         // Clamp position to ensure it stays within bounds
-                        val clampedPosition = GridUtils.clampPosition(newPosition, gridResume.gridConfig)
+                        val clampedPosition =
+                            GridUtils.clampPosition(newPosition, gridResume.gridConfig)
 
                         // Update element with new position (size)
                         // IMPORTANT: Use copy() which preserves all properties including shapeType, isCircle, etc.
@@ -239,7 +325,12 @@ fun GridEditorScreen(
                         onToggleVisibility = { viewModel.toggleElementVisibility(it) },
                         onToggleLock = { viewModel.toggleElementLock(it) },
                         onMoveLayer = { from, to -> viewModel.moveElementLayer(from, to) },
-                        onMoveToContainer = { elementId, containerId -> viewModel.moveElementToContainer(elementId, containerId) },
+                        onMoveToContainer = { elementId, containerId ->
+                            viewModel.moveElementToContainer(
+                                elementId,
+                                containerId
+                            )
+                        },
                         onMoveOut = { elementId -> viewModel.moveElementOut(elementId) },
                         onClose = { showLayersPanel = false }
                     )
@@ -322,7 +413,12 @@ fun GridEditorScreen(
                     putExtra(android.content.Intent.EXTRA_STREAM, uri)
                     addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(android.content.Intent.createChooser(intent, "Share Resume PDF"))
+                context.startActivity(
+                    android.content.Intent.createChooser(
+                        intent,
+                        "Share Resume PDF"
+                    )
+                )
             }
         )
     }
@@ -350,7 +446,7 @@ private fun GridEditorTopBar(
     onPreview: () -> Unit,
     onSwitchMode: () -> Unit,
     onShowTemplates: () -> Unit,
-    onApplyTemplateData: () -> Unit = {}
+    onApplyTemplateData: () -> Unit = {},
 ) {
     TopAppBar(
         title = {
@@ -472,7 +568,7 @@ private fun GridEditorBottomBar(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onUndo: () -> Unit,
-    onRedo: () -> Unit
+    onRedo: () -> Unit,
 ) {
     Surface(
         tonalElevation = 3.dp,
@@ -580,7 +676,7 @@ private fun GridCanvas(
     onResize: (ResumeElement, GridPosition) -> Unit,
     onOpenProperties: () -> Unit,
     onZoomChange: (Float) -> Unit,
-    onExitMoveMode: () -> Unit
+    onExitMoveMode: () -> Unit,
 ) {
     val density = LocalDensity.current.density
     val cellSizePx = gridResume.gridConfig.cellSizeDp * density
@@ -591,7 +687,7 @@ private fun GridCanvas(
 
     // Track zoom level
     var currentZoom by remember { mutableFloatStateOf(zoomLevel) }
-    
+
     // Pan offset for move mode
     var panOffsetX by remember { mutableFloatStateOf(0f) }
     var panOffsetY by remember { mutableFloatStateOf(0f) }
@@ -615,19 +711,19 @@ private fun GridCanvas(
         fun clampPan(panX: Float, panY: Float, zoom: Float): Pair<Float, Float> {
             val pageW = gridWidthPx * zoom
             val pageH = gridHeightPx * zoom
-            
+
             val newX = if (pageW <= viewportWidthPx) {
                 (viewportWidthPx - pageW) / 2f
             } else {
                 panX.coerceIn(viewportWidthPx - pageW, 0f)
             }
-            
+
             val newY = if (pageH <= viewportHeightPx) {
                 (viewportHeightPx - pageH) / 2f
             } else {
                 panY.coerceIn(viewportHeightPx - pageH, 0f)
             }
-            
+
             return newX to newY
         }
 
@@ -637,14 +733,14 @@ private fun GridCanvas(
                 val oldZoom = currentZoom
                 val newZoom = zoomLevel
                 val zoomFactor = if (oldZoom > 0) newZoom / oldZoom else 1f
-                
+
                 if (isMoveMode) {
                     // Zoom to center of viewport
                     val cx = viewportWidthPx / 2f
                     val cy = viewportHeightPx / 2f
                     val targetPanX = cx - (cx - panOffsetX) * zoomFactor
                     val targetPanY = cy - (cy - panOffsetY) * zoomFactor
-                    
+
                     val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, newZoom)
                     panOffsetX = clampedX
                     panOffsetY = clampedY
@@ -652,13 +748,13 @@ private fun GridCanvas(
                     // Adjust scroll to keep center
                     val cx = viewportWidthPx / 2f
                     val cy = viewportHeightPx / 2f
-                    
+
                     val scrollX = horizontalScrollState.value
                     val scrollY = verticalScrollState.value
-                    
+
                     val newScrollX = ((scrollX + cx) * zoomFactor - cx).roundToInt()
                     val newScrollY = ((scrollY + cy) * zoomFactor - cy).roundToInt()
-                    
+
                     horizontalScrollState.scrollTo(newScrollX)
                     verticalScrollState.scrollTo(newScrollY)
                 }
@@ -674,10 +770,10 @@ private fun GridCanvas(
                 val pageHeightPx = gridHeightPx * currentZoom
                 val innerWidth = maxOf(viewportWidthPx, pageWidthPx)
                 val innerHeight = maxOf(viewportHeightPx, pageHeightPx)
-                
+
                 val newScrollX = ((innerWidth - pageWidthPx) / 2f - panOffsetX).roundToInt()
                 val newScrollY = ((innerHeight - pageHeightPx) / 2f - panOffsetY).roundToInt()
-                
+
                 horizontalScrollState.scrollTo(newScrollX)
                 verticalScrollState.scrollTo(newScrollY)
             }
@@ -685,16 +781,16 @@ private fun GridCanvas(
             // We are in Scroll Mode -> Keep PanOffset updated
             val scrollX = horizontalScrollState.value
             val scrollY = verticalScrollState.value
-            
+
             LaunchedEffect(scrollX, scrollY, viewportWidthPx, viewportHeightPx, currentZoom) {
                 val pageWidthPx = gridWidthPx * currentZoom
                 val pageHeightPx = gridHeightPx * currentZoom
                 val innerWidth = maxOf(viewportWidthPx, pageWidthPx)
                 val innerHeight = maxOf(viewportHeightPx, pageHeightPx)
-                
+
                 val targetPanX = (innerWidth - pageWidthPx) / 2f - scrollX
                 val targetPanY = (innerHeight - pageHeightPx) / 2f - scrollY
-                
+
                 // We don't clamp here because ScrollState is already valid/clamped by definition
                 panOffsetX = targetPanX
                 panOffsetY = targetPanY
@@ -725,12 +821,12 @@ private fun GridCanvas(
                                 val cy = centroid.y
                                 val targetPanX = cx - (cx - panOffsetX) * zoomFactor
                                 val targetPanY = cy - (cy - panOffsetY) * zoomFactor
-                                
+
                                 val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, newZoom)
                                 panOffsetX = clampedX
                                 panOffsetY = clampedY
                             }
-                            
+
                             currentZoom = newZoom
                             onZoomChange(currentZoom)
                             event.changes.forEach { it.consume() }
@@ -740,11 +836,11 @@ private fun GridCanvas(
                         if (change.positionChanged()) {
                             val targetPanX = panOffsetX + change.positionChange().x
                             val targetPanY = panOffsetY + change.positionChange().y
-                            
+
                             val (clampedX, clampedY) = clampPan(targetPanX, targetPanY, currentZoom)
                             panOffsetX = clampedX
                             panOffsetY = clampedY
-                            
+
                             change.consume()
                         }
                     }
@@ -785,12 +881,12 @@ private fun GridCanvas(
                 modifier = Modifier
                     .then(
                         if (isMoveMode) {
-                             // Just wrap content, position is handled by offset
+                            // Just wrap content, position is handled by offset
                             Modifier.wrapContentSize(Alignment.TopStart, unbounded = true)
                         } else {
                             // Force minimum size to allow centering within scroll
                             Modifier.defaultMinSize(
-                                minWidth = viewportWidthDp, 
+                                minWidth = viewportWidthDp,
                                 minHeight = viewportHeightDp
                             )
                         }
@@ -843,150 +939,268 @@ private fun GridCanvas(
                         page.elementsByZIndex()
                             .filter { it.isVisible && !childIds.contains(it.id) } // Only render visible top-level elements
                             .forEach { element ->
-                            key(element.id) {
-                                val isSelected = selectedElement?.id == element.id
-                                val isDragging = draggedElement?.element?.id == element.id
+                                key(element.id) {
+                                    val isSelected = selectedElement?.id == element.id
+                                    val isDragging = draggedElement?.element?.id == element.id
 
-                                DraggableElement(
-                                    element = element,
-                                    gridConfig = gridResume.gridConfig,
-                                    zoomLevel = currentZoom,
-                                    isSelected = isSelected && !isMoveMode,
-                                    isDragging = isDragging && !isMoveMode,
-                                    enabled = !isMoveMode,
-                                    onDragStart = onDragStart,
-                                    onDrag = onDrag,
-                                    onDragEnd = onDragEnd,
-                                    onResize = onResize,
-                                    onSelect = onElementSelect,
-                                    onDeselect = onElementDeselect,
-                                    onOpenProperties = { _ -> onOpenProperties() }
-                                ) {
-                                    when (element) {
-                                        is ResumeElement.TextElement -> {
-                                            TextElementRenderer(
-                                                element = element,
-                                                isEditing = false,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.ImageElement -> {
-                                            ImageElementRenderer(
-                                                element = element
-                                            )
-                                        }
-                                        is ResumeElement.ShapeElement -> {
-                                            ShapeElementRenderer(
-                                                element = element
-                                            )
-                                        }
-                                        is ResumeElement.ContactElement -> {
-                                            ContactElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.WorkExperienceElement -> {
-                                            WorkExperienceElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.EducationElement -> {
-                                            EducationElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.SkillElement -> {
-                                            SkillElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.ProjectElement -> {
-                                            ProjectElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.CertificationElement -> {
-                                            CertificationElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.LanguageElement -> {
-                                            LanguageElementRenderer(
-                                                element = element,
-                                                zoomLevel = currentZoom
-                                            )
-                                        }
-                                        is ResumeElement.ContainerElement -> {
-                                            // Resolve children
-                                            val children = remember(element.children, page.elements) {
-                                                element.children.mapNotNull { childId ->
-                                                    page.elements.find { it.id == childId }
-                                                }
+                                    DraggableElement(
+                                        element = element,
+                                        gridConfig = gridResume.gridConfig,
+                                        zoomLevel = currentZoom,
+                                        isSelected = isSelected && !isMoveMode,
+                                        isDragging = isDragging && !isMoveMode,
+                                        enabled = !isMoveMode,
+                                        onDragStart = onDragStart,
+                                        onDrag = onDrag,
+                                        onDragEnd = onDragEnd,
+                                        onResize = onResize,
+                                        onSelect = onElementSelect,
+                                        onDeselect = onElementDeselect,
+                                        onOpenProperties = { _ -> onOpenProperties() }
+                                    ) {
+                                        when (element) {
+                                            is ResumeElement.TextElement -> {
+                                                TextElementRenderer(
+                                                    element = element,
+                                                    isEditing = false,
+                                                    zoomLevel = currentZoom
+                                                )
                                             }
-                                            
-                                            ContainerElementRenderer(
-                                                element = element,
-                                                children = children,
-                                                gridConfig = gridResume.gridConfig,
-                                                zoomLevel = currentZoom,
-                                                renderChild = { child ->
-                                                    // Recursive rendering for children
-                                                    // Note: We don't support nested dragging inside canvas yet, only via Layers Panel
-                                                    // So we just render the child content
-                                                    when (child) {
-                                                        is ResumeElement.TextElement -> TextElementRenderer(
-                                                            element = child,
-                                                            isEditing = false,
-                                                            zoomLevel = currentZoom
-                                                        )
-                                                        is ResumeElement.ImageElement -> ImageElementRenderer(child)
-                                                        is ResumeElement.ShapeElement -> ShapeElementRenderer(child)
-                                                        is ResumeElement.ContactElement -> ContactElementRenderer(child, currentZoom)
-                                                        is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(child, currentZoom)
-                                                        is ResumeElement.EducationElement -> EducationElementRenderer(child, currentZoom)
-                                                        is ResumeElement.SkillElement -> SkillElementRenderer(child, currentZoom)
-                                                        is ResumeElement.ProjectElement -> ProjectElementRenderer(child, currentZoom)
-                                                        is ResumeElement.CertificationElement -> CertificationElementRenderer(child, currentZoom)
-                                                        is ResumeElement.LanguageElement -> LanguageElementRenderer(child, currentZoom)
-                                                        // Handle nested containers if needed (recursion)
-                                                        is ResumeElement.ContainerElement -> {
-                                                            // Simple recursion for nested containers
-                                                            // Note: This might hit recursion depth limits if circular, but ViewModel prevents circular
-                                                            Box(modifier = Modifier.fillMaxSize().background(Color.LightGray.copy(alpha = 0.5f)))
+
+                                            is ResumeElement.ImageElement -> {
+                                                ImageElementRenderer(
+                                                    element = element
+                                                )
+                                            }
+
+                                            is ResumeElement.ShapeElement -> {
+                                                ShapeElementRenderer(
+                                                    element = element
+                                                )
+                                            }
+
+                                            is ResumeElement.ContactElement -> {
+                                                ContactElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.WorkExperienceElement -> {
+                                                WorkExperienceElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.EducationElement -> {
+                                                EducationElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.SkillElement -> {
+                                                SkillElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.ProjectElement -> {
+                                                ProjectElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.CertificationElement -> {
+                                                CertificationElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.LanguageElement -> {
+                                                LanguageElementRenderer(
+                                                    element = element,
+                                                    zoomLevel = currentZoom
+                                                )
+                                            }
+
+                                            is ResumeElement.ContainerElement -> {
+                                                // Resolve children
+                                                val children =
+                                                    remember(element.children, page.elements) {
+                                                        element.children.mapNotNull { childId ->
+                                                            page.elements.find { it.id == childId }
                                                         }
-                                                        else -> Box(modifier = Modifier.fillMaxSize())
+                                                    }
+
+                                                // Get hover progress if this container is being hovered
+                                                val hoverProgress =
+                                                    if (draggedElement?.hoveredContainerId == element.id) {
+                                                        draggedElement.hoverProgress
+                                                    } else {
+                                                        0f
+                                                    }
+
+                                                ContainerElementRenderer(
+                                                    element = element,
+                                                    hoverProgress = hoverProgress
+                                                ) {
+                                                    // Render children manually here
+                                                    children.forEach { child ->
+                                                        // Enable interaction ONLY if container is locked
+                                                        val isInteractive = element.locked
+
+                                                        key(child.id) {
+                                                            DraggableElement(
+                                                                element = child,
+                                                                gridConfig = gridResume.gridConfig,
+                                                                zoomLevel = currentZoom,
+                                                                isSelected = selectedElement?.id == child.id && !isMoveMode,
+                                                                isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
+                                                                enabled = isInteractive && !isMoveMode,
+                                                                onDragStart = onDragStart,
+                                                                onDrag = onDrag,
+                                                                onDragEnd = onDragEnd,
+                                                                onResize = onResize,
+                                                                onSelect = onElementSelect,
+                                                                onDeselect = onElementDeselect,
+                                                                onOpenProperties = { _ -> onOpenProperties() },
+                                                                maxColumns = element.position.colSpan,
+                                                                maxRows = element.position.rowSpan
+                                                            ) {
+                                                                // Render child content
+                                                                when (child) {
+                                                                    is ResumeElement.TextElement -> TextElementRenderer(
+                                                                        element = child,
+                                                                        isEditing = false,
+                                                                        zoomLevel = currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.ImageElement -> ImageElementRenderer(
+                                                                        child
+                                                                    )
+
+                                                                    is ResumeElement.ShapeElement -> ShapeElementRenderer(
+                                                                        child
+                                                                    )
+
+                                                                    is ResumeElement.ContactElement -> ContactElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.WorkExperienceElement -> WorkExperienceElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.EducationElement -> EducationElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.SkillElement -> SkillElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.ProjectElement -> ProjectElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.CertificationElement -> CertificationElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.LanguageElement -> LanguageElementRenderer(
+                                                                        child,
+                                                                        currentZoom
+                                                                    )
+
+                                                                    is ResumeElement.ContainerElement -> {
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .fillMaxSize()
+                                                                                .background(
+                                                                                    Color.LightGray.copy(
+                                                                                        alpha = 0.5f
+                                                                                    )
+                                                                                )
+                                                                        )
+                                                                    }
+
+                                                                    else -> Box(modifier = Modifier.fillMaxSize())
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
-                                            )
-                                        }
-                                        else -> {
-                                            Box(
+                                            }
+
+                                            is ResumeElement.ChartElement -> Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .background(Color.LightGray)
                                             )
+
+                                            is ResumeElement.IconElement -> Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color.Cyan)
+                                            )
+
+                                            else -> Box(modifier = Modifier.fillMaxSize())
                                         }
                                     }
                                 }
                             }
-                        }
                     }
 
                     // Drag Ghost
                     draggedElement?.let { drag ->
-                        DragGhost(
-                            element = drag.element,
-                            position = drag.currentPosition,
-                            gridConfig = gridResume.gridConfig,
-                            zoomLevel = currentZoom,
-                            isValid = drag.isValidPosition
-                        ) {}
+                        // Calculate absolute offset by traversing up the parent chain
+                        val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                        var parent = allElements.filterIsInstance<ResumeElement.ContainerElement>()
+                            .find { it.children.contains(drag.element.id) }
+
+                        var accumulatedCol = 0
+                        var accumulatedRow = 0
+
+                        while (parent != null) {
+                            accumulatedCol += parent.position.col
+                            accumulatedRow += parent.position.row
+
+                            val currentId = parent.id
+                            parent = allElements.filterIsInstance<ResumeElement.ContainerElement>()
+                                .find { it.children.contains(currentId) }
+                        }
+
+                        val effectiveCellSizePx = cellSizePx * currentZoom
+                        val parentOffsetX = accumulatedCol * effectiveCellSizePx
+                        val parentOffsetY = accumulatedRow * effectiveCellSizePx
+
+                        Box(
+                            modifier = Modifier.offset {
+                                androidx.compose.ui.unit.IntOffset(
+                                    x = parentOffsetX.roundToInt(),
+                                    y = parentOffsetY.roundToInt()
+                                )
+                            }
+                        ) {
+                            DragGhost(
+                                element = drag.element,
+                                position = drag.currentPosition,
+                                gridConfig = gridResume.gridConfig,
+                                zoomLevel = currentZoom,
+                                isValid = drag.isValidPosition
+                            ) {}
+                        }
                     }
                 }
             }
@@ -1000,7 +1214,7 @@ private fun GridCanvas(
 @Composable
 private fun ElementPickerDialog(
     onDismiss: () -> Unit,
-    onElementTypeSelected: (ElementType) -> Unit
+    onElementTypeSelected: (ElementType) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1094,6 +1308,13 @@ private fun ElementPickerDialog(
                         onClick = { onElementTypeSelected(ElementType.LANGUAGE) }
                     )
                 }
+                item {
+                    ElementTypeButton(
+                        icon = Icons.Default.Inbox,
+                        label = "Container",
+                        onClick = { onElementTypeSelected(ElementType.CONTAINER) }
+                    )
+                }
             }
         },
         confirmButton = {},
@@ -1112,7 +1333,7 @@ private fun ElementPickerDialog(
 private fun ElementTypeButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     OutlinedCard(
         onClick = onClick,
@@ -1122,8 +1343,8 @@ private fun ElementTypeButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, contentDescription = null)
             Text(label, fontSize = 16.sp)
@@ -1139,7 +1360,7 @@ private fun PdfExportDialog(
     exportState: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState,
     onDismiss: () -> Unit,
     onExport: () -> Unit,
-    onShare: (android.net.Uri) -> Unit
+    onShare: (android.net.Uri) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1160,6 +1381,7 @@ private fun PdfExportDialog(
                         )
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.PreparingImages -> {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1169,6 +1391,7 @@ private fun PdfExportDialog(
                         Text("Preparing images...")
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.RenderingPage -> {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1178,6 +1401,7 @@ private fun PdfExportDialog(
                         Text("Rendering page ${exportState.page} of ${exportState.total}...")
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.SavingFile -> {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1187,6 +1411,7 @@ private fun PdfExportDialog(
                         Text("Saving PDF...")
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Success -> {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1204,6 +1429,7 @@ private fun PdfExportDialog(
                         )
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Error -> {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1225,10 +1451,15 @@ private fun PdfExportDialog(
                         Text("Export")
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Success -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { onShare(exportState.uri) }) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Share")
                         }
@@ -1237,11 +1468,13 @@ private fun PdfExportDialog(
                         }
                     }
                 }
+
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Error -> {
                     Button(onClick = onDismiss) {
                         Text("Close")
                     }
                 }
+
                 else -> {
                     // Hide button during export
                 }
@@ -1254,7 +1487,9 @@ private fun PdfExportDialog(
                         Text("Cancel")
                     }
                 }
-                else -> { /* No dismiss button during/after export */ }
+
+                else -> { /* No dismiss button during/after export */
+                }
             }
         }
     )

@@ -71,7 +71,24 @@ class ResumeElementTypeAdapter : JsonSerializer<ResumeElement>, JsonDeserializer
             "ImageElement" -> context.deserialize(data, ResumeElement.ImageElement::class.java)
             "ShapeElement" -> context.deserialize(data, ResumeElement.ShapeElement::class.java)
             "ChartElement" -> context.deserialize(data, ResumeElement.ChartElement::class.java)
-            "ContainerElement" -> context.deserialize(data, ResumeElement.ContainerElement::class.java)
+            "ContainerElement" -> {
+                val containerData = data.asJsonObject
+                if (!containerData.has("layoutMode") || containerData.get("layoutMode").isJsonNull) {
+                    containerData.addProperty("layoutMode", "GRID")
+                }
+                if (!containerData.has("padding")) {
+                    val paddingObj = JsonObject()
+                    paddingObj.addProperty("top", 0f)
+                    paddingObj.addProperty("right", 0f)
+                    paddingObj.addProperty("bottom", 0f)
+                    paddingObj.addProperty("left", 0f)
+                    containerData.add("padding", paddingObj)
+                }
+                if (!containerData.has("children")) {
+                    containerData.add("children", JsonArray())
+                }
+                context.deserialize(containerData, ResumeElement.ContainerElement::class.java)
+            }
             "IconElement" -> context.deserialize(data, ResumeElement.IconElement::class.java)
             "ContactElement" -> context.deserialize(data, ResumeElement.ContactElement::class.java)
             "WorkExperienceElement" -> context.deserialize(data, ResumeElement.WorkExperienceElement::class.java)
