@@ -136,8 +136,8 @@ fun AppNavigation() {
         composable(Screen.ResumeDesignScreen.route) {
             ResumeDesignScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToGridEditor = { designId, template ->
-                    navController.navigate(Screen.GridEditor.buildRoute(designId, template))
+                onNavigateToGridEditor = { designId, template, isNewDesign ->
+                    navController.navigate(Screen.GridEditor.buildRoute(designId, template, isNewDesign))
                 }
             )
         }
@@ -154,17 +154,22 @@ fun AppNavigation() {
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument(Screen.GridEditor.isNewDesignKey()) {
+                    type = NavType.BoolType
+                    defaultValue = false
                 }
             )
         ) { backStackEntry ->
             val designId = backStackEntry.arguments?.getString(Screen.GridEditor.designIdKey())
             val template = backStackEntry.arguments?.getString(Screen.GridEditor.templateKey())
+            val isNewDesign = backStackEntry.arguments?.getBoolean(Screen.GridEditor.isNewDesignKey()) ?: false
 
             val viewModel: GridEditorViewModel = viewModel(
                 factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return GridEditorViewModel(context, designId, template) as T
+                        return GridEditorViewModel(context, designId, template, isNewDesign) as T
                     }
                 }
             )

@@ -28,11 +28,13 @@ import java.util.*
  * @param context Application context
  * @param designId Optional design ID to load existing design
  * @param templateName Optional template name to apply template
+ * @param isNewDesign Flag to indicate if this is a new blank design
  */
 class GridEditorViewModel(
     private val context: Context,
     private val designId: String? = null,
-    private val templateName: String? = null
+    private val templateName: String? = null,
+    private val isNewDesign: Boolean = false
 ) : ViewModel() {
 
     private val repository = ResumeRepository.getInstance(context)
@@ -130,6 +132,7 @@ class GridEditorViewModel(
 
     /**
      * Loads the latest resume or creates a new one with default template
+     * If isNewDesign is true, creates a blank design without loading from SharedPreferences
      * If designId is provided, loads that specific design from GridResumeRepository
      * If templateName is provided, applies that template
      */
@@ -138,6 +141,13 @@ class GridEditorViewModel(
             _isLoading.value = true
             try {
                 when {
+                    // Case 0: Create new blank design (takes priority over all other cases)
+                    isNewDesign -> {
+                        _gridResume.value = createDefaultResume()
+                        linkedResumeId = null
+                        android.util.Log.d("GridEditorViewModel", "Created new blank design")
+                    }
+
                     // Case 1: Load specific design by ID
                     designId != null -> {
                         val result = gridResumeRepository.getDesign(designId)

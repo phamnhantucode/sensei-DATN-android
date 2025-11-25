@@ -44,7 +44,7 @@ import java.util.*
 @Composable
 fun ResumeDesignScreen(
     onBack: () -> Unit,
-    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?) -> Unit,
+    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?, isNewDesign: Boolean) -> Unit,
     viewModel: ResumeDesignViewModel = ResumeDesignViewModel(LocalContext.current)
 ) {
     val designs by viewModel.designs.collectAsState()
@@ -67,34 +67,20 @@ fun ResumeDesignScreen(
                         )
                     }
                 },
-                actions = {
-                    // Create New Design button
-                    Button(
-                        onClick = { onNavigateToGridEditor(null, null) },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("New Design")
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
             // Error message
             error?.let { errorMessage ->
                 Card(
@@ -118,7 +104,7 @@ fun ResumeDesignScreen(
                 templates = templates,
                 isLoading = isLoadingTemplates,
                 onTemplateClick = { template ->
-                    onNavigateToGridEditor(null, template.assetPath)
+                    onNavigateToGridEditor(null, template.assetPath, false)
                 }
             )
 
@@ -129,12 +115,30 @@ fun ResumeDesignScreen(
                 designs = designs,
                 isLoading = isLoading,
                 onDesignClick = { design ->
-                    onNavigateToGridEditor(design.id, null)
+                    onNavigateToGridEditor(design.id, null, false)
                 },
                 onDeleteClick = { designId ->
                     showDeleteConfirmation = designId
                 }
             )
+            }
+
+            // Floating Action Button for New Design
+            ExtendedFloatingActionButton(
+                onClick = { onNavigateToGridEditor(null, null, true) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "New Design"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("New Design")
+            }
         }
     }
 

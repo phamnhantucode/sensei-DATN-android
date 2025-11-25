@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
@@ -53,6 +54,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -151,9 +153,10 @@ fun ResumeBuilderScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
                 // Header with back button
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -207,37 +210,24 @@ fun ResumeBuilderScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Grid Editor Button
-                                IconButton(
+                                // Grid Editor Button with text
+                                Button(
                                     onClick = onNavigateToGridEditor,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.secondaryContainer,
-                                            CircleShape
-                                        )
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Dashboard,
-                                        contentDescription = "Grid Editor",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                        contentDescription = "Resume designer",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                }
-
-                                // Theme Button
-                                IconButton(
-                                    onClick = { showThemeDialog = true },
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.tertiaryContainer,
-                                            CircleShape
-                                        )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Palette,
-                                        contentDescription = "Theme",
-                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Resume designer",
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
 
@@ -261,65 +251,22 @@ fun ResumeBuilderScreen(
                                 }
                             }
 
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            // Save Button
+                            Button(
+                                onClick = { viewModel.saveResume(showToast = true) },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                ),
+                                enabled = !isSaving
                             ) {
-                                // Save Button
-                                Button(
-                                    onClick = { viewModel.saveResume(showToast = true) },
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondary
-                                    ),
-                                    enabled = !isSaving
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.CheckCircle,
-                                        contentDescription = "Save",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if (isSaving) "Saving..." else "Save")
-                                }
-
-                                // Export Button
-                                Box {
-                                    Button(
-                                        onClick = { exportMenuExpanded = true },
-                                        shape = RoundedCornerShape(24.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.FileDownload,
-                                            contentDescription = "Export",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Export")
-                                    }
-                                    DropdownMenu(
-                                        expanded = exportMenuExpanded,
-                                        onDismissRequest = { exportMenuExpanded = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Export as Markdown (.md)") },
-                                            onClick = {
-                                                exportMenuExpanded = false
-                                                viewModel.exportResume(latestContext, ResumeExportFormat.MARKDOWN)
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Export as PDF (.pdf)") },
-                                            onClick = {
-                                                exportMenuExpanded = false
-                                                viewModel.exportResume(latestContext, ResumeExportFormat.PDF)
-                                            }
-                                        )
-                                    }
-                                }
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = "Save",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(if (isSaving) "Saving..." else "Save")
                             }
                         }
                     }
@@ -545,10 +492,32 @@ fun ResumeBuilderScreen(
 
                     Spacer(modifier = Modifier.height(80.dp))
                 }
-            Spacer(
+                Spacer(
+                    modifier = Modifier
+                        .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
+                )
+            }
+
+            // Floating Action Button for Create Markdown
+            ExtendedFloatingActionButton(
+                onClick = {
+                    // TODO: Implement markdown creation functionality
+                    Toast.makeText(context, "Create Markdown - Coming soon!", Toast.LENGTH_SHORT).show()
+                },
                 modifier = Modifier
-                    .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
-            )
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Description,
+                    contentDescription = "Create Markdown"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Create Markdown")
+            }
         }
     }
 

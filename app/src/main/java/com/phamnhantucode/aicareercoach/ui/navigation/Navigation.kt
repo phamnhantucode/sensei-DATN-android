@@ -12,11 +12,12 @@ sealed class Screen(val route: String) {
     object GridEditor : Screen("grid_editor") {
         private const val DesignIdArg = "designId"
         private const val TemplateArg = "template"
+        private const val IsNewDesignArg = "isNewDesign"
 
         val routeWithArgs: String =
-            "$route?$DesignIdArg={$DesignIdArg}&$TemplateArg={$TemplateArg}"
+            "$route?$DesignIdArg={$DesignIdArg}&$TemplateArg={$TemplateArg}&$IsNewDesignArg={$IsNewDesignArg}"
 
-        fun buildRoute(designId: String? = null, template: String? = null): String {
+        fun buildRoute(designId: String? = null, template: String? = null, isNewDesign: Boolean = false): String {
             val params = mutableListOf<String>()
             if (designId != null) {
                 params.add("$DesignIdArg=${Uri.encode(designId)}")
@@ -24,6 +25,7 @@ sealed class Screen(val route: String) {
             if (template != null) {
                 params.add("$TemplateArg=${Uri.encode(template)}")
             }
+            params.add("$IsNewDesignArg=$isNewDesign")
             return if (params.isNotEmpty()) {
                 "$route?${params.joinToString("&")}"
             } else {
@@ -33,6 +35,7 @@ sealed class Screen(val route: String) {
 
         fun designIdKey(): String = DesignIdArg
         fun templateKey(): String = TemplateArg
+        fun isNewDesignKey(): String = IsNewDesignArg
     }
     object InterviewPrep : Screen("interview_prep")
     object CoverLetter : Screen("cover_letter")
