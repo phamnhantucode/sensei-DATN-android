@@ -5,6 +5,7 @@ import android.util.Log
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
 import com.phamnhantucode.aicareercoach.data.local.ResumeEntity
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
 import com.phamnhantucode.aicareercoach.data.neon.NeonResumeService
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
@@ -38,15 +39,26 @@ class ResumeRepository private constructor(context: Context) {
     }
 
     /**
-     * Gets the current user's Neon ID
+     * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
+     * If the user doesn't exist in Neon yet, creates them first.
      */
     private suspend fun getCurrentUserId(): String {
         val clerkUser = Clerk.user
             ?: throw IllegalStateException("User not logged in")
 
-        // Try to get Neon user ID
-        val neonUser = NeonUserService.getUser(clerkUser.id)
-        return neonUser?.clerkUserId ?: clerkUser.id
+        val authToken = NeonAuth.fetchNeonAuthToken()
+        
+        // Get Neon user's internal ID (not the Clerk ID) for foreign key references
+        var neonUser = NeonUserService.getUser(clerkUser.id, authToken)
+        
+        // If user doesn't exist in Neon, create them
+        if (neonUser == null) {
+            Log.d(TAG, "User not found in Neon, creating...")
+            NeonUserService.upsertUser(clerkUser, authToken)
+            neonUser = NeonUserService.getUser(clerkUser.id, authToken)
+        }
+        
+        return neonUser?.id ?: throw IllegalStateException("Failed to create user in Neon database")
     }
 
     /**
@@ -71,7 +83,8 @@ class ResumeRepository private constructor(context: Context) {
 
                 // Sync to remote if requested
                 if (syncToRemote) {
-                    val remoteResult = NeonResumeService.saveResume(resume, userId)
+                    val authToken = NeonAuth.fetchNeonAuthToken()
+                    val remoteResult = NeonResumeService.saveResume(resume, userId, authToken)
                     if (remoteResult.isFailure) {
                         Log.w(TAG, "Failed to sync resume to remote", remoteResult.exceptionOrNull())
                         // Don't fail the whole operation if remote sync fails
@@ -113,7 +126,8 @@ class ResumeRepository private constructor(context: Context) {
 
                 // Sync to remote if requested
                 if (syncToRemote) {
-                    val remoteResult = NeonResumeService.updateResume(resume)
+                    val authToken = NeonAuth.fetchNeonAuthToken()
+                    val remoteResult = NeonResumeService.updateResume(resume, authToken)
                     if (remoteResult.isFailure) {
                         Log.w(TAG, "Failed to sync update to remote", remoteResult.exceptionOrNull())
                     } else {
@@ -144,7 +158,8 @@ class ResumeRepository private constructor(context: Context) {
                 }
 
                 // Fetch from remote
-                val remoteResult = NeonResumeService.getResume(resumeId)
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val remoteResult = NeonResumeService.getResume(resumeId, authToken)
                 if (remoteResult.isSuccess) {
                     val resume = remoteResult.getOrNull()
                     if (resume != null) {
@@ -186,7 +201,8 @@ class ResumeRepository private constructor(context: Context) {
                 }
 
                 // Fetch from remote
-                val remoteResult = NeonResumeService.getAllResumesForUser(userId)
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val remoteResult = NeonResumeService.getAllResumesForUser(userId, authToken)
                 if (remoteResult.isSuccess) {
                     val resumes = remoteResult.getOrNull() ?: emptyList()
 
@@ -244,7 +260,8 @@ class ResumeRepository private constructor(context: Context) {
 
                 // Sync to remote if requested
                 if (syncToRemote) {
-                    val remoteResult = NeonResumeService.deleteResume(resumeId)
+                    val authToken = NeonAuth.fetchNeonAuthToken()
+                    val remoteResult = NeonResumeService.deleteResume(resumeId, authToken)
                     if (remoteResult.isFailure) {
                         Log.w(TAG, "Failed to delete from remote", remoteResult.exceptionOrNull())
                     } else {
@@ -295,9 +312,10 @@ class ResumeRepository private constructor(context: Context) {
             val userId = getCurrentUserId()
             val localResumes = resumeDao.getAllResumesByUser(userId)
 
+            val authToken = NeonAuth.fetchNeonAuthToken()
             var syncedCount = 0
             localResumes.forEach { entity ->
-                val result = NeonResumeService.saveResume(entity.resumeData, userId)
+                val result = NeonResumeService.saveResume(entity.resumeData, userId, authToken)
                 if (result.isSuccess) {
                     syncedCount++
                 }

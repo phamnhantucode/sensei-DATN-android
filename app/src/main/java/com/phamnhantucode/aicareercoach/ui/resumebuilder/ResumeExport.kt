@@ -221,6 +221,473 @@ object ResumeFormatter {
         values.mapNotNull { value ->
             value?.takeIf { it.isNotBlank() }?.trim()
         }
+
+    /**
+     * Parses Markdown text back into a Resume object.
+     * This enables cross-platform compatibility with the web version.
+     */
+    fun fromMarkdown(markdown: String): Resume {
+        val lines = markdown.lines()
+        var currentLine = 0
+
+        val personalInfo = parsePersonalInfo(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val professionalSummary = parseSummary(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val skills = parseSkills(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val workExperiences = parseWorkExperience(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val education = parseEducation(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val projects = parseProjects(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val certifications = parseCertifications(lines, currentLine)
+        currentLine = findNextSection(lines, currentLine)
+
+        val languages = parseLanguages(lines, currentLine)
+
+        return Resume(
+            id = java.util.UUID.randomUUID().toString(),
+            personalInfo = personalInfo,
+            professionalSummary = professionalSummary,
+            workExperiences = workExperiences,
+            education = education,
+            skills = skills,
+            projects = projects,
+            certifications = certifications,
+            languages = languages
+        )
+    }
+
+    private fun parsePersonalInfo(lines: List<String>, startFrom: Int): PersonalInfo {
+        var fullName = ""
+        var email = ""
+        var phone = ""
+        var linkedIn = ""
+        var github = ""
+        var portfolio = ""
+        var location = ""
+
+        // Find name in header (## <div align="center">Name</div>)
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            if (line.startsWith("## <div")) {
+                fullName = line.replace(Regex("<[^>]*>"), "").replace("##", "").trim()
+                break
+            } else if (line.startsWith("##")) {
+                // If we hit another section header, stop
+                break
+            }
+        }
+
+        // Find contact info line with emojis
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            if (line.contains("📧") || line.contains("📱") || line.contains("💼")) {
+                val parts = line.split("|").map { it.trim() }
+                parts.forEach { part ->
+                    when {
+                        part.contains("📧") -> email = part.replace("📧", "").trim()
+                        part.contains("📱") -> phone = part.replace("📱", "").trim()
+                        part.contains("💼") && part.contains("[LinkedIn]") -> {
+                            linkedIn = extractUrl(part)
+                        }
+                        part.contains("🔗") && part.contains("[GitHub]") -> {
+                            github = extractUrl(part)
+                        }
+                        part.contains("🌐") && part.contains("[Portfolio]") -> {
+                            portfolio = extractUrl(part)
+                        }
+                        part.contains("📍") -> location = part.replace("📍", "").trim()
+                    }
+                }
+                break
+            }
+        }
+
+        return PersonalInfo(
+            fullName = fullName,
+            email = email,
+            phone = phone,
+            location = location,
+            linkedIn = linkedIn,
+            github = github,
+            portfolio = portfolio
+        )
+    }
+
+    private fun parseSummary(lines: List<String>, startFrom: Int): String {
+        val summaryLines = mutableListOf<String>()
+        var foundSection = false
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Professional Summary" -> foundSection = true
+                foundSection && line.startsWith("##") -> break
+                foundSection && line.isNotBlank() -> summaryLines.add(line)
+            }
+        }
+
+        return summaryLines.joinToString(" ").trim()
+    }
+
+    private fun parseSkills(lines: List<String>, startFrom: Int): List<String> {
+        var foundSection = false
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Skills" -> foundSection = true
+                foundSection && line.startsWith("##") -> break
+                foundSection && line.isNotBlank() -> {
+                    return line.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                }
+            }
+        }
+
+        return emptyList()
+    }
+
+    private fun parseWorkExperience(lines: List<String>, startFrom: Int): List<WorkExperience> {
+        val experiences = mutableListOf<WorkExperience>()
+        var foundSection = false
+        var currentExp: MutableMap<String, Any?> = mutableMapOf()
+        val responsibilities = mutableListOf<String>()
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Work Experience" -> foundSection = true
+                foundSection && line.startsWith("## ") && line != "## Work Experience" -> break
+                foundSection && line.startsWith("### ") -> {
+                    // Save previous experience if exists
+                    if (currentExp.isNotEmpty()) {
+                        experiences.add(buildWorkExperience(currentExp, responsibilities.toList()))
+                        responsibilities.clear()
+                    }
+                    currentExp = mutableMapOf("jobTitle" to line.removePrefix("### "))
+                }
+                foundSection && line.startsWith("**") && line.endsWith("**") -> {
+                    val text = line.removeSurrounding("**")
+                    val parts = text.split("•").map { it.trim() }
+                    if (parts.isNotEmpty()) currentExp["company"] = parts[0]
+                    if (parts.size > 1) currentExp["location"] = parts[1]
+                }
+                foundSection && line.startsWith("*") && line.endsWith("*") -> {
+                    val dateText = line.removeSurrounding("*")
+                    val (startDate, endDate, isCurrent) = parseDateRange(dateText)
+                    currentExp["startDate"] = startDate
+                    currentExp["endDate"] = endDate
+                    currentExp["isCurrentRole"] = isCurrent
+                }
+                foundSection && line.startsWith("- ") -> {
+                    responsibilities.add(line.removePrefix("- "))
+                }
+            }
+        }
+
+        // Add last experience
+        if (currentExp.isNotEmpty()) {
+            experiences.add(buildWorkExperience(currentExp, responsibilities.toList()))
+        }
+
+        return experiences
+    }
+
+    private fun parseEducation(lines: List<String>, startFrom: Int): List<Education> {
+        val educationList = mutableListOf<Education>()
+        var foundSection = false
+        var currentEdu: MutableMap<String, Any?> = mutableMapOf()
+        val achievements = mutableListOf<String>()
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Education" -> foundSection = true
+                foundSection && line.startsWith("## ") && line != "## Education" -> break
+                foundSection && line.startsWith("### ") -> {
+                    // Save previous education if exists
+                    if (currentEdu.isNotEmpty()) {
+                        educationList.add(buildEducation(currentEdu, achievements.toList()))
+                        achievements.clear()
+                    }
+                    currentEdu = mutableMapOf("degree" to line.removePrefix("### "))
+                }
+                foundSection && line.startsWith("**") && line.endsWith("**") -> {
+                    val text = line.removeSurrounding("**")
+                    val parts = text.split("•").map { it.trim() }
+                    if (parts.isNotEmpty()) currentEdu["institution"] = parts[0]
+                    if (parts.size > 1) currentEdu["location"] = parts[1]
+                }
+                foundSection && line.startsWith("*") && line.endsWith("*") -> {
+                    val dateText = line.removeSurrounding("*")
+                    val (startDate, endDate, _) = parseDateRange(dateText)
+                    currentEdu["startDate"] = startDate
+                    currentEdu["endDate"] = endDate
+                }
+                foundSection && line.startsWith("- GPA:") -> {
+                    currentEdu["gpa"] = line.removePrefix("- GPA:").trim()
+                }
+                foundSection && line.startsWith("- ") && !line.startsWith("- GPA:") -> {
+                    achievements.add(line.removePrefix("- "))
+                }
+            }
+        }
+
+        // Add last education
+        if (currentEdu.isNotEmpty()) {
+            educationList.add(buildEducation(currentEdu, achievements.toList()))
+        }
+
+        return educationList
+    }
+
+    private fun parseProjects(lines: List<String>, startFrom: Int): List<Project> {
+        val projects = mutableListOf<Project>()
+        var foundSection = false
+        var currentProject: MutableMap<String, Any?> = mutableMapOf()
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Projects" -> foundSection = true
+                foundSection && line.startsWith("## ") && line != "## Projects" -> break
+                foundSection && line.startsWith("### ") -> {
+                    // Save previous project if exists
+                    if (currentProject.isNotEmpty()) {
+                        projects.add(buildProject(currentProject))
+                    }
+                    currentProject = mutableMapOf("title" to line.removePrefix("### "))
+                }
+                foundSection && line.startsWith("*") && line.endsWith("*") -> {
+                    val dateText = line.removeSurrounding("*")
+                    val (startDate, endDate, _) = parseDateRange(dateText)
+                    currentProject["startDate"] = startDate
+                    currentProject["endDate"] = endDate
+                }
+                foundSection && line.startsWith("**Technologies:**") -> {
+                    val techText = line.removePrefix("**Technologies:**").trim()
+                    currentProject["technologies"] = techText.split(",").map { it.trim() }
+                }
+                foundSection && line.startsWith("**Link:**") -> {
+                    currentProject["link"] = extractUrl(line)
+                }
+                foundSection && !line.startsWith("**") && !line.startsWith("###") && !line.startsWith("*") && line.isNotBlank() -> {
+                    // Description text
+                    if (!currentProject.containsKey("description")) {
+                        currentProject["description"] = line
+                    }
+                }
+            }
+        }
+
+        // Add last project
+        if (currentProject.isNotEmpty()) {
+            projects.add(buildProject(currentProject))
+        }
+
+        return projects
+    }
+
+    private fun parseCertifications(lines: List<String>, startFrom: Int): List<Certification> {
+        val certifications = mutableListOf<Certification>()
+        var foundSection = false
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Certifications" -> foundSection = true
+                foundSection && line.startsWith("##") -> break
+                foundSection && line.startsWith("- **") -> {
+                    val cert = parseCertificationLine(line)
+                    if (cert != null) certifications.add(cert)
+                }
+            }
+        }
+
+        return certifications
+    }
+
+    private fun parseLanguages(lines: List<String>, startFrom: Int): List<Language> {
+        val languages = mutableListOf<Language>()
+        var foundSection = false
+
+        for (i in startFrom until lines.size) {
+            val line = lines[i].trim()
+            when {
+                line == "## Languages" -> foundSection = true
+                foundSection && line.startsWith("##") -> break
+                foundSection && line.startsWith("- **") -> {
+                    val lang = parseLanguageLine(line)
+                    if (lang != null) languages.add(lang)
+                }
+            }
+        }
+
+        return languages
+    }
+
+    // Helper functions
+    private fun findNextSection(lines: List<String>, currentLine: Int): Int {
+        for (i in (currentLine + 1) until lines.size) {
+            if (lines[i].trim().startsWith("##")) {
+                return i
+            }
+        }
+        return lines.size
+    }
+
+    private fun extractUrl(text: String): String {
+        val regex = Regex("\\[.+?\\]\\((.+?)\\)")
+        return regex.find(text)?.groupValues?.get(1) ?: ""
+    }
+
+    private fun parseDateRange(dateText: String): Triple<LocalDate?, LocalDate?, Boolean> {
+        val parts = dateText.split("-").map { it.trim() }
+        var startDate: LocalDate? = null
+        var endDate: LocalDate? = null
+        var isCurrent = false
+
+        if (parts.isNotEmpty()) {
+            startDate = parseDate(parts[0])
+        }
+        if (parts.size > 1) {
+            when (parts[1]) {
+                "Present" -> isCurrent = true
+                else -> endDate = parseDate(parts[1])
+            }
+        }
+
+        return Triple(startDate, endDate, isCurrent)
+    }
+
+    private fun parseDate(dateStr: String): LocalDate? {
+        return try {
+            val parts = dateStr.split(" ")
+            if (parts.size == 2) {
+                val month = when (parts[0]) {
+                    "Jan" -> 1
+                    "Feb" -> 2
+                    "Mar" -> 3
+                    "Apr" -> 4
+                    "May" -> 5
+                    "Jun" -> 6
+                    "Jul" -> 7
+                    "Aug" -> 8
+                    "Sep" -> 9
+                    "Oct" -> 10
+                    "Nov" -> 11
+                    "Dec" -> 12
+                    else -> return null
+                }
+                val year = parts[1].toIntOrNull() ?: return null
+                LocalDate.of(year, month, 1)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun buildWorkExperience(data: Map<String, Any?>, responsibilities: List<String>): WorkExperience {
+        return WorkExperience(
+            jobTitle = data["jobTitle"] as? String ?: "",
+            company = data["company"] as? String ?: "",
+            location = data["location"] as? String ?: "",
+            startDate = data["startDate"] as? LocalDate,
+            endDate = data["endDate"] as? LocalDate,
+            isCurrentRole = data["isCurrentRole"] as? Boolean ?: false,
+            responsibilities = responsibilities
+        )
+    }
+
+    private fun buildEducation(data: Map<String, Any?>, achievements: List<String>): Education {
+        return Education(
+            degree = data["degree"] as? String ?: "",
+            institution = data["institution"] as? String ?: "",
+            location = data["location"] as? String ?: "",
+            startDate = data["startDate"] as? LocalDate,
+            endDate = data["endDate"] as? LocalDate,
+            gpa = data["gpa"] as? String ?: "",
+            achievements = achievements
+        )
+    }
+
+    private fun buildProject(data: Map<String, Any?>): Project {
+        return Project(
+            title = data["title"] as? String ?: "",
+            description = data["description"] as? String ?: "",
+            technologies = data["technologies"] as? List<String> ?: emptyList(),
+            link = data["link"] as? String ?: "",
+            startDate = data["startDate"] as? LocalDate,
+            endDate = data["endDate"] as? LocalDate
+        )
+    }
+
+    private fun parseCertificationLine(line: String): Certification? {
+        // Format: - **Name** - Issuer • Date • ID: xxx
+        val nameMatch = Regex("\\*\\*(.+?)\\*\\*").find(line) ?: return null
+        val name = nameMatch.groupValues[1]
+
+        val detailsPart = line.substringAfter("** - ").takeIf { it != line } ?: ""
+        val details = detailsPart.split("•").map { it.trim() }
+
+        var issuer = ""
+        var issueDate: LocalDate? = null
+        var credentialId = ""
+
+        details.forEach { detail ->
+            when {
+                detail.startsWith("ID:") -> credentialId = detail.removePrefix("ID:").trim()
+                detail.contains(" ") && !detail.startsWith("ID") -> {
+                    // Try to parse as date
+                    val date = parseDate(detail)
+                    if (date != null) {
+                        issueDate = date
+                    } else if (issuer.isEmpty()) {
+                        issuer = detail
+                    }
+                }
+                issuer.isEmpty() -> issuer = detail
+            }
+        }
+
+        return Certification(
+            name = name,
+            issuer = issuer,
+            issueDate = issueDate,
+            credentialId = credentialId
+        )
+    }
+
+    private fun parseLanguageLine(line: String): Language? {
+        // Format: - **Name** - Proficiency
+        val parts = line.removePrefix("- ").split(" - ")
+        if (parts.size < 2) return null
+
+        val name = parts[0].removeSurrounding("**")
+        val proficiencyStr = parts[1].trim()
+
+        val proficiency = when (proficiencyStr) {
+            "Elementary" -> LanguageProficiency.ELEMENTARY
+            "Intermediate" -> LanguageProficiency.INTERMEDIATE
+            "Proficient" -> LanguageProficiency.PROFICIENT
+            "Fluent" -> LanguageProficiency.FLUENT
+            "Native" -> LanguageProficiency.NATIVE
+            else -> LanguageProficiency.INTERMEDIATE
+        }
+
+        return Language(name = name, proficiency = proficiency)
+    }
 }
 
 class ResumeExporter(private val context: Context) {

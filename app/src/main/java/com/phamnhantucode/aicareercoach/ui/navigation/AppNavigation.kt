@@ -25,6 +25,7 @@ import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeBuilderScreen
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeMarkdownScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorViewModel
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeDesignScreen
@@ -129,7 +130,16 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() },
                 onNavigateToGridEditor = {
                     navController.navigate(Screen.ResumeDesignScreen.route)
+                },
+                onNavigateToMarkdown = {
+                    navController.navigate(Screen.ResumeMarkdown.route)
                 }
+            )
+        }
+
+        composable(Screen.ResumeMarkdown.route) {
+            ResumeMarkdownScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

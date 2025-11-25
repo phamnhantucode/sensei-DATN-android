@@ -4,7 +4,8 @@
       "Bash(./gradlew assembleDebug:*)",
       "Bash(./gradlew clean:*)",
       "Bash(./gradlew compileDebugKotlin:*)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

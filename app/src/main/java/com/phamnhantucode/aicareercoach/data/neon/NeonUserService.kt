@@ -233,12 +233,14 @@ object NeonUserService {
             val results = JSONArray(bodyString)
             if (results.length() == 0) return@withContext null
             val json = results.getJSONObject(0)
+            val neonId = json.getString("id") // The auto-generated hex ID
             val industry = json.optString("industry").takeIf { it.isNotBlank() }
             val experience = if (json.has("experience") && !json.isNull("experience")) json.optInt("experience") else null
             val skillsArray = json.optJSONArray("skills") ?: JSONArray()
             val skills = List(skillsArray.length()) { i -> skillsArray.optString(i) }.filter { it.isNotBlank() }
             val bio = json.optString("bio").takeIf { it.isNotBlank() }
             return@use NeonUser(
+                id = neonId,
                 clerkUserId = clerkUserId,
                 industry = industry,
                 experienceYears = experience,
@@ -325,6 +327,7 @@ object NeonUserService {
     )
 
     data class NeonUser(
+        val id: String, // Neon User.id (the auto-generated hex ID used as foreign key)
         val clerkUserId: String,
         val industry: String?,
         val experienceYears: Int?,

@@ -95,7 +95,8 @@ import java.util.Locale
 fun ResumeBuilderScreen(
     onBack: () -> Unit = {},
     onNavigateToPreview: ((Resume) -> Unit)? = null,
-    onNavigateToGridEditor: () -> Unit = {}
+    onNavigateToGridEditor: () -> Unit = {},
+    onNavigateToMarkdown: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: ResumeBuilderViewModel = viewModel { ResumeBuilderViewModel(context) }
@@ -500,10 +501,7 @@ fun ResumeBuilderScreen(
 
             // Floating Action Button for Create Markdown
             ExtendedFloatingActionButton(
-                onClick = {
-                    // TODO: Implement markdown creation functionality
-                    Toast.makeText(context, "Create Markdown - Coming soon!", Toast.LENGTH_SHORT).show()
-                },
+                onClick = onNavigateToMarkdown,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)

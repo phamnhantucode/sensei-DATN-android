@@ -5,6 +5,7 @@ import android.util.Log
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.local.ResumeConverters
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -40,47 +41,51 @@ object NeonResumeService {
                 ?: return@withContext Result.failure(Exception("No Neon auth credentials available"))
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-            val now = java.time.Instant.now().toString()
 
-            // Convert Resume to JSON using the converter
-            val resumeJson = converter.fromResume(resume)
+            // First, check if resume already exists
+            val existingResume = getResume(resume.id, authToken)
 
-            val payload = JSONObject().apply {
-                put("id", resume.id)
-                put("userId", userId)
-                put("content", resumeJson) // Store as JSON text
-                put("atsScore", JSONObject.NULL) // Can be calculated later
-                put("feedback", JSONObject.NULL)
-                put("createdAt", now)
-                put("updatedAt", now)
-            }
+            if (existingResume.isSuccess && existingResume.getOrNull() != null) {
+                // Resume exists, update it
+                Log.d(TAG, "Resume ${resume.id} already exists, updating...")
+                return@withContext updateResume(resume, authToken)
+            } else {
+                // Resume doesn't exist, create new one
+                Log.d(TAG, "Creating new resume ${resume.id} for user $userId")
+                val now = java.time.Instant.now().toString()
 
-            Log.d(TAG, "Saving resume ${resume.id} for user $userId")
+                // Convert Resume to Markdown for cross-platform compatibility with web
+                val resumeMarkdown = ResumeFormatter.toMarkdown(resume)
 
-            val request = Request.Builder()
-                .url("$apiUrl/Resume?on_conflict=id")
-                .addHeader("Authorization", authorizationHeader)
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Prefer", "resolution=merge-duplicates")
-                .addHeader("Prefer", "return=minimal")
-                .post(payload.toString().toRequestBody(jsonMediaType))
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string()
-                if (!response.isSuccessful) {
-                    val errorMessage = bodyString ?: "Empty response body"
-                    if (response.code == 409) {
-                        // Resume exists, try to update
-                        Log.i(TAG, "Resume exists, attempting to update...")
-                        return@withContext updateResume(resume, authToken)
-                    }
-                    return@withContext Result.failure(
-                        IOException("Failed to save resume (${response.code}): $errorMessage")
-                    )
+                val payload = JSONObject().apply {
+                    put("id", resume.id)
+                    put("userId", userId)
+                    put("content", resumeMarkdown) // Store as Markdown text (web-compatible)
+                    put("atsScore", JSONObject.NULL) // Can be calculated later
+                    put("feedback", JSONObject.NULL)
+                    put("createdAt", now)
+                    put("updatedAt", now)
                 }
-                Log.d(TAG, "Successfully saved resume ${resume.id}")
-                Result.success(Unit)
+
+                val request = Request.Builder()
+                    .url("$apiUrl/Resume")
+                    .addHeader("Authorization", authorizationHeader)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Prefer", "return=minimal")
+                    .post(payload.toString().toRequestBody(jsonMediaType))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    val bodyString = response.body?.string()
+                    if (!response.isSuccessful) {
+                        val errorMessage = bodyString ?: "Empty response body"
+                        return@withContext Result.failure(
+                            IOException("Failed to save resume (${response.code}): $errorMessage")
+                        )
+                    }
+                    Log.d(TAG, "Successfully saved resume ${resume.id}")
+                    Result.success(Unit)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving resume", e)
@@ -102,11 +107,11 @@ object NeonResumeService {
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val now = java.time.Instant.now().toString()
 
-            // Convert Resume to JSON using the converter
-            val resumeJson = converter.fromResume(resume)
+            // Convert Resume to Markdown for cross-platform compatibility with web
+            val resumeMarkdown = ResumeFormatter.toMarkdown(resume)
 
             val payload = JSONObject().apply {
-                put("content", resumeJson)
+                put("content", resumeMarkdown) // Store as Markdown text (web-compatible)
                 put("updatedAt", now)
             }
 
@@ -169,8 +174,16 @@ object NeonResumeService {
                 }
 
                 val json = results.getJSONObject(0)
-                val contentJson = json.getString("content")
-                val resume = converter.toResume(contentJson)
+                val contentMarkdown = json.getString("content")
+
+                // Parse Markdown back to Resume object for cross-platform compatibility
+                val resume = try {
+                    ResumeFormatter.fromMarkdown(contentMarkdown).copy(id = json.getString("id"))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to parse Markdown, trying JSON fallback", e)
+                    // Fallback: try parsing as JSON (for backward compatibility)
+                    converter.toResume(contentMarkdown)
+                }
 
                 Log.d(TAG, "Successfully retrieved resume $resumeId")
                 Result.success(resume)
@@ -215,8 +228,16 @@ object NeonResumeService {
                 for (i in 0 until results.length()) {
                     try {
                         val json = results.getJSONObject(i)
-                        val contentJson = json.getString("content")
-                        val resume = converter.toResume(contentJson)
+                        val contentMarkdown = json.getString("content")
+
+                        // Parse Markdown back to Resume object for cross-platform compatibility
+                        val resume = try {
+                            ResumeFormatter.fromMarkdown(contentMarkdown).copy(id = json.getString("id"))
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to parse Markdown at index $i, trying JSON fallback", e)
+                            // Fallback: try parsing as JSON (for backward compatibility)
+                            converter.toResume(contentMarkdown)
+                        }
                         resumes.add(resume)
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to parse resume at index $i", e)

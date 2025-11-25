@@ -8,6 +8,7 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object IndustryInsights : Screen("industry_insights")
     object ResumeBuilder : Screen("resume_builder")
+    object ResumeMarkdown : Screen("resume_markdown")
     object ResumeDesignScreen : Screen("resume_design_screen")
     object GridEditor : Screen("grid_editor") {
         private const val DesignIdArg = "designId"
