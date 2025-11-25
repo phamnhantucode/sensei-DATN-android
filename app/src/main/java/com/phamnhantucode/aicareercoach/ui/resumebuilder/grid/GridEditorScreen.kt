@@ -120,6 +120,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.elementsByZIndex
 import kotlinx.coroutines.launch
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState
 import kotlin.math.roundToInt
 
 /**
@@ -141,6 +142,7 @@ fun GridEditorScreen(
     val draggedElement by viewModel.draggedElement.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val pdfExportState by viewModel.pdfExportState.collectAsState()
+    val imageExportState by viewModel.imageExportState.collectAsState()
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val isMoveMode by viewModel.isMoveMode.collectAsState()
 
@@ -149,6 +151,7 @@ fun GridEditorScreen(
     var showTemplateDialog by remember { mutableStateOf(false) }
     var showElementPicker by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showImageExportDialog by remember { mutableStateOf(false) }
     var applyingTemplateData by remember { mutableStateOf(false) }
 
     // Load resume data for template application
@@ -194,6 +197,7 @@ fun GridEditorScreen(
                 onNavigateBack = onNavigateBack,
                 onSave = { viewModel.save() },
                 onExport = { showExportDialog = true },
+                onExportImage = { showImageExportDialog = true },
                 onPreview = onNavigateToPreview,
                 onSwitchMode = onSwitchToFormEditor,
                 onShowTemplates = { showTemplateDialog = true },
@@ -465,6 +469,42 @@ fun GridEditorScreen(
         )
     }
 
+    // Image Export dialog
+    if (showImageExportDialog) {
+        ImageExportDialog(
+            exportState = imageExportState,
+            onDismiss = {
+                showImageExportDialog = false
+                viewModel.resetImageExportState()
+            },
+            onExport = {
+                // Create a temporary file URI for the Image
+                val fileName = "resume_${System.currentTimeMillis()}.png"
+                val file = java.io.File(context.cacheDir, fileName)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                viewModel.exportToImage(file, uri)
+            },
+            onShare = { uri ->
+                // Share the Image using Android share sheet
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(
+                    android.content.Intent.createChooser(
+                        intent,
+                        "Share Resume Image"
+                    )
+                )
+            }
+        )
+    }
+
     // Close property panel when element is deselected
     LaunchedEffect(selectedElement) {
         if (selectedElement == null) {
@@ -485,6 +525,7 @@ private fun GridEditorTopBar(
     onNavigateBack: () -> Unit,
     onSave: () -> Unit,
     onExport: () -> Unit,
+    onExportImage: () -> Unit,
     onPreview: () -> Unit,
     onSwitchMode: () -> Unit,
     onShowTemplates: () -> Unit,
@@ -588,6 +629,15 @@ private fun GridEditorTopBar(
                             onExport()
                         },
                         leadingIcon = { Icon(Icons.Default.FileDownload, null) }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Export as Image") },
+                        onClick = {
+                            showMenu = false
+                            onExportImage()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Image, null) }
                     )
                 }
             }
@@ -1725,6 +1775,135 @@ private fun PdfExportDialog(
         dismissButton = {
             when (exportState) {
                 is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState.Idle -> {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                }
+
+                else -> { /* No dismiss button during/after export */
+                }
+            }
+        }
+    )
+}
+
+
+/**
+ * Image Export Dialog
+ */
+@Composable
+private fun ImageExportDialog(
+    exportState: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState,
+    onDismiss: () -> Unit,
+    onExport: () -> Unit,
+    onShare: (android.net.Uri) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Export Image")
+        },
+        text = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Idle -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Export your resume as a high-quality PNG image.")
+                        Text(
+                            "The image will be saved to your device.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Rendering -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Rendering image...")
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.SavingFile -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text("Saving image...")
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Success -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("✓ Image exported successfully!")
+                        Text(
+                            "Size: ${exportState.fileSizeBytes / 1024} KB",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Error -> {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("❌ Export failed")
+                        Text(
+                            exportState.message,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Idle -> {
+                    Button(onClick = onExport) {
+                        Text("Export")
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Success -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onShare(exportState.uri) }) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Share")
+                        }
+                        Button(onClick = onDismiss) {
+                            Text("Close")
+                        }
+                    }
+                }
+
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Error -> {
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                }
+
+                else -> {
+                    // Hide button during export
+                }
+            }
+        },
+        dismissButton = {
+            when (exportState) {
+                is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState.Idle -> {
                     TextButton(onClick = onDismiss) {
                         Text("Cancel")
                     }

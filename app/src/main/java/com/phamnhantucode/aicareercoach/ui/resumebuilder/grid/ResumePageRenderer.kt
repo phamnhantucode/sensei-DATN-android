@@ -9,6 +9,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.GridCoordin
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageCache
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportConfig
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfRenderContext
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ResumeCanvasRenderer
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.renderers.*
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlinx.coroutines.Dispatchers
@@ -29,17 +30,6 @@ class ResumePageRenderer(private val context: Context) {
 
     private val imageCache: ImageCache = CoilImageCache(context)
     private val colorConverter = ColorConverter()
-
-    // Reuse PDF element renderers for consistency
-    private val textRenderer = TextElementPdfRenderer()
-    private val shapeRenderer = ShapeElementPdfRenderer()
-    private val imageRenderer = ImageElementPdfRenderer()
-    private val chartRenderer = ChartElementPdfRenderer()
-    private val iconRenderer = IconElementPdfRenderer()
-    private val contactRenderer = ContactElementPdfRenderer()
-    private val workExperienceRenderer = WorkExperienceElementPdfRenderer()
-    private val educationRenderer = EducationElementPdfRenderer()
-    private val skillRenderer = SkillElementPdfRenderer()
 
     /**
      * Renders the first page of a resume to a bitmap at A4 resolution
@@ -113,83 +103,16 @@ class ResumePageRenderer(private val context: Context) {
     /**
      * Render all elements on the canvas using the PDF renderers
      */
+    /**
+     * Render all elements on the canvas using the shared ResumeCanvasRenderer
+     */
     private suspend fun renderElements(
         canvas: Canvas,
         elements: List<ResumeElement>,
         gridConfig: GridConfig,
         config: PdfExportConfig
     ) {
-        val mapper = GridCoordinateMapper(gridConfig, config)
-        val renderContext = PdfRenderContext(context, config, imageCache, colorConverter)
-
-        elements.forEach { element ->
-            try {
-                when (element) {
-                    is ResumeElement.TextElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        textRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.ShapeElement -> {
-                        val bounds = if (element.customWidthDp != null || element.customHeightDp != null) {
-                            mapper.customSizeToRect(
-                                element.position,
-                                element.customWidthDp,
-                                element.customHeightDp
-                            )
-                        } else {
-                            mapper.gridToPdfRect(element.position)
-                        }
-                        shapeRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.ImageElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        imageRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.ChartElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        chartRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.IconElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        iconRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.ContactElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        contactRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.WorkExperienceElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        workExperienceRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.EducationElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        educationRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.SkillElement -> {
-                        val bounds = mapper.gridToPdfRect(element.position)
-                        skillRenderer.render(canvas, element, bounds, mapper, renderContext)
-                    }
-
-                    is ResumeElement.ProjectElement,
-                    is ResumeElement.CertificationElement,
-                    is ResumeElement.LanguageElement,
-                    is ResumeElement.ContainerElement -> {
-                        // For elements without dedicated renderers, render as text
-                        // These will show basic content until specific renderers are added
-                        android.util.Log.d("ResumePageRenderer", "Skipping element type: ${element::class.simpleName}")
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("ResumePageRenderer", "Failed to render element: ${element::class.simpleName}", e)
-            }
-        }
+        val renderer = ResumeCanvasRenderer(context, config, imageCache, colorConverter)
+        renderer.renderElements(canvas, elements, gridConfig)
     }
 }

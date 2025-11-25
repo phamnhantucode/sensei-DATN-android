@@ -45,13 +45,13 @@ class GridCoordinateMapper(
     /**
      * Use uniform scaling to maintain aspect ratio
      */
-    private val scale: Float = minOf(scaleX, scaleY)
+    val scale: Float = minOf(scaleX, scaleY)
 
     /**
      * Centering offsets (if grid doesn't fill entire page)
      */
-    private val offsetX: Float = (pdfConfig.pageWidth - totalGridWidth * scale) / 2
-    private val offsetY: Float = (pdfConfig.pageHeight - totalGridHeight * scale) / 2
+    val offsetX: Float = (pdfConfig.pageWidth - totalGridWidth * scale) / 2
+    val offsetY: Float = (pdfConfig.pageHeight - totalGridHeight * scale) / 2
 
     /**
      * Convert grid position to PDF rectangle (in points)

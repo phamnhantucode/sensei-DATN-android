@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 class ResumeDesignViewModel(context: Context) : ViewModel() {
 
     private val repository = GridResumeRepository.getInstance(context)
+    private val templateLoader = TemplateLoader.getInstance(context)
 
     // State flows
     private val _designs = MutableStateFlow<List<GridResumeEntity>>(emptyList())
@@ -29,11 +30,41 @@ class ResumeDesignViewModel(context: Context) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Available templates (from GridTemplateType enum)
-    val templates: List<GridTemplateType> = GridTemplateType.values().toList()
+    // Templates loaded from assets
+    private val _templates = MutableStateFlow<List<ResumeTemplate>>(emptyList())
+    val templates: StateFlow<List<ResumeTemplate>> = _templates.asStateFlow()
+
+    private val _isLoadingTemplates = MutableStateFlow(false)
+    val isLoadingTemplates: StateFlow<Boolean> = _isLoadingTemplates.asStateFlow()
 
     init {
         loadDesigns()
+        loadTemplates()
+    }
+
+    /**
+     * Load templates from assets folder
+     */
+    private fun loadTemplates() {
+        viewModelScope.launch {
+            _isLoadingTemplates.value = true
+            try {
+                val loadedTemplates = templateLoader.getAllTemplates()
+                _templates.value = loadedTemplates
+            } catch (e: Exception) {
+                android.util.Log.e("ResumeDesignViewModel", "Failed to load templates", e)
+                _error.value = "Failed to load templates"
+            } finally {
+                _isLoadingTemplates.value = false
+            }
+        }
+    }
+
+    /**
+     * Get a GridResume from a template for editing
+     */
+    suspend fun getTemplateGridResume(template: ResumeTemplate): GridResume? {
+        return templateLoader.getTemplateGridResume(template)
     }
 
     /**

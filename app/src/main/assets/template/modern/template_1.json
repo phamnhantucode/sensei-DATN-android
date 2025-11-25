@@ -1,0 +1,1466 @@
+{
+  "globalStyles": {
+    "accentColor": 4280391411,
+    "defaultFontSize": 14,
+    "defaultFontWeight": 400,
+    "defaultTextColor": 4278190080
+  },
+  "gridConfig": {
+    "cellSizeDp": 12,
+    "columns": 48,
+    "rows": 68,
+    "showGrid": false,
+    "snapThreshold": 0.3,
+    "snapToGrid": true
+  },
+  "id": "1fbc40f0-ecfb-4b3e-b388-7db705b1bfbd",
+  "metadata": {
+    "createdAt": 1763205131939,
+    "editorType": "GRID",
+    "updatedAt": 1763205131939,
+    "version": 1
+  },
+  "name": "Resume Design 1",
+  "pages": [
+    {
+      "backgroundColor": 4294967295,
+      "elements": [
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "CENTER",
+            "content": "Tran Cong Bao",
+            "id": "9b195803-87f4-4268-a674-e5924cbd3ddb",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 2,
+              "colSpan": 15,
+              "heightMode": "FIXED",
+              "row": 20,
+              "rowSpan": 4,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 21.866953,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": "NAME",
+            "verticalAlignment": "CENTER",
+            "zIndex": 19
+          }
+        },
+        {
+          "elementType": "ImageElement",
+          "data": {
+            "contentScale": "FIT",
+            "cornerRadius": 0,
+            "description": "",
+            "id": "5e53f4ba-1980-45a9-ad6d-32038d97f728",
+            "imageUrl": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvdXBsb2FkZWQvaW1nXzM1cFJKbEV5OHRKclYyalFZcVJWbVg1VGlCSiJ9",
+            "isCircle": true,
+            "isVisible": true,
+            "locked": false,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 2,
+              "colSpan": 16,
+              "heightMode": "FIXED",
+              "row": 2,
+              "rowSpan": 16,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "userInfoTag": "AVATAR",
+            "zIndex": 18
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "CONTACT",
+            "id": "fbd6aa63-82d0-4bc0-890a-3a5c5f2e595b",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 1,
+              "colSpan": 9,
+              "heightMode": "FIXED",
+              "row": 26,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.558744,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 17
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "SKILL",
+            "id": "303cb2bc-5972-4d54-a582-aca20cb99f28",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 1,
+              "colSpan": 14,
+              "heightMode": "FIXED",
+              "row": 34,
+              "rowSpan": 4,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.284157,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 16
+          }
+        },
+        {
+          "elementType": "EducationElement",
+          "data": {
+            "achievementSpacing": 4,
+            "achievementStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "bulletStyle": "DISC",
+            "dateFormat": "MMM_YYYY",
+            "dateSeparator": " - ",
+            "dateStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "degreeStyle": {
+              "color": 4278190080,
+              "fontSize": 16,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "displayStyle": "DETAILED",
+            "gpaStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "horizontalAlignment": "START",
+            "id": "b7c8da80-c07d-401c-98e5-c32c7e874fa0",
+            "institutionStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 600
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "isVisible": true,
+            "itemSpacing": 4,
+            "items": [
+              {
+                "achievements": [],
+                "degree": "Bachelor of Engineering in Information Technology",
+                "endDate": "2026-01-01",
+                "gpa": "3.34",
+                "id": "00d454fb-dc54-4a07-a0c6-23739231aec7",
+                "institution": "Vietnam-Korea University of Information and Communication Technology",
+                "location": "Da Nang, Vietnam",
+                "startDate": "2021-11-01",
+                "userInfoTag": null
+              }
+            ],
+            "locationStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "locked": false,
+            "orientation": "VERTICAL",
+            "padding": null,
+            "position": {
+              "cachedHeightDp": 140.57143,
+              "col": 21,
+              "colSpan": 26,
+              "heightMode": "WRAP_CONTENT",
+              "row": 56,
+              "rowSpan": 12,
+              "widthMode": "FIXED"
+            },
+            "showDates": true,
+            "showGPA": true,
+            "showLocation": true,
+            "spacing": 16,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "userInfoTag": "EDUCATION",
+            "verticalAlignment": "TOP",
+            "zIndex": 14
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "Results-oriented Android Engineer with 3 years of experience transforming complex requirements into user-friendly mobile solutions. Proficient in collaborating with cross-functional teams (Design, QA, Product) to deliver robust applications",
+            "id": "717f2cdd-4a71-4b66-8027-cbe392b19c64",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": {
+              "bottom": 0,
+              "left": 8,
+              "right": 8,
+              "top": 0
+            },
+            "position": {
+              "cachedHeightDp": 134.85715,
+              "col": 21,
+              "colSpan": 27,
+              "heightMode": "WRAP_CONTENT",
+              "row": 4,
+              "rowSpan": 11,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": "PROFESSIONAL_SUMMARY",
+            "verticalAlignment": "CENTER",
+            "zIndex": 11
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "PROFILE",
+            "id": "7962ed8e-0048-40e1-bbb3-03609f730eef",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": {
+              "bottom": 0,
+              "left": 8,
+              "right": 8,
+              "top": 0
+            },
+            "position": {
+              "cachedHeightDp": 38.857143,
+              "col": 20,
+              "colSpan": 19,
+              "heightMode": "WRAP_CONTENT",
+              "row": 2,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.284157,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 10
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "CERTIFICATE",
+            "id": "9ab702a6-9327-4c76-8fb2-7f3e874999e9",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 1,
+              "colSpan": 10,
+              "heightMode": "FIXED",
+              "row": 54,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.009567,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 9
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "CENTER",
+            "content": "Software Engineer",
+            "id": "d10e20b7-0301-440b-a672-292c9022fa17",
+            "isVisible": true,
+            "locked": true,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 3,
+              "colSpan": 13,
+              "heightMode": "FIXED",
+              "row": 22,
+              "rowSpan": 4,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 8
+          }
+        },
+        {
+          "elementType": "ProjectElement",
+          "data": {
+            "bulletStyle": "DISC",
+            "dateFormat": "MMM_YYYY",
+            "dateSeparator": " - ",
+            "dateStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "descriptionStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "displayStyle": "STANDARD",
+            "highlightSpacing": 4,
+            "highlightStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "horizontalAlignment": "START",
+            "id": "ab163c13-b151-43e4-93d7-a975c685dded",
+            "isVisible": true,
+            "itemSpacing": 4,
+            "items": [
+              {
+                "description": "Android application for AI-powered career coaching and resume building",
+                "endDate": "",
+                "highlights": [
+                  {
+                    "customBullet": null,
+                    "id": "74864a37-f6a9-43ba-b451-c09ba7e3225f",
+                    "text": "Built complete resume builder with grid-based editor"
+                  },
+                  {
+                    "customBullet": null,
+                    "id": "4ced904f-d2d2-44e2-8682-66bd0a9ccfa7",
+                    "text": "Integrated AI features for interview preparation"
+                  },
+                  {
+                    "customBullet": null,
+                    "id": "315e1b1c-f79d-4c57-aaca-8c0194752054",
+                    "text": "Designed modern UI with Material Design 3"
+                  }
+                ],
+                "id": "f9cd6583-ebe2-4a59-b4e8-c5c25d53a59f",
+                "isOngoing": true,
+                "link": "https://github.com/example/ai-career-coach",
+                "name": "AI Career Coach App",
+                "startDate": "2024-01-01",
+                "technologies": "Kotlin, Jetpack Compose, Android, AI/ML",
+                "userInfoTag": null
+              }
+            ],
+            "linkStyle": {
+              "color": 4280391411,
+              "fontSize": 11,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "locked": false,
+            "nameStyle": {
+              "color": 4278190080,
+              "fontSize": 16,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "padding": null,
+            "position": {
+              "cachedHeightDp": 205.68571,
+              "col": 21,
+              "colSpan": 27,
+              "heightMode": "WRAP_CONTENT",
+              "row": 36,
+              "rowSpan": 17,
+              "widthMode": "FIXED"
+            },
+            "showDates": true,
+            "showDescription": true,
+            "showLink": true,
+            "showTechnologies": true,
+            "spacing": 16,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "technologySpacing": 6,
+            "technologyStyle": {
+              "color": 4278190080,
+              "fontSize": 11,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "technologyTagBackgroundColor": 4293128957,
+            "technologyTagBorderColor": null,
+            "technologyTagBorderWidth": 0,
+            "technologyTagCornerRadius": 12,
+            "userInfoTag": null,
+            "verticalAlignment": "TOP",
+            "zIndex": 6
+          }
+        },
+        {
+          "elementType": "WorkExperienceElement",
+          "data": {
+            "bulletStyle": "DISC",
+            "companyStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 600
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "dateFormat": "MMM_YYYY",
+            "dateSeparator": " - ",
+            "dateStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "displayStyle": "STANDARD",
+            "horizontalAlignment": "START",
+            "id": "dcca9b7d-6376-4225-8ef3-80a8b7d1515d",
+            "isVisible": true,
+            "itemSpacing": 4,
+            "items": [
+              {
+                "company": "Maxmobile Software",
+                "endDate": "",
+                "id": "e641def6-06dd-4158-92e0-1a4e8ed3b6b0",
+                "isCurrentRole": true,
+                "jobTitle": "Android Developer",
+                "location": "Da Nang City, Viet Nam",
+                "responsibilities": [
+                  {
+                    "customBullet": null,
+                    "id": "c8795b2c-50ed-44aa-85c0-97827fc04312",
+                    "text": "Led the migration of 40% of the codebase from Java to Kotlin, resulting in a 20% reduction in boilerplate code and improved null safety."
+                  },
+                  {
+                    "customBullet": null,
+                    "id": "9cec3702-4f79-44ff-b37f-361fa6868689",
+                    "text": "Refactored the legacy codebase to MVVM Clean Architecture using Hilt for dependency injection, making the app 100% unit-testable."
+                  }
+                ],
+                "startDate": "2024-12-02",
+                "userInfoTag": null
+              }
+            ],
+            "locationStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "locked": false,
+            "orientation": "VERTICAL",
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 21,
+              "colSpan": 27,
+              "heightMode": "FIXED",
+              "row": 18,
+              "rowSpan": 16,
+              "widthMode": "FIXED"
+            },
+            "responsibilitySpacing": 4,
+            "responsibilityStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "showDates": true,
+            "showLocation": true,
+            "spacing": 16,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "titleStyle": {
+              "color": 4278190080,
+              "fontSize": 16,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": "WORK_EXPERIENCE",
+            "verticalAlignment": "TOP",
+            "zIndex": 5
+          }
+        },
+        {
+          "elementType": "ContactElement",
+          "data": {
+            "horizontalAlignment": "START",
+            "iconSize": 16,
+            "iconStyle": "ICON",
+            "id": "df293e36-4df5-4919-be79-0900faf196e7",
+            "isVisible": true,
+            "items": [
+              {
+                "iconName": "phone",
+                "id": "a9389e1a-16ba-4f90-82ca-9eae0328e5fd",
+                "label": "Phone:",
+                "type": "PHONE",
+                "userInfoTag": "PHONE",
+                "value": "086884778"
+              },
+              {
+                "iconName": "email",
+                "id": "c202fa91-a0c4-4ce2-9c58-5e588b1a33d0",
+                "label": "Email:",
+                "type": "EMAIL",
+                "userInfoTag": "EMAIL",
+                "value": "xegawof934@agenra.com"
+              },
+              {
+                "iconName": "location_on",
+                "id": "ac2907c7-f866-4dc8-9af2-c84154a84bd0",
+                "label": "Location:",
+                "type": "ADDRESS",
+                "userInfoTag": "LOCATION",
+                "value": "Da Nang City, Viet Nam"
+              }
+            ],
+            "locked": false,
+            "orientation": "VERTICAL",
+            "padding": null,
+            "position": {
+              "cachedHeightDp": 74.28571,
+              "col": 1,
+              "colSpan": 19,
+              "heightMode": "WRAP_CONTENT",
+              "row": 28,
+              "rowSpan": 6,
+              "widthMode": "FIXED"
+            },
+            "spacing": 4.278344,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "TOP",
+            "zIndex": 4
+          }
+        },
+        {
+          "elementType": "CertificationElement",
+          "data": {
+            "activeStatusColor": 4283215696,
+            "credentialIdStyle": {
+              "color": 4278190080,
+              "fontSize": 11,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "dateFormat": "MMM_YYYY",
+            "dateStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "displayStyle": "STANDARD",
+            "expiredStatusColor": 4294924066,
+            "expiryStatusStyle": {
+              "color": 4278190080,
+              "fontSize": 11,
+              "fontWeight": {
+                "weight": 500
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "horizontalAlignment": "START",
+            "id": "279bb6d7-16f0-446b-b767-455e0a0e884d",
+            "isVisible": true,
+            "issuerStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 600
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "itemSpacing": 4,
+            "items": [
+              {
+                "credentialId": "ABC123XYZ",
+                "expiryDate": "2026-06-01",
+                "id": "508b8212-0f8b-4069-9ba9-a65971290b29",
+                "issueDate": "2023-06-01",
+                "issuer": "Google",
+                "name": "Android Associate Developer",
+                "userInfoTag": null,
+                "verificationLink": "https://developers.google.com/certification/verify"
+              }
+            ],
+            "linkStyle": {
+              "color": 4280391411,
+              "fontSize": 11,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "locked": false,
+            "nameStyle": {
+              "color": 4278190080,
+              "fontSize": 14.681152,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 1,
+              "colSpan": 19,
+              "heightMode": "FIXED",
+              "row": 56,
+              "rowSpan": 12,
+              "widthMode": "FIXED"
+            },
+            "showCredentialId": true,
+            "showExpiryDate": true,
+            "showExpiryStatus": true,
+            "showIssueDate": true,
+            "showVerificationLink": true,
+            "spacing": 16,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "TOP",
+            "zIndex": 3
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "LANGUAGE",
+            "id": "df5cdf5f-9ca9-4c82-a211-4d6a2fa68ccc",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 1,
+              "colSpan": 15,
+              "heightMode": "FIXED",
+              "row": 45,
+              "rowSpan": 4,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.955809,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 2
+          }
+        },
+        {
+          "elementType": "ShapeElement",
+          "data": {
+            "cornerRadius": 0,
+            "customHeightDp": null,
+            "customWidthDp": null,
+            "id": "1b927590-da4b-424c-ae73-949e127fecee",
+            "isVisible": true,
+            "locked": true,
+            "padding": null,
+            "position": {
+              "cachedHeightDp": null,
+              "col": 0,
+              "colSpan": 20,
+              "heightMode": "FIXED",
+              "row": 0,
+              "rowSpan": 68,
+              "widthMode": "FIXED"
+            },
+            "shapeType": "RECTANGLE",
+            "style": {
+              "backgroundColor": 4292927712,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "userInfoTag": null,
+            "zIndex": 1
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "EDUCATION",
+            "id": "e30f1b96-5222-4fbe-84c9-f4e0c4dddefb",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": {
+              "bottom": 8,
+              "left": 8,
+              "right": 8,
+              "top": 8
+            },
+            "position": {
+              "cachedHeightDp": 39.2381,
+              "col": 20,
+              "colSpan": 13,
+              "heightMode": "WRAP_CONTENT",
+              "row": 54,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.558744,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 20
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "PROJECT",
+            "id": "46044139-d0cb-494a-9742-8f1949727e38",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": {
+              "bottom": 8,
+              "left": 8,
+              "right": 8,
+              "top": 8
+            },
+            "position": {
+              "cachedHeightDp": 39.238094,
+              "col": 20,
+              "colSpan": 12,
+              "heightMode": "WRAP_CONTENT",
+              "row": 34,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.739807,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 21
+          }
+        },
+        {
+          "elementType": "TextElement",
+          "data": {
+            "alignment": "LEFT",
+            "content": "WORK EXPERIENCE",
+            "id": "0477f381-9a54-4ea0-8481-28e9ee2b64e0",
+            "isVisible": true,
+            "locked": false,
+            "maxLines": null,
+            "padding": {
+              "bottom": 8,
+              "left": 8,
+              "right": 8,
+              "top": 8
+            },
+            "position": {
+              "cachedHeightDp": 38.47619,
+              "col": 20,
+              "colSpan": 16,
+              "heightMode": "WRAP_CONTENT",
+              "row": 16,
+              "rowSpan": 3,
+              "widthMode": "FIXED"
+            },
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "textStyle": {
+              "color": 4278190080,
+              "fontSize": 16.009567,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "userInfoTag": null,
+            "verticalAlignment": "CENTER",
+            "zIndex": 22
+          }
+        },
+        {
+          "elementType": "LanguageElement",
+          "data": {
+            "displayStyle": "TEXT_LABELS",
+            "dotSize": 8,
+            "horizontalAlignment": "START",
+            "id": "9e924509-dc67-464b-b068-9e241f3446fd",
+            "isVisible": true,
+            "items": [
+              {
+                "cefrLevel": null,
+                "id": "3984edb6-caaa-4928-8f4b-4d921e418170",
+                "name": "English",
+                "proficiency": 0.5,
+                "proficiencyLabel": "INTERMEDIATE",
+                "userInfoTag": null
+              },
+              {
+                "cefrLevel": null,
+                "id": "0fd9a116-a7a9-4029-9ba8-614e31b71887",
+                "name": "Vietnamese",
+                "proficiency": 0.5,
+                "proficiencyLabel": "NATIVE",
+                "userInfoTag": null
+              }
+            ],
+            "languageStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 500
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "locked": false,
+            "maxDots": 5,
+            "padding": {
+              "bottom": 8,
+              "left": 8,
+              "right": 8,
+              "top": 8
+            },
+            "position": {
+              "cachedHeightDp": 52,
+              "col": 0,
+              "colSpan": 20,
+              "heightMode": "WRAP_CONTENT",
+              "row": 48,
+              "rowSpan": 4,
+              "widthMode": "FIXED"
+            },
+            "proficiencyLabelStyle": {
+              "color": 4278190080,
+              "fontSize": 12,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "proficiencyType": "TEXT",
+            "progressBarBackgroundColor": 4292927712,
+            "progressBarColor": 4280391411,
+            "progressBarCornerRadius": 4,
+            "progressBarHeight": 8,
+            "spacing": 8,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "tagBackgroundColor": 4293128957,
+            "tagBorderColor": null,
+            "tagBorderWidth": 0,
+            "tagCornerRadius": 16,
+            "userInfoTag": "LANGUAGES",
+            "verticalAlignment": "TOP",
+            "zIndex": 23
+          }
+        },
+        {
+          "elementType": "SkillElement",
+          "data": {
+            "bulletStyle": "DISC",
+            "categoryStyle": {
+              "color": 4278190080,
+              "fontSize": 16,
+              "fontWeight": {
+                "weight": 700
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "displayStyle": "LIST",
+            "dotSize": 8,
+            "groupSpacing": 16,
+            "horizontalAlignment": "START",
+            "id": "088a4657-dcab-4f1d-bfb3-23776213de12",
+            "isVisible": true,
+            "items": [
+              {
+                "category": "",
+                "id": "161f9bb6-868d-4e7c-adb8-112a99ad3c26",
+                "name": "Android",
+                "proficiency": null,
+                "proficiencyLabel": "",
+                "userInfoTag": null
+              },
+              {
+                "category": "",
+                "id": "55a25464-1a55-43ee-ba3d-da3961f89909",
+                "name": "Kotlin",
+                "proficiency": null,
+                "proficiencyLabel": "",
+                "userInfoTag": null
+              },
+              {
+                "category": "",
+                "id": "0a099089-29f1-4b5a-a7d1-b48f4ca3d93f",
+                "name": "Flutter",
+                "proficiency": null,
+                "proficiencyLabel": "",
+                "userInfoTag": null
+              }
+            ],
+            "locked": false,
+            "maxDots": 5,
+            "padding": {
+              "bottom": 8,
+              "left": 8,
+              "right": 8,
+              "top": 8
+            },
+            "position": {
+              "cachedHeightDp": 91.42857,
+              "col": 1,
+              "colSpan": 17,
+              "heightMode": "WRAP_CONTENT",
+              "row": 37,
+              "rowSpan": 8,
+              "widthMode": "FIXED"
+            },
+            "proficiencyLabelStyle": {
+              "color": 4278190080,
+              "fontSize": 10,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "progressBarBackgroundColor": 4292927712,
+            "progressBarColor": 4280391411,
+            "progressBarCornerRadius": 4,
+            "progressBarHeight": 8,
+            "showBullets": true,
+            "showProficiencyLabel": false,
+            "skillStyle": {
+              "color": 4278190080,
+              "fontSize": 14,
+              "fontWeight": {
+                "weight": 400
+              },
+              "isBold": false,
+              "isItalic": false,
+              "isUnderlined": false,
+              "letterSpacing": 0,
+              "lineHeight": null
+            },
+            "spacing": 8,
+            "style": {
+              "backgroundColor": null,
+              "borderColor": null,
+              "borderRadius": 0,
+              "borderWidth": 0,
+              "opacity": 1,
+              "shadowBlur": 0,
+              "shadowColor": null,
+              "shadowOffsetX": 0,
+              "shadowOffsetY": 0
+            },
+            "tagBackgroundColor": 4293128957,
+            "tagBorderColor": null,
+            "tagBorderWidth": 0,
+            "tagCornerRadius": 16,
+            "userInfoTag": "SKILLS",
+            "verticalAlignment": "TOP",
+            "zIndex": 24
+          }
+        }
+      ],
+      "id": "223a0a68-2e69-4e5e-8de5-49bff4c6a300",
+      "layoutMode": "FREE"
+    }
+  ],
+  "userId": ""
+}

@@ -11,6 +11,8 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.converters.toFormResume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.converters.toGridResume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidPdfGenerator
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidImageExporter
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
@@ -36,6 +38,7 @@ class GridEditorViewModel(
     private val repository = ResumeRepository.getInstance(context)
     private val gridResumeRepository = GridResumeRepository.getInstance(context)
     private val pdfExporter = AndroidPdfGenerator(context)
+    private val imageExporter = AndroidImageExporter(context)
     private val thumbnailGenerator = ThumbnailGenerator(context)
     private val sharedPreferences = context.getSharedPreferences("grid_resume_prefs", Context.MODE_PRIVATE)
 
@@ -69,6 +72,10 @@ class GridEditorViewModel(
     // PDF Export state
     private val _pdfExportState = MutableStateFlow<PdfExportState>(PdfExportState.Idle)
     val pdfExportState: StateFlow<PdfExportState> = _pdfExportState.asStateFlow()
+
+    // Image Export state
+    private val _imageExportState = MutableStateFlow<ImageExportState>(ImageExportState.Idle)
+    val imageExportState: StateFlow<ImageExportState> = _imageExportState.asStateFlow()
 
     // Zoom state - will be calculated dynamically based on screen size
     private val _zoomLevel = MutableStateFlow(1f)
@@ -147,16 +154,39 @@ class GridEditorViewModel(
                         }
                     }
 
-                    // Case 2: Apply template (create new design from template)
+                    // Case 2: Apply template (create new design from template asset path)
                     templateName != null -> {
-                        val templateType = try {
-                            GridTemplateType.valueOf(templateName.uppercase())
-                        } catch (e: Exception) {
-                            GridTemplateType.PROFESSIONAL
-                        }
+                        // Check if templateName is an asset path (contains '/')
+                        if (templateName.contains("/")) {
+                            // Load template from assets
+                            val templateLoader = TemplateLoader.getInstance(context)
+                            val category = templateName.substringAfter("template/").substringBefore("/")
+                            val template = templateLoader.loadTemplateFromAsset(templateName, category)
+                            
+                            if (template?.gridResume != null) {
+                                // Create a new resume from the template
+                                val newResume = templateLoader.getTemplateGridResume(template)
+                                if (newResume != null) {
+                                    _gridResume.value = migrateToFreeLayoutMode(newResume)
+                                    android.util.Log.d("GridEditorViewModel", "Loaded template from assets: $templateName")
+                                } else {
+                                    _gridResume.value = createDefaultResume()
+                                }
+                            } else {
+                                android.util.Log.w("GridEditorViewModel", "Failed to load template from assets: $templateName")
+                                _gridResume.value = createDefaultResume()
+                            }
+                        } else {
+                            // Fallback: treat as GridTemplateType enum name
+                            val templateType = try {
+                                GridTemplateType.valueOf(templateName.uppercase())
+                            } catch (e: Exception) {
+                                GridTemplateType.PROFESSIONAL
+                            }
 
-                        // Create resume with template
-                        _gridResume.value = createResumeWithTemplate(templateType)
+                            // Create resume with template
+                            _gridResume.value = createResumeWithTemplate(templateType)
+                        }
 
                         // Get user data from form resume to populate template
                         val formResumeResult = repository.getLatestResume()
@@ -168,7 +198,7 @@ class GridEditorViewModel(
                         }
 
                         linkedResumeId = null
-                        android.util.Log.d("GridEditorViewModel", "Applied template: $templateType")
+                        android.util.Log.d("GridEditorViewModel", "Applied template: $templateName")
                     }
 
                     // Case 3: Default - load latest from SharedPreferences or create new
@@ -1253,6 +1283,9 @@ class GridEditorViewModel(
                 if (tag != null && tag != UserInfoTag.NONE) {
                     // Create updated element based on tag
                     createUpdatedElementFromTag(element, tag, resume)
+                } else if (element is ResumeElement.ContactElement) {
+                    // ContactElement items may have individual userInfoTags even if element itself doesn't
+                    updateContactElementItems(element, resume)
                 } else {
                     element
                 }
@@ -1283,6 +1316,9 @@ class GridEditorViewModel(
                     UserInfoTag.EMAIL -> resume.personalInfo.email
                     UserInfoTag.PHONE -> resume.personalInfo.phone
                     UserInfoTag.LOCATION -> resume.personalInfo.location
+                    UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
+                    UserInfoTag.GITHUB -> resume.personalInfo.github
+                    UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
                     UserInfoTag.PROFESSIONAL_SUMMARY -> resume.professionalSummary
                     else -> element.content
                 }
@@ -1408,6 +1444,29 @@ class GridEditorViewModel(
         }
     }
 
+    /**
+     * Helper to update ContactElement items with user data
+     * Called when ContactElement itself has no userInfoTag but its items may have individual tags
+     */
+    private fun updateContactElementItems(
+        element: ResumeElement.ContactElement,
+        resume: Resume
+    ): ResumeElement.ContactElement {
+        val newItems = element.items.map { item ->
+            val newValue = when (item.userInfoTag) {
+                UserInfoTag.EMAIL -> resume.personalInfo.email
+                UserInfoTag.PHONE -> resume.personalInfo.phone
+                UserInfoTag.LOCATION -> resume.personalInfo.location
+                UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
+                UserInfoTag.GITHUB -> resume.personalInfo.github
+                UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
+                else -> item.value
+            }
+            if (newValue.isNotEmpty()) item.copy(value = newValue) else item
+        }
+        return element.copy(items = newItems)
+    }
+
     // ============================================================================
     // Undo / Redo
     // ============================================================================
@@ -1506,6 +1565,25 @@ class GridEditorViewModel(
      */
     fun resetPdfExportState() {
         _pdfExportState.value = PdfExportState.Idle
+    }
+
+    /**
+     * Exports the resume to an image file
+     */
+    fun exportToImage(file: java.io.File, uri: Uri) {
+        viewModelScope.launch {
+            imageExporter.generateImage(_gridResume.value, file)
+                .collect { state ->
+                    _imageExportState.value = state
+                }
+        }
+    }
+
+    /**
+     * Resets Image export state
+     */
+    fun resetImageExportState() {
+        _imageExportState.value = ImageExportState.Idle
     }
 
     // ============================================================================

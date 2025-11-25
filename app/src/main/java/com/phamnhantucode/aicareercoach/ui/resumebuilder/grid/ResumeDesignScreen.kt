@@ -44,12 +44,14 @@ import java.util.*
 @Composable
 fun ResumeDesignScreen(
     onBack: () -> Unit,
-    onNavigateToGridEditor: (designId: String?, template: String?) -> Unit,
+    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?) -> Unit,
     viewModel: ResumeDesignViewModel = ResumeDesignViewModel(LocalContext.current)
 ) {
     val designs by viewModel.designs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val templates by viewModel.templates.collectAsState()
+    val isLoadingTemplates by viewModel.isLoadingTemplates.collectAsState()
 
     var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
 
@@ -113,9 +115,10 @@ fun ResumeDesignScreen(
 
             // Templates Section
             TemplatesSection(
-                templates = viewModel.templates,
+                templates = templates,
+                isLoading = isLoadingTemplates,
                 onTemplateClick = { template ->
-                    onNavigateToGridEditor(null, template.name)
+                    onNavigateToGridEditor(null, template.assetPath)
                 }
             )
 
@@ -168,8 +171,9 @@ fun ResumeDesignScreen(
  */
 @Composable
 private fun TemplatesSection(
-    templates: List<GridTemplateType>,
-    onTemplateClick: (GridTemplateType) -> Unit
+    templates: List<ResumeTemplate>,
+    isLoading: Boolean,
+    onTemplateClick: (ResumeTemplate) -> Unit
 ) {
     Column {
         Text(
@@ -186,14 +190,49 @@ private fun TemplatesSection(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(templates) { template ->
-                TemplateCard(
-                    template = template,
-                    onClick = { onTemplateClick(template) }
-                )
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            templates.isEmpty() -> {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No templates available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            else -> {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(templates) { template ->
+                        TemplateCard(
+                            template = template,
+                            onClick = { onTemplateClick(template) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -204,15 +243,13 @@ private fun TemplatesSection(
  */
 @Composable
 private fun TemplateCard(
-    template: GridTemplateType,
+    template: ResumeTemplate,
     onClick: () -> Unit
 ) {
-    val templateInfo = getTemplateInfo(template)
-
     Card(
         modifier = Modifier
             .width(180.dp)
-            .height(200.dp)
+            .height(260.dp)
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp)
@@ -220,10 +257,10 @@ private fun TemplateCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Template preview placeholder
+            // Template thumbnail preview
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -239,12 +276,37 @@ private fun TemplateCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
+                if (template.thumbnail.isNotEmpty()) {
+                    // Display actual thumbnail
+                    val thumbnailBitmap = remember(template.thumbnail) {
+                        decodeBase64Thumbnail(template.thumbnail)
+                    }
+
+                    if (thumbnailBitmap != null) {
+                        Image(
+                            bitmap = thumbnailBitmap.asImageBitmap(),
+                            contentDescription = "Template preview: ${template.name}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        // Fallback if thumbnail decode fails
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                } else {
+                    // Fallback placeholder
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -252,12 +314,14 @@ private fun TemplateCard(
             // Template info
             Column {
                 Text(
-                    text = templateInfo.name,
+                    text = template.name,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = templateInfo.description,
+                    text = template.description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
