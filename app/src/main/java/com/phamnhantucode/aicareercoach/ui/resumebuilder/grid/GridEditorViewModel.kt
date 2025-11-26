@@ -1628,7 +1628,7 @@ class GridEditorViewModel(
 
     private fun getDefaultElementSize(type: ElementType): Pair<Int, Int> {
         return when (type) {
-            ElementType.TEXT -> Pair(2, 12) // rowSpan, colSpan
+            ElementType.TEXT -> Pair(4, 12) // rowSpan, colSpan
             ElementType.IMAGE -> Pair(8, 8)
             ElementType.SHAPE -> Pair(4, 4)
             ElementType.DIVIDER -> Pair(1, 48)
@@ -1647,7 +1647,7 @@ class GridEditorViewModel(
 
     private fun createElementOfType(type: ElementType, position: GridPosition): ResumeElement {
         return when (type) {
-            ElementType.TEXT -> ResumeElement.TextElement(position = position, content = "New Text")
+            ElementType.TEXT -> ResumeElement.TextElement(position = position.copy(heightMode = SizeMode.WRAP_CONTENT), content = "New Text")
             ElementType.IMAGE -> ResumeElement.ImageElement(position = position)
             ElementType.SHAPE -> ResumeElement.ShapeElement(position = position)
             ElementType.DIVIDER -> ResumeElement.ShapeElement(position = position, shapeType = ShapeType.DIVIDER)

@@ -61,11 +61,16 @@ class ResumeMarkdownViewModel(private val context: Context) : ViewModel() {
             try {
                 // Load resume from local storage
                 val result = repository.getLatestResume()
-                val resume = result.getOrNull()
+                var resume = result.getOrNull()
 
+                // Auto-create resume for new users if none exists
                 if (resume == null) {
-                    _uiState.value = MarkdownUiState.Error("No resume found. Please create a resume first.")
-                    return@launch
+                    Log.d(TAG, "No resume found, creating default resume for new user")
+                    resume = Resume() // Create empty resume with default values
+
+                    // Save to local and remote database
+                    repository.saveResume(resume, syncToRemote = true)
+                    Log.d(TAG, "Default resume created and saved with ID: ${resume.id}")
                 }
 
                 currentResume = resume

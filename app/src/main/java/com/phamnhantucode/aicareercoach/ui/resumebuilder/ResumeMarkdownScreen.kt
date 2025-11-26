@@ -50,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -75,9 +76,14 @@ fun ResumeMarkdownScreen(
     val uiState by viewModel.uiState.collectAsState()
     val markdown by viewModel.markdown.collectAsState()
     val isExporting by viewModel.isExporting.collectAsState()
-    
+
     // View mode: true = rendered preview, false = raw text
     var isPreviewMode by remember { mutableStateOf(true) }
+
+    // Calculate WindowInsets once for stable references
+    val systemBarsPadding = WindowInsets.systemBars.asPaddingValues()
+    val topPadding = systemBarsPadding.calculateTopPadding()
+    val bottomPadding = systemBarsPadding.calculateBottomPadding()
 
     // Handle export events
     LaunchedEffect(viewModel) {
@@ -123,7 +129,7 @@ fun ResumeMarkdownScreen(
                         .padding(
                             start = 16.dp,
                             end = 16.dp,
-                            top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(),
+                            top = 12.dp + topPadding,
                             bottom = 12.dp
                         )
                 ) {
@@ -293,44 +299,47 @@ fun ResumeMarkdownScreen(
 
                 is MarkdownUiState.Success, is MarkdownUiState.Syncing -> {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (isPreviewMode) {
-                            // WebView rendered markdown
-                            MarkdownWebView(
-                                markdown = markdown,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
-                            )
-                        } else {
-                            // Raw text view
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(16.dp)
-                            ) {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(
-                                        text = markdown,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 13.sp,
-                                            lineHeight = 20.sp
-                                        ),
-                                        modifier = Modifier.padding(16.dp),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                        // Always render WebView to keep it alive (use graphicsLayer to hide/show)
+                        MarkdownWebView(
+                            markdown = markdown,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = bottomPadding)
+                                .graphicsLayer {
+                                    alpha = if (isPreviewMode) 1f else 0f
                                 }
+                        )
 
-                                Spacer(
-                                    modifier = Modifier
-                                        .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding() + 80.dp)
+                        // Raw text view (always rendered but hidden when in preview mode)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp)
+                                .graphicsLayer {
+                                    alpha = if (isPreviewMode) 0f else 1f
+                                }
+                        ) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = markdown,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 13.sp,
+                                        lineHeight = 20.sp
+                                    ),
+                                    modifier = Modifier.padding(16.dp),
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
+
+                            Spacer(
+                                modifier = Modifier.height(bottomPadding + 80.dp)
+                            )
                         }
 
                         // FAB to toggle view mode
@@ -339,7 +348,7 @@ fun ResumeMarkdownScreen(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(16.dp)
-                                .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
+                                .padding(bottom = bottomPadding),
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
@@ -360,16 +369,25 @@ private fun MarkdownWebView(
     markdown: String,
     modifier: Modifier = Modifier
 ) {
+    // Get theme colors
     val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
     val textColor = MaterialTheme.colorScheme.onBackground.toArgb()
     val linkColor = MaterialTheme.colorScheme.primary.toArgb()
     val codeBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
 
-    // Convert colors to hex
-    val bgHex = String.format("#%06X", 0xFFFFFF and backgroundColor)
-    val textHex = String.format("#%06X", 0xFFFFFF and textColor)
-    val linkHex = String.format("#%06X", 0xFFFFFF and linkColor)
-    val codeBgHex = String.format("#%06X", 0xFFFFFF and codeBackgroundColor)
+    // Convert colors to hex - memoized to prevent recalculation
+    val bgHex = remember(backgroundColor) {
+        String.format("#%06X", 0xFFFFFF and backgroundColor)
+    }
+    val textHex = remember(textColor) {
+        String.format("#%06X", 0xFFFFFF and textColor)
+    }
+    val linkHex = remember(linkColor) {
+        String.format("#%06X", 0xFFFFFF and linkColor)
+    }
+    val codeBgHex = remember(codeBackgroundColor) {
+        String.format("#%06X", 0xFFFFFF and codeBackgroundColor)
+    }
 
     val htmlContent = remember(markdown, bgHex, textHex, linkHex, codeBgHex) {
         """
@@ -473,6 +491,9 @@ private fun MarkdownWebView(
         """.trimIndent()
     }
 
+    // Track last loaded content to prevent unnecessary reloads
+    var lastLoadedContent by remember { mutableStateOf("") }
+
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -483,13 +504,17 @@ private fun MarkdownWebView(
             }
         },
         update = { webView ->
-            webView.loadDataWithBaseURL(
-                null,
-                htmlContent,
-                "text/html",
-                "UTF-8",
-                null
-            )
+            // Only reload if content actually changed
+            if (htmlContent != lastLoadedContent) {
+                webView.loadDataWithBaseURL(
+                    null,
+                    htmlContent,
+                    "text/html",
+                    "UTF-8",
+                    null
+                )
+                lastLoadedContent = htmlContent
+            }
         },
         modifier = modifier
     )
