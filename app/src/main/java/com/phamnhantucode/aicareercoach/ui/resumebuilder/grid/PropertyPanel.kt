@@ -1018,6 +1018,26 @@ private fun TextElementProperties(
                 }
             }
         )
+
+        // Text Transform
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("All Caps", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Switch(
+                checked = element.textStyle.isAllCaps,
+                onCheckedChange = { isAllCaps ->
+                    onUpdateElement(
+                        element.copy(
+                            textStyle = element.textStyle.copy(isAllCaps = isAllCaps),
+                            position = element.position.copy(cachedHeightDp = null)
+                        )
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -1359,6 +1379,33 @@ private fun ContactElementProperties(
     }
 
     PropertySection(title = "Display Settings") {
+        // Display Style
+        Text("Display Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ContactDisplayStyle.entries.forEach { style ->
+                FilterChip(
+                    selected = (element.displayStyle ?: ContactDisplayStyle.STANDARD) == style,
+                    onClick = {
+                        onUpdateElement(element.copy(displayStyle = style))
+                    },
+                    label = { Text(style.name.replace("_", " ")) }
+                )
+            }
+        }
+
+        // Separator (only for ONE_LINE)
+        if ((element.displayStyle ?: ContactDisplayStyle.STANDARD) == ContactDisplayStyle.ONE_LINE) {
+            OutlinedTextField(
+                value = element.separator ?: " • ",
+                onValueChange = { onUpdateElement(element.copy(separator = it)) },
+                label = { Text("Separator") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         // Icon style toggle
         Text("Icon Style", fontSize = 12.sp, fontWeight = FontWeight.Medium)
         FlowRow(
@@ -1376,20 +1423,22 @@ private fun ContactElementProperties(
             }
         }
 
-        // Orientation toggle
-        Text("Orientation", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ContactOrientation.entries.forEach { orientation ->
-                FilterChip(
-                    selected = element.orientation == orientation,
-                    onClick = {
-                        onUpdateElement(element.copy(orientation = orientation))
-                    },
-                    label = { Text(orientation.name) }
-                )
+        // Orientation toggle (only for STANDARD)
+        if ((element.displayStyle ?: ContactDisplayStyle.STANDARD) == ContactDisplayStyle.STANDARD) {
+            Text("Orientation", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ContactOrientation.entries.forEach { orientation ->
+                    FilterChip(
+                        selected = element.orientation == orientation,
+                        onClick = {
+                            onUpdateElement(element.copy(orientation = orientation))
+                        },
+                        label = { Text(orientation.name) }
+                    )
+                }
             }
         }
 

@@ -48,10 +48,10 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         canvas.translate(contentBounds.left, contentBounds.top)
         canvas.clipRect(0f, 0f, contentBounds.width(), contentBounds.height())
 
-        // Calculate layout based on orientation
-        when (element.orientation) {
-            ContactOrientation.VERTICAL -> {
-                renderVerticalLayout(
+        // Calculate layout based on display style and orientation
+        when (element.displayStyle ?: ContactDisplayStyle.STANDARD) {
+            ContactDisplayStyle.ONE_LINE -> {
+                renderOneLineLayout(
                     canvas,
                     element,
                     contentBounds,
@@ -61,16 +61,31 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                     context
                 )
             }
-            ContactOrientation.HORIZONTAL -> {
-                renderHorizontalLayout(
-                    canvas,
-                    element,
-                    contentBounds,
-                    textPaint,
-                    boldTextPaint,
-                    mapper,
-                    context
-                )
+            ContactDisplayStyle.STANDARD -> {
+                when (element.orientation) {
+                    ContactOrientation.VERTICAL -> {
+                        renderVerticalLayout(
+                            canvas,
+                            element,
+                            contentBounds,
+                            textPaint,
+                            boldTextPaint,
+                            mapper,
+                            context
+                        )
+                    }
+                    ContactOrientation.HORIZONTAL -> {
+                        renderHorizontalLayout(
+                            canvas,
+                            element,
+                            contentBounds,
+                            textPaint,
+                            boldTextPaint,
+                            mapper,
+                            context
+                        )
+                    }
+                }
             }
         }
 
@@ -220,6 +235,82 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                     canvas, item, element, currentX, baselineY - textPaint.textSize,
                     textPaint, boldTextPaint, mapper, context
                 )
+            }
+        }
+    }
+
+    /**
+     * Render contact items in one line layout with separators
+     */
+    private fun renderOneLineLayout(
+        canvas: Canvas,
+        element: ResumeElement.ContactElement,
+        bounds: RectF,
+        textPaint: TextPaint,
+        boldTextPaint: TextPaint,
+        mapper: GridCoordinateMapper,
+        context: PdfRenderContext
+    ) {
+        val iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END
+        
+        // Calculate vertical position based on vertical alignment
+        val baselineY = when (element.verticalAlignment ?: VerticalAlignment.CENTER) {
+            VerticalAlignment.TOP -> textPaint.textSize
+            VerticalAlignment.CENTER -> bounds.height() / 2f + textPaint.textSize / 3f
+            VerticalAlignment.BOTTOM -> bounds.height()
+        }
+
+        // Calculate total width of all items + separators
+        val visibleItems = element.items.filter { it.value.isNotEmpty() }
+        val separator = element.separator ?: " • "
+        val separatorWidth = textPaint.measureText(separator)
+        
+        val totalWidth = visibleItems.sumOf {
+            measureItemWidth(it, element, textPaint, boldTextPaint, mapper).toDouble()
+        }.toFloat() + if (visibleItems.size > 1) (separatorWidth * (visibleItems.size - 1)) else 0f
+
+        // Calculate horizontal starting position based on horizontal alignment
+        var currentX = when (element.horizontalAlignment ?: HorizontalAlignment.START) {
+            HorizontalAlignment.START -> 0f
+            HorizontalAlignment.CENTER -> (bounds.width() - totalWidth) / 2f
+            HorizontalAlignment.END -> bounds.width() - totalWidth
+        }
+
+        visibleItems.forEachIndexed { index, item ->
+            // Render in order based on iconAfterText
+            if (!iconAfterText) {
+                currentX += drawIconOrLabel(
+                    canvas, item, element, currentX, baselineY - textPaint.textSize,
+                    textPaint, boldTextPaint, mapper, context
+                )
+            }
+
+            // Draw value
+            canvas.drawText(
+                item.value,
+                currentX,
+                baselineY,
+                textPaint
+            )
+            currentX += textPaint.measureText(item.value)
+
+            if (iconAfterText) {
+                currentX += mapper.borderWidthToPdfPoints(4f)
+                currentX += drawIconOrLabel(
+                    canvas, item, element, currentX, baselineY - textPaint.textSize,
+                    textPaint, boldTextPaint, mapper, context
+                )
+            }
+            
+            // Draw separator if not last item
+            if (index < visibleItems.size - 1) {
+                canvas.drawText(
+                    separator,
+                    currentX,
+                    baselineY,
+                    textPaint
+                )
+                currentX += separatorWidth
             }
         }
     }

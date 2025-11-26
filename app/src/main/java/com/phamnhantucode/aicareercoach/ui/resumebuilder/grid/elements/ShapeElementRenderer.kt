@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,9 +28,17 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType
 @Composable
 fun ShapeElementRenderer(
     element: ResumeElement.ShapeElement,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false
 ) {
-    val backgroundColor = element.style.backgroundColor?.let { Color(it) } ?: Color.Black
+    // Determine background color
+    // For DIVIDER: if selected, use selection color (Blue), otherwise use element color (or Black default)
+    val backgroundColor = if (element.shapeType == ShapeType.DIVIDER && isSelected) {
+        Color(0xFF2196F3) // Selection Blue
+    } else {
+        element.style.backgroundColor?.let { Color(it) } ?: Color.Black
+    }
+    
     val borderColor = element.style.borderColor?.let { Color(it) }
     val shape = element.shapeType.toShape(element.cornerRadius)
 
@@ -39,7 +48,9 @@ fun ShapeElementRenderer(
                 when (element.shapeType) {
                     ShapeType.LINE, ShapeType.DIVIDER -> {
                         // Lines and dividers should only fill width
-                        Modifier.fillMaxWidth()
+                        // If no custom height is set, default to 2dp
+                        val height = element.customHeightDp?.dp ?: 2.dp
+                        Modifier.fillMaxWidth().height(height)
                     }
                     ShapeType.CIRCLE -> {
                         // Circles should maintain 1:1 aspect ratio

@@ -87,7 +87,7 @@ fun TextElementRenderer(
                 // Create layout for text with base width
                 // This layout is calculated at zoom 1.0x to ensure consistent line breaks
                 val layout = createTextLayout(
-                    element.content,
+                    if (element.textStyle.isAllCaps) element.content.uppercase() else element.content,
                     textPaint,
                     baseWidth.toInt().coerceAtLeast(1),
                     element.alignment,
@@ -337,7 +337,7 @@ private fun EditableTextRenderer(
                 contentAlignment = Alignment.TopStart
             ) {
                 EditableText(
-                    text = element.content,
+                    text = if (element.textStyle.isAllCaps) element.content.uppercase() else element.content,
                     textStyle = unscaledTextStyle,
                     alignment = element.alignment,
                     onContentChange = onContentChange

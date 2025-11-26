@@ -64,6 +64,7 @@ fun DraggableElement(
     onOpenProperties: (ResumeElement) -> Unit = { _ -> },
     maxColumns: Int = gridConfig.columns,
     maxRows: Int = gridConfig.rows,
+    containerWidth: Float? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
@@ -96,7 +97,9 @@ fun DraggableElement(
 
     // Calculate size in pixels
     // For ShapeElements with custom dimensions, use those instead of grid-based sizing
-    val width = if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
+    val width = if (containerWidth != null) {
+        containerWidth
+    } else if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
         element.customWidthDp * density * zoomLevel
     } else if (element.position.widthMode == SizeMode.WRAP_CONTENT) {
         // For wrap content, we'll use a placeholder width that will be adjusted by the content
@@ -116,32 +119,31 @@ fun DraggableElement(
         // Store in local variable to allow smart cast
         val cachedHeight = element.position.cachedHeightDp
         
-        // Check if we have a cached height
-        if (cachedHeight != null) {
-            // Use cached height
-            cachedHeight * density * zoomLevel
-        } else {
-            // Calculate actual content height for wrap content mode
-            val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
-            val fallbackHeight = element.position.rowSpan * cellSizePx
-            
-            val finalHeight = actualContentHeight ?: fallbackHeight
-            
-            // Store the calculated height back into the element's position
-            // Convert from pixels back to dp for storage
-            val heightInDp = finalHeight / (density * zoomLevel)
-            
-            // Calculate equivalent rowSpan for the calculated height
-            // This ensures when user turns wrap content OFF, it keeps the calculated height
-            val newRowSpan = (heightInDp / gridConfig.cellSizeDp).roundToInt().coerceAtLeast(1)
-            
-            // Store pending update to be applied in LaunchedEffect
-            if (actualContentHeight != null && pendingHeightUpdate == null) {
+        // Calculate actual content height for wrap content mode
+        // We ALWAYS calculate this to ensure updates (like padding changes) are reflected immediately
+        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+        val fallbackHeight = element.position.rowSpan * cellSizePx
+        
+        val finalHeight = actualContentHeight ?: fallbackHeight
+        
+        // Store the calculated height back into the element's position
+        // Convert from pixels back to dp for storage
+        val heightInDp = finalHeight / (density * zoomLevel)
+        
+        // Calculate equivalent rowSpan for the calculated height
+        // This ensures when user turns wrap content OFF, it keeps the calculated height
+        val newRowSpan = (heightInDp / gridConfig.cellSizeDp).roundToInt().coerceAtLeast(1)
+        
+        // Store pending update to be applied in LaunchedEffect
+        // Only update if we have a valid calculation AND (no cached height OR significant difference)
+        if (actualContentHeight != null) {
+            val isDifferent = cachedHeight == null || kotlin.math.abs(cachedHeight - heightInDp) > 0.1f
+            if (isDifferent && pendingHeightUpdate == null) {
                 pendingHeightUpdate = heightInDp to newRowSpan
             }
-            
-            finalHeight
         }
+        
+        finalHeight
     } else {
         element.position.rowSpan * cellSizePx
     }
@@ -164,14 +166,9 @@ fun DraggableElement(
 
     // For thin elements (like dividers), use a minimum interaction height to make selection easier
     // Visual rendering stays thin, but the clickable/selectable area is larger
-    val minInteractionHeightPx = 24f * density
-    val interactionHeight = if (element is ResumeElement.ShapeElement &&
-        (element.shapeType == ShapeType.DIVIDER || element.shapeType == ShapeType.LINE) &&
-        height < minInteractionHeightPx) {
-        minInteractionHeightPx
-    } else {
-        height
-    }
+    // UPDATE: User requested to remove this boost to fix layout issues in vertical containers
+    // val minInteractionHeightPx = 24f * density
+    val interactionHeight = height
 
     // Determine Z-Index to ensure non-container elements are selectable when overlapping containers
     // Map integer zIndex to float, but split the 0 level to prioritize content over containers
@@ -377,7 +374,8 @@ fun DraggableElement(
         content()
 
         // Selection border (rendered second, above content)
-        if (isSelected) {
+        val isDivider = (element as? ResumeElement.ShapeElement)?.shapeType == ShapeType.DIVIDER
+        if (isSelected && !isDivider) {
             SelectionBorder(
                 element = element,
                 gridConfig = gridConfig,
@@ -967,8 +965,14 @@ private fun calculateTextContentHeight(
     }
 
     // Calculate base dimensions (unscaled) - matching TextElementRenderer logic
-    val basePadding = 8f * density // 8dp in pixels
-    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    // Use element padding instead of hardcoded 8dp
+    val safePadding = element.padding ?: Padding()
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
     
     // Create text paint with base text size (no zoom) - matching TextElementRenderer
     val textPaint = TextPaint().apply {
@@ -1019,7 +1023,7 @@ private fun calculateTextContentHeight(
     val textHeight = layout.height.toFloat() - topPadding
     
     // Add padding and apply zoom
-    val totalHeight = (textHeight + (basePadding * 2)) * zoomLevel
+    val totalHeight = (textHeight + paddingTop + paddingBottom) * zoomLevel
     
     return totalHeight
 }
@@ -2156,32 +2160,33 @@ private fun calculateContactContentHeight(
     
     var totalHeight = 0f
     
-    when (element.orientation) {
-        ContactOrientation.VERTICAL -> {
-            // In vertical mode, items are stacked, so we add each item's height
-            element.items.forEach { item ->
-                if (item.value.isNotEmpty()) {
-                    val layout = createSimpleLayout(item.value, textPaint, baseWidth)
-                    totalHeight += layout.height.toFloat()
-                }
-            }
-            
-            // Add spacing between items
-            if (element.items.size > 1) {
-                totalHeight += itemSpacing * (element.items.size - 1)
+    // Check if we should use horizontal layout (ONE_LINE style or HORIZONTAL orientation)
+    val useHorizontalLayout = element.displayStyle == ContactDisplayStyle.ONE_LINE || 
+                              element.orientation == ContactOrientation.HORIZONTAL
+    
+    if (useHorizontalLayout) {
+        // In horizontal mode (or one line), all items are in one row, height is just text height
+        // Find the tallest item
+        var maxItemHeight = 0f
+        element.items.forEach { item ->
+            if (item.value.isNotEmpty()) {
+                val layout = createSimpleLayout(item.value, textPaint, baseWidth)
+                maxItemHeight = maxOf(maxItemHeight, layout.height.toFloat())
             }
         }
-        ContactOrientation.HORIZONTAL -> {
-            // In horizontal mode, all items are in one row, height is just text height
-            // Find the tallest item
-            var maxItemHeight = 0f
-            element.items.forEach { item ->
-                if (item.value.isNotEmpty()) {
-                    val layout = createSimpleLayout(item.value, textPaint, baseWidth)
-                    maxItemHeight = maxOf(maxItemHeight, layout.height.toFloat())
-                }
+        totalHeight = maxItemHeight
+    } else {
+        // In vertical mode (and NOT one line), items are stacked
+        element.items.forEach { item ->
+            if (item.value.isNotEmpty()) {
+                val layout = createSimpleLayout(item.value, textPaint, baseWidth)
+                totalHeight += layout.height.toFloat()
             }
-            totalHeight = maxItemHeight
+        }
+        
+        // Add spacing between items
+        if (element.items.size > 1) {
+            totalHeight += itemSpacing * (element.items.size - 1)
         }
     }
     

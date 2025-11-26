@@ -48,7 +48,7 @@ class TextElementPdfRenderer : ElementPdfRenderer<ResumeElement.TextElement> {
 
         // Create layout for text with padded width
         val layout = createTextLayout(
-            element.content,
+            if (element.textStyle.isAllCaps) element.content.uppercase() else element.content,
             textPaint,
             contentBounds.width().toInt().coerceAtLeast(1),
             element.alignment,

@@ -105,6 +105,11 @@ enum class ContactIconStyle {
     NONE         // Just the value
 }
 
+enum class ContactDisplayStyle {
+    STANDARD,   // Current behavior (Vertical/Horizontal lists)
+    ONE_LINE    // Single line with separators
+}
+
 enum class ContactOrientation {
     VERTICAL,   // Stacked
     HORIZONTAL  // Side by side

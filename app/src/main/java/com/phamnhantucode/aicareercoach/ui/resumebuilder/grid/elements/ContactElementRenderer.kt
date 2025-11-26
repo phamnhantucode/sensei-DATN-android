@@ -103,33 +103,15 @@ fun ContactElementRenderer(
             HorizontalAlignment.END -> Alignment.End
         }
 
-        when (element.orientation) {
-            ContactOrientation.VERTICAL -> {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = verticalArrangementForColumn,
-                    horizontalAlignment = horizontalAlignmentForColumn
-                ) {
-                    element.items.forEach { item ->
-                        ContactItemRow(
-                            item = item,
-                            iconStyle = element.iconStyle,
-                            textStyle = element.textStyle,
-                            iconSize = element.iconSize,
-                            iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
-                            verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
-                            zoomLevel = zoomLevel
-                        )
-                    }
-                }
-            }
-            ContactOrientation.HORIZONTAL -> {
+        when (element.displayStyle ?: ContactDisplayStyle.STANDARD) {
+            ContactDisplayStyle.ONE_LINE -> {
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = horizontalArrangement,
                     verticalAlignment = verticalAlignmentForRow
                 ) {
-                    element.items.forEach { item ->
+                    val visibleItems = element.items.filter { it.value.isNotEmpty() }
+                    visibleItems.forEachIndexed { index, item ->
                         ContactItemRow(
                             item = item,
                             iconStyle = element.iconStyle,
@@ -139,6 +121,56 @@ fun ContactElementRenderer(
                             verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
                             zoomLevel = zoomLevel
                         )
+                        
+                        // Add separator if not the last item
+                        if (index < visibleItems.size - 1) {
+                            Text(
+                                text = element.separator ?: " • ",
+                                style = element.textStyle.toComposeTextStyle(zoomLevel)
+                            )
+                        }
+                    }
+                }
+            }
+            ContactDisplayStyle.STANDARD -> {
+                when (element.orientation) {
+                    ContactOrientation.VERTICAL -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = verticalArrangementForColumn,
+                            horizontalAlignment = horizontalAlignmentForColumn
+                        ) {
+                            element.items.forEach { item ->
+                                ContactItemRow(
+                                    item = item,
+                                    iconStyle = element.iconStyle,
+                                    textStyle = element.textStyle,
+                                    iconSize = element.iconSize,
+                                    iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
+                                    verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
+                        }
+                    }
+                    ContactOrientation.HORIZONTAL -> {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = horizontalArrangement,
+                            verticalAlignment = verticalAlignmentForRow
+                        ) {
+                            element.items.forEach { item ->
+                                ContactItemRow(
+                                    item = item,
+                                    iconStyle = element.iconStyle,
+                                    textStyle = element.textStyle,
+                                    iconSize = element.iconSize,
+                                    iconAfterText = (element.horizontalAlignment ?: HorizontalAlignment.START) == HorizontalAlignment.END,
+                                    verticalAlignment = element.verticalAlignment ?: VerticalAlignment.CENTER,
+                                    zoomLevel = zoomLevel
+                                )
+                            }
+                        }
                     }
                 }
             }

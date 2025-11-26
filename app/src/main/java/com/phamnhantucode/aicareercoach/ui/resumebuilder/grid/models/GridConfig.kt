@@ -45,8 +45,8 @@ data class ResumePage(
  * @param snapThreshold Snap threshold as fraction of cell size (0.0-1.0)
  */
 data class GridConfig(
-    val columns: Int = 48,
-    val rows: Int = 68,  // 48 × √2 ≈ 67.9, rounded to 68 for A4 aspect ratio
+    val columns: Int = 96,
+    val rows: Int = 136,  // 96 × √2 ≈ 135.76, rounded to 136 for A4 aspect ratio
     val cellSizeDp: Float = CELL_SIZE_FOR_A4,  // Calculated to match A4 dimensions exactly
     val showGrid: Boolean = true,
     val snapToGrid: Boolean = true,
@@ -54,20 +54,20 @@ data class GridConfig(
 ) {
     companion object {
         /**
-         * Optimal cell size calculated to make a 48x68 grid match A4 paper dimensions exactly.
+         * Optimal cell size calculated to make a 96x136 grid match A4 paper dimensions exactly.
          *
          * A4 at 72 DPI = 595 x 842 points
-         * For 68 rows: 842 / 68 = 12.382353 points per row (height-based)
+         * For 136 rows: 842 / 136 = 6.1911765 points per row (height-based)
          *
          * Using height-based calculation ensures:
-         * - Grid height = 68 * 12.382353 = 842 points (exact match)
-         * - Grid width = 48 * 12.382353 = 594.35 points (fits within 595 with minimal centering)
+         * - Grid height = 136 * 6.1911765 = 842 points (exact match)
+         * - Grid width = 96 * 6.1911765 = 594.35 points (fits within 595 with minimal centering)
          * - Uniform scale factor = 1.0 (no distortion, perfect 1:1 rendering)
          *
          * This eliminates scaling artifacts and ensures pixel-perfect consistency
          * between the editor canvas and exported PDF.
          */
-        const val CELL_SIZE_FOR_A4 = 12.382353f
+        const val CELL_SIZE_FOR_A4 = 6.1911765f
     }
 }
 

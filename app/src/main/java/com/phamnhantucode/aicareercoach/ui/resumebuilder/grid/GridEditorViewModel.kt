@@ -153,7 +153,8 @@ class GridEditorViewModel(
                         val result = gridResumeRepository.getDesign(designId)
                         val gridResume = result.getOrNull()
                         if (gridResume != null) {
-                            _gridResume.value = migrateToFreeLayoutMode(gridResume)
+                            val freeModeResume = migrateToFreeLayoutMode(gridResume)
+                            _gridResume.value = migrateToHighRes(freeModeResume)
                             linkedResumeId = null // Grid designs are separate from form resumes
                             android.util.Log.d("GridEditorViewModel", "Loaded design: $designId")
                         } else {
@@ -177,7 +178,8 @@ class GridEditorViewModel(
                                 // Create a new resume from the template
                                 val newResume = templateLoader.getTemplateGridResume(template)
                                 if (newResume != null) {
-                                    _gridResume.value = migrateToFreeLayoutMode(newResume)
+                                    val freeModeResume = migrateToFreeLayoutMode(newResume)
+                                    _gridResume.value = migrateToHighRes(freeModeResume)
                                     android.util.Log.d("GridEditorViewModel", "Loaded template from assets: $templateName")
                                 } else {
                                     _gridResume.value = createDefaultResume()
@@ -195,7 +197,7 @@ class GridEditorViewModel(
                             }
 
                             // Create resume with template
-                            _gridResume.value = createResumeWithTemplate(templateType)
+                            _gridResume.value = migrateToHighRes(createResumeWithTemplate(templateType))
                         }
 
                         // Get user data from form resume to populate template
@@ -222,7 +224,9 @@ class GridEditorViewModel(
                             try {
                                 val savedGridResume = gson.fromJson(savedGridResumeJson, GridResume::class.java)
                                 // Migrate to FREE layout mode for all pages
-                                _gridResume.value = migrateToFreeLayoutMode(savedGridResume)
+                                val freeModeResume = migrateToFreeLayoutMode(savedGridResume)
+                                // Migrate to high-res grid if needed
+                                _gridResume.value = migrateToHighRes(freeModeResume)
                                 // Restore the linked resume ID
                                 linkedResumeId = savedResumeId
                             } catch (e: Exception) {
@@ -235,7 +239,8 @@ class GridEditorViewModel(
                                 if (formResume != null) {
                                     // Convert form resume to grid resume - this preserves user data
                                     android.util.Log.d("GridEditorViewModel", "Recovered resume from database after SharedPreferences parse failure")
-                                    _gridResume.value = migrateToFreeLayoutMode(formResume.toGridResume())
+                                    val gridResume = migrateToFreeLayoutMode(formResume.toGridResume())
+                                    _gridResume.value = migrateToHighRes(gridResume)
                                     linkedResumeId = formResume.id
                                 } else {
                                     // Only fall back to empty resume if repository also has no data
@@ -251,7 +256,8 @@ class GridEditorViewModel(
 
                             if (formResume != null) {
                                 // Convert form resume to grid resume
-                                _gridResume.value = migrateToFreeLayoutMode(formResume.toGridResume())
+                                val gridResume = migrateToFreeLayoutMode(formResume.toGridResume())
+                                _gridResume.value = migrateToHighRes(gridResume)
                                 // Store the resume ID so we update this record instead of creating new ones
                                 linkedResumeId = formResume.id
                             } else {
@@ -273,6 +279,61 @@ class GridEditorViewModel(
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * Migrates a resume to the new high-resolution grid (96x136)
+     * Scales all positions and sizes by 2x
+     */
+    private fun migrateToHighRes(resume: GridResume): GridResume {
+        // Check if migration is needed (old column count was 48)
+        if (resume.gridConfig.columns >= 96) return resume
+
+        android.util.Log.d("GridEditorViewModel", "Migrating resume to high-res grid (96x136)")
+
+        // Create new config with high resolution
+        val newConfig = GridConfig(
+            columns = 96,
+            rows = 136,
+            cellSizeDp = GridConfig.CELL_SIZE_FOR_A4
+        )
+
+        // Migrate all pages
+        val newPages = resume.pages.map { page ->
+            val newElements = page.elements.map { element ->
+                // Scale position and size by 2
+                val newPosition = element.position.copy(
+                    row = element.position.row * 2,
+                    col = element.position.col * 2,
+                    rowSpan = element.position.rowSpan * 2,
+                    colSpan = element.position.colSpan * 2
+                )
+                
+                // Update element with new position
+                // Use the specific copy method for each type to preserve all properties
+                when (element) {
+                    is ResumeElement.TextElement -> element.copy(position = newPosition)
+                    is ResumeElement.ImageElement -> element.copy(position = newPosition)
+                    is ResumeElement.ShapeElement -> element.copy(position = newPosition)
+                    is ResumeElement.ChartElement -> element.copy(position = newPosition)
+                    is ResumeElement.ContainerElement -> element.copy(position = newPosition)
+                    is ResumeElement.IconElement -> element.copy(position = newPosition)
+                    is ResumeElement.ContactElement -> element.copy(position = newPosition)
+                    is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
+                    is ResumeElement.EducationElement -> element.copy(position = newPosition)
+                    is ResumeElement.SkillElement -> element.copy(position = newPosition)
+                    is ResumeElement.ProjectElement -> element.copy(position = newPosition)
+                    is ResumeElement.CertificationElement -> element.copy(position = newPosition)
+                    is ResumeElement.LanguageElement -> element.copy(position = newPosition)
+                }
+            }
+            page.copy(elements = newElements)
+        }
+
+        return resume.copy(
+            gridConfig = newConfig,
+            pages = newPages
+        )
     }
 
     /**
@@ -1631,7 +1692,7 @@ class GridEditorViewModel(
             ElementType.TEXT -> Pair(4, 12) // rowSpan, colSpan
             ElementType.IMAGE -> Pair(8, 8)
             ElementType.SHAPE -> Pair(4, 4)
-            ElementType.DIVIDER -> Pair(1, 48)
+            ElementType.DIVIDER -> Pair(1, _gridResume.value.gridConfig.columns)
             ElementType.CHART -> Pair(4, 12)
             ElementType.ICON -> Pair(2, 2)
             ElementType.CONTAINER -> Pair(10, 48)
@@ -1650,7 +1711,13 @@ class GridEditorViewModel(
             ElementType.TEXT -> ResumeElement.TextElement(position = position.copy(heightMode = SizeMode.WRAP_CONTENT), content = "New Text")
             ElementType.IMAGE -> ResumeElement.ImageElement(position = position)
             ElementType.SHAPE -> ResumeElement.ShapeElement(position = position)
-            ElementType.DIVIDER -> ResumeElement.ShapeElement(position = position, shapeType = ShapeType.DIVIDER)
+            ElementType.DIVIDER -> ResumeElement.ShapeElement(
+                position = position.copy(
+                    col = 0,
+                    colSpan = _gridResume.value.gridConfig.columns
+                ),
+                shapeType = ShapeType.DIVIDER
+            )
             ElementType.CHART -> ResumeElement.ChartElement(position = position)
             ElementType.ICON -> ResumeElement.IconElement(position = position, iconName = "star")
             ElementType.CONTAINER -> ResumeElement.ContainerElement(position = position)

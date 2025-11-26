@@ -136,6 +136,8 @@ sealed class ResumeElement {
         override val userInfoTag: UserInfoTag? = null,
         override val isVisible: Boolean = true,
         val items: List<ContactItem> = emptyList(),
+        val displayStyle: ContactDisplayStyle? = ContactDisplayStyle.STANDARD,
+        val separator: String? = " • ",
         val iconStyle: ContactIconStyle = ContactIconStyle.ICON,
         val spacing: Float = 8f, // dp between items
         val orientation: ContactOrientation = ContactOrientation.VERTICAL,

@@ -432,6 +432,11 @@ fun createResumeFromTemplate(template: GridTemplateType): GridResume {
         name = "Resume - ${template.name} Template",
         pages = listOf(
             ResumePage(elements = elements)
+        ),
+        gridConfig = GridConfig(
+            columns = 48, // Templates are defined in 48x68, will be migrated
+            rows = 68,
+            cellSizeDp = GridConfig.CELL_SIZE_FOR_A4 * 2 // Double cell size for 48x68
         )
     )
 }

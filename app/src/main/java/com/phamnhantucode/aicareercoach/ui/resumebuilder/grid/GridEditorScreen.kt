@@ -1068,8 +1068,18 @@ private fun GridCanvas(
                                             }
 
                                             is ResumeElement.ShapeElement -> {
+                                                // Center dividers and lines vertically in their container
+                                                val modifier = if (element.shapeType == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType.DIVIDER || 
+                                                                  element.shapeType == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType.LINE) {
+                                                    Modifier.align(Alignment.Center)
+                                                } else {
+                                                    Modifier
+                                                }
+
                                                 ShapeElementRenderer(
-                                                    element = element
+                                                    element = element,
+                                                    modifier = modifier,
+                                                    isSelected = isSelected
                                                 )
                                             }
 
@@ -1210,25 +1220,27 @@ private fun GridCanvas(
                                                             )
 
                                                             key(child.id) {
-                                                                DraggableElement(
-                                                                    element = child,
-                                                                    gridConfig = gridResume.gridConfig,
-                                                                    zoomLevel = currentZoom,
-                                                                    isSelected = selectedElement?.id == child.id && !isMoveMode,
-                                                                    isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
-                                                                    enabled = isInteractive && !isMoveMode,
-                                                                    useRelativePositioning = true,
-                                                                    animationOffsetY = animatedOffsetY,
-                                                                    onDragStart = onDragStart,
-                                                                    onDrag = onDrag,
-                                                                    onDragEnd = onDragEnd,
-                                                                    onResize = onResize,
-                                                                    onSelect = onElementSelect,
-                                                                    onDeselect = onElementDeselect,
-                                                                    onOpenProperties = { _ -> onOpenProperties() },
-                                                                    maxColumns = element.position.colSpan,
-                                                                    maxRows = element.position.rowSpan
-                                                                ) {
+                                                                    DraggableElement(
+                                                                        element = child,
+                                                                        gridConfig = gridResume.gridConfig,
+                                                                        zoomLevel = currentZoom,
+                                                                        isSelected = selectedElement?.id == child.id && !isMoveMode,
+                                                                        isDragging = draggedElement?.element?.id == child.id && !isMoveMode,
+                                                                        enabled = isInteractive && !isMoveMode,
+                                                                        useRelativePositioning = true,
+                                                                        animationOffsetY = animatedOffsetY,
+                                                                        onDragStart = onDragStart,
+                                                                        onDrag = onDrag,
+                                                                        onDragEnd = onDragEnd,
+                                                                        onResize = onResize,
+                                                                        onSelect = onElementSelect,
+                                                                        onDeselect = onElementDeselect,
+                                                                        onOpenProperties = { _ -> onOpenProperties() },
+                                                                        maxColumns = element.position.colSpan,
+                                                                        maxRows = element.position.rowSpan,
+                                                                        containerWidth = (element.position.colSpan * gridResume.gridConfig.cellSizeDp * density * currentZoom) - 
+                                                                                ((element.padding.left + element.padding.right) * density * currentZoom)
+                                                                    ) {
                                                                     // Render child content
                                                                     when (child) {
                                                                         is ResumeElement.TextElement -> TextElementRenderer(
@@ -1242,7 +1254,8 @@ private fun GridCanvas(
                                                                         )
 
                                                                         is ResumeElement.ShapeElement -> ShapeElementRenderer(
-                                                                            child
+                                                                            child,
+                                                                            isSelected = selectedElement?.id == child.id && !isMoveMode
                                                                         )
 
                                                                         is ResumeElement.ContactElement -> ContactElementRenderer(
@@ -1340,7 +1353,8 @@ private fun GridCanvas(
                                                                         )
 
                                                                         is ResumeElement.ShapeElement -> ShapeElementRenderer(
-                                                                            child
+                                                                            child,
+                                                                            isSelected = selectedElement?.id == child.id && !isMoveMode
                                                                         )
 
                                                                         is ResumeElement.ContactElement -> ContactElementRenderer(

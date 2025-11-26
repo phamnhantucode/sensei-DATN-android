@@ -38,5 +38,6 @@ data class TextStyle(
     val letterSpacing: Float = 0f,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
-    val isUnderlined: Boolean = false
+    val isUnderlined: Boolean = false,
+    val isAllCaps: Boolean = false
 )
