@@ -63,11 +63,21 @@ class ResumeCanvasRenderer(
         currentMapper = mapper
         currentRenderContext = renderContext
 
+        // Collect all child IDs from containers to skip them in main render loop
+        // (they will be rendered by their parent containers)
+        val containerChildIds = elements
+            .filterIsInstance<ResumeElement.ContainerElement>()
+            .flatMap { it.children }
+            .toSet()
+
         // Sort by z-index to ensure correct layering
         val sortedElements = elements.sortedBy { it.zIndex }
 
         sortedElements.forEach { element ->
-            renderSingleElement(canvas, element, mapper, renderContext)
+            // Skip elements that are children of containers - they're rendered by their parent
+            if (element.id !in containerChildIds) {
+                renderSingleElement(canvas, element, mapper, renderContext)
+            }
         }
     }
 
@@ -175,14 +185,52 @@ class ResumeCanvasRenderer(
         
         // Check if container uses vertical layout
         val isVerticalLayout = container.effectiveLayoutMode == LayoutMode.VERTICAL
-        
+
+        // For vertical layout, maintain child order from container.children list
+        val orderedChildren = if (isVerticalLayout) {
+            // Preserve the order from container.children array
+            container.children.mapNotNull { childId ->
+                childElements.find { it.id == childId }
+            }
+        } else {
+            childElements
+        }
+
+        // Track accumulated Y offset for vertical layout (in dp)
+        var accumulatedYDp = 0f
+        // Get cell size in dp for calculations
+        val cellSizeDp = currentMapper.cellWidthPoints / currentMapper.scale
+
         // Render each child element
-        childElements.forEach { child ->
+        orderedChildren.forEachIndexed { index, child ->
             try {
                 // Determine position based on layout mode
                 val renderPosition = if (isVerticalLayout) {
-                    // VERTICAL layout: children already have relative positions, use as-is
-                    child.position
+                    // VERTICAL layout: position based on accumulated heights of previous children
+                    // Store current offset BEFORE adding this child's height
+                    val currentOffsetDp = accumulatedYDp
+                    
+                    // Calculate this child's height in dp
+                    val childHeightDp = if (child.position.heightMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.SizeMode.WRAP_CONTENT) {
+                        child.position.cachedHeightDp ?: (child.position.rowSpan * cellSizeDp)
+                    } else {
+                        child.position.rowSpan * cellSizeDp
+                    }
+                    
+                    // Update accumulated offset for next child
+                    accumulatedYDp += childHeightDp
+                    
+                    GridPosition(
+                        row = 0,  // Base row is 0, actual Y position handled by verticalOffsetDp
+                        col = 0,
+                        rowSpan = child.position.rowSpan,
+                        colSpan = container.position.colSpan,  // Fill container width
+                        widthMode = child.position.widthMode,
+                        heightMode = child.position.heightMode,
+                        cachedHeightDp = child.position.cachedHeightDp,
+                        // Store the accumulated offset (position of this child)
+                        verticalOffsetDp = currentOffsetDp
+                    )
                 } else {
                     // GRID/FREE layout: children have absolute positions, convert to relative
                     GridPosition(
@@ -213,7 +261,16 @@ class ResumeCanvasRenderer(
                     is ResumeElement.LanguageElement -> child.copy(position = renderPosition)
                 }
                 
-                renderSingleElement(canvas, relativeChild, currentMapper, currentRenderContext)
+                // For vertical layout, apply the accumulated Y offset to the canvas
+                if (isVerticalLayout && renderPosition.verticalOffsetDp != null && renderPosition.verticalOffsetDp > 0f) {
+                    canvas.save()
+                    val offsetPts = renderPosition.verticalOffsetDp * currentMapper.scale
+                    canvas.translate(0f, offsetPts)
+                    renderSingleElement(canvas, relativeChild, currentMapper, currentRenderContext)
+                    canvas.restore()
+                } else {
+                    renderSingleElement(canvas, relativeChild, currentMapper, currentRenderContext)
+                }
                 
             } catch (e: Exception) {
                 android.util.Log.e("ResumeCanvasRenderer", "Error rendering container child: ${child.id}", e)

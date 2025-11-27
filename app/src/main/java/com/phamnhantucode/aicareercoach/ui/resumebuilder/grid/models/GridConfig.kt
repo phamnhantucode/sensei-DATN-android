@@ -1,5 +1,7 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models
 
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.pagination.LinkedElementGroup
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.pagination.PagePaginationInfo
 import java.util.UUID
 
 /**
@@ -7,10 +9,11 @@ import java.util.UUID
  * @param id Unique identifier
  * @param userId Owner's user ID
  * @param name Resume name/title
- * @param pages List of pages (usually just one for now)
+ * @param pages List of pages (supports multi-page resumes)
  * @param gridConfig Grid configuration
  * @param globalStyles Global styling defaults
  * @param metadata Resume metadata
+ * @param linkedElementGroups Cross-page element linking for pagination
  */
 data class GridResume(
     val id: String = UUID.randomUUID().toString(),
@@ -19,21 +22,67 @@ data class GridResume(
     val pages: List<ResumePage> = listOf(ResumePage()),
     val gridConfig: GridConfig = GridConfig(),
     val globalStyles: GlobalStyles = GlobalStyles(),
-    val metadata: ResumeMetadata = ResumeMetadata()
-)
+    val metadata: ResumeMetadata = ResumeMetadata(),
+    val linkedElementGroups: List<LinkedElementGroup> = emptyList()
+) {
+    /**
+     * Get total page count
+     */
+    val pageCount: Int get() = pages.size
+    
+    /**
+     * Find which page contains a specific element
+     */
+    fun findPageForElement(elementId: String): Int? {
+        pages.forEachIndexed { index, page ->
+            if (page.elements.any { it.id == elementId }) {
+                return index
+            }
+        }
+        return null
+    }
+    
+    /**
+     * Get the linked group for an element (if it's part of a split element)
+     */
+    fun getLinkedGroupForElement(elementId: String): LinkedElementGroup? {
+        return linkedElementGroups.find { it.containsElement(elementId) }
+    }
+}
 
 /**
  * A single page in the resume
  * @param id Page identifier
  * @param elements List of elements on this page
  * @param backgroundColor Background color of the page
+ * @param layoutMode Page-level layout mode (FREE by default)
+ * @param paginationInfo Pagination metadata for multi-page support
  */
 data class ResumePage(
     val id: String = UUID.randomUUID().toString(),
     val elements: List<ResumeElement> = emptyList(),
     val backgroundColor: Long = 0xFFFFFFFF,
-    val layoutMode: LayoutMode = LayoutMode.FREE // Page-level layout mode - FREE by default
-)
+    val layoutMode: LayoutMode = LayoutMode.FREE,
+    val paginationInfo: PagePaginationInfo? = null
+) {
+    /**
+     * Check if this page is an auto-generated overflow page
+     */
+    val isOverflowPage: Boolean
+        get() = paginationInfo?.isOverflowPage == true
+    
+    /**
+     * Check if this page has elements that continue from the previous page
+     */
+    val hasContinuedContent: Boolean
+        get() = paginationInfo?.hasContinuedElements == true
+    
+    /**
+     * Check if this page has elements that overflow to the next page
+     */
+    val hasOverflowingContent: Boolean
+        get() = paginationInfo?.hasOverflowingElements == true
+}
 
 /**
  * Grid configuration
@@ -43,6 +92,8 @@ data class ResumePage(
  * @param showGrid Whether to show grid lines
  * @param snapToGrid Whether to snap elements to grid
  * @param snapThreshold Snap threshold as fraction of cell size (0.0-1.0)
+ * @param showPageNumbers Whether to show page numbers on exported PDF
+ * @param pageNumberPosition Position of page numbers on the page
  */
 data class GridConfig(
     val columns: Int = 96,
@@ -50,7 +101,9 @@ data class GridConfig(
     val cellSizeDp: Float = CELL_SIZE_FOR_A4,  // Calculated to match A4 dimensions exactly
     val showGrid: Boolean = true,
     val snapToGrid: Boolean = true,
-    val snapThreshold: Float = 0.3f // 30% of cell size
+    val snapThreshold: Float = 0.3f, // 30% of cell size
+    val showPageNumbers: Boolean = false,
+    val pageNumberPosition: PageNumberPosition = PageNumberPosition.BOTTOM_CENTER
 ) {
     companion object {
         /**
@@ -69,6 +122,18 @@ data class GridConfig(
          */
         const val CELL_SIZE_FOR_A4 = 6.1911765f
     }
+}
+
+/**
+ * Position options for page numbers
+ */
+enum class PageNumberPosition {
+    BOTTOM_LEFT,
+    BOTTOM_CENTER,
+    BOTTOM_RIGHT,
+    TOP_LEFT,
+    TOP_CENTER,
+    TOP_RIGHT
 }
 
 /**

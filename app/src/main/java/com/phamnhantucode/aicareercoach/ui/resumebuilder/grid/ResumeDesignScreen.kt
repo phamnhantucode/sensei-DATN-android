@@ -8,9 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,15 +16,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -128,6 +128,7 @@ fun ResumeDesignScreen(
                 onClick = { onNavigateToGridEditor(null, null, true) },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
                     .padding(16.dp),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -167,6 +168,184 @@ fun ResumeDesignScreen(
                 }
             }
         )
+    }
+}
+
+/**
+ * Represents different variants of resume cards with their specific data and actions
+ */
+private sealed class ResumeCardVariant {
+    data class Template(
+        val template: ResumeTemplate,
+        val onTemplateClick: (ResumeTemplate) -> Unit
+    ) : ResumeCardVariant()
+
+    data class Design(
+        val design: GridResumeEntity,
+        val onDesignClick: (GridResumeEntity) -> Unit,
+        val onDeleteClick: (String) -> Unit
+    ) : ResumeCardVariant()
+}
+
+/**
+ * Unified resume card component supporting both templates and designs
+ * Uses A4 aspect ratio (0.707) for accurate resume representation
+ */
+@Composable
+private fun ResumeCard(
+    variant: ResumeCardVariant,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .width(200.dp)
+            .aspectRatio(0.707f) // A4 aspect ratio (width/height)
+            .clickable {
+                when (variant) {
+                    is ResumeCardVariant.Template -> variant.onTemplateClick(variant.template)
+                    is ResumeCardVariant.Design -> variant.onDesignClick(variant.design)
+                }
+            },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Thumbnail section
+                ResumeCardThumbnail(variant = variant)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Info section
+                ResumeCardInfo(variant = variant)
+            }
+
+            // Actions overlay (delete button for designs)
+            ResumeCardActions(variant = variant)
+        }
+    }
+}
+
+/**
+ * Thumbnail section with unified empty state handling
+ */
+@Composable
+private fun ResumeCardThumbnail(variant: ResumeCardVariant) {
+    val thumbnail = when (variant) {
+        is ResumeCardVariant.Template -> variant.template.thumbnail
+        is ResumeCardVariant.Design -> variant.design.thumbnail
+    }
+
+    val contentDescription = when (variant) {
+        is ResumeCardVariant.Template -> "Template preview: ${variant.template.name}"
+        is ResumeCardVariant.Design -> "Resume preview: ${variant.design.name}"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.707f) // A4 aspect ratio for thumbnail
+            .clip(RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (thumbnail.isNotEmpty()) {
+            val thumbnailBitmap = remember(thumbnail) {
+                decodeBase64Thumbnail(thumbnail)
+            }
+
+            if (thumbnailBitmap != null) {
+                Image(
+                    bitmap = thumbnailBitmap.asImageBitmap(),
+                    contentDescription = contentDescription,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                // Fallback if decode fails
+                ThumbnailPlaceholder()
+            }
+        } else {
+            // Empty state fallback
+            ThumbnailPlaceholder()
+        }
+    }
+}
+
+/**
+ * Unified placeholder for missing or failed thumbnails
+ */
+@Composable
+private fun ThumbnailPlaceholder() {
+    Icon(
+        imageVector = Icons.Default.Description,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(40.dp)
+    )
+}
+
+/**
+ * Info section showing name and description/date
+ */
+@Composable
+private fun ResumeCardInfo(variant: ResumeCardVariant) {
+    Column {
+        // Name/Title
+        Text(
+            text = when (variant) {
+                is ResumeCardVariant.Template -> variant.template.name
+                is ResumeCardVariant.Design -> variant.design.name
+            },
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // Subtitle (description for templates, date for designs)
+        Text(
+            text = when (variant) {
+                is ResumeCardVariant.Template -> variant.template.description
+                is ResumeCardVariant.Design -> formatDate(variant.design.updatedAt)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 11.sp
+        )
+    }
+}
+
+/**
+ * Actions overlay (currently only delete button for designs)
+ */
+@Composable
+private fun ResumeCardActions(variant: ResumeCardVariant) {
+    if (variant is ResumeCardVariant.Design) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            IconButton(
+                onClick = { variant.onDeleteClick(variant.design.id) },
+                modifier = Modifier
+                    .padding(4.dp)
+                    .size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete design",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 
@@ -228,110 +407,17 @@ private fun TemplatesSection(
             }
             else -> {
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(templates) { template ->
-                        TemplateCard(
-                            template = template,
-                            onClick = { onTemplateClick(template) }
+                        ResumeCard(
+                            variant = ResumeCardVariant.Template(
+                                template = template,
+                                onTemplateClick = onTemplateClick
+                            )
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-/**
- * Template Card Component
- */
-@Composable
-private fun TemplateCard(
-    template: ResumeTemplate,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .width(180.dp)
-            .height(260.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Template thumbnail preview
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(8.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (template.thumbnail.isNotEmpty()) {
-                    // Display actual thumbnail
-                    val thumbnailBitmap = remember(template.thumbnail) {
-                        decodeBase64Thumbnail(template.thumbnail)
-                    }
-
-                    if (thumbnailBitmap != null) {
-                        Image(
-                            bitmap = thumbnailBitmap.asImageBitmap(),
-                            contentDescription = "Template preview: ${template.name}",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        // Fallback if thumbnail decode fails
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                } else {
-                    // Fallback placeholder
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Template info
-            Column {
-                Text(
-                    text = template.name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = template.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 11.sp
-                )
             }
         }
     }
@@ -355,6 +441,13 @@ private fun MyDesignsSection(
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
+        Text(
+            text = "Your saved resume designs",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
         when {
             isLoading -> {
                 Box(
@@ -370,17 +463,16 @@ private fun MyDesignsSection(
                 EmptyDesignsPlaceholder()
             }
             else -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.height(400.dp) // Fixed height for scrollable grid
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(designs) { design ->
-                        DesignCard(
-                            design = design,
-                            onClick = { onDesignClick(design) },
-                            onDeleteClick = { onDeleteClick(design.id) }
+                        ResumeCard(
+                            variant = ResumeCardVariant.Design(
+                                design = design,
+                                onDesignClick = onDesignClick,
+                                onDeleteClick = onDeleteClick
+                            )
                         )
                     }
                 }
@@ -410,7 +502,7 @@ private fun EmptyDesignsPlaceholder() {
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Default.Description,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -425,119 +517,9 @@ private fun EmptyDesignsPlaceholder() {
             Text(
                 text = "Create your first design using a template or start from scratch",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-        }
-    }
-}
-
-/**
- * Design Card Component
- * Matches thumbnail aspect ratio (300x420 = 1:1.4) for better visual fit
- */
-@Composable
-private fun DesignCard(
-    design: GridResumeEntity,
-    onClick: () -> Unit,
-    onDeleteClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.714f) // Width:Height ratio matching thumbnail (300/420 = 0.714)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Thumbnail - maintains A4 aspect ratio (1:1.4)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(0.707f) // A4 aspect ratio (595/842 = 0.707)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                            shape = RoundedCornerShape(8.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (design.thumbnail.isNotEmpty()) {
-                        // Display actual thumbnail
-                        val thumbnailBitmap = remember(design.thumbnail) {
-                            decodeBase64Thumbnail(design.thumbnail)
-                        }
-
-                        if (thumbnailBitmap != null) {
-                            Image(
-                                bitmap = thumbnailBitmap.asImageBitmap(),
-                                contentDescription = "Resume preview",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        } else {
-                            // Fallback if thumbnail decode fails
-                            Text(
-                                text = "Preview",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        // Fallback if no thumbnail
-                        Text(
-                            text = "No Preview",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Design info
-                Column {
-                    Text(
-                        text = design.name,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = formatDate(design.updatedAt),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            // Delete button
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete design",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
         }
     }
 }

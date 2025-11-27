@@ -79,8 +79,45 @@ fun ResumePage.updateElement(elementId: String, update: (ResumeElement) -> Resum
 }
 
 /**
- * Remove element
+ * Remove element from page
+ * - Removes element from the elements list
+ * - Removes element from any parent container's children list
+ * - If element is a ContainerElement, moves its children to top-level (preserves them)
  */
 fun ResumePage.removeElement(elementId: String): ResumePage {
-    return copy(elements = elements.filter { it.id != elementId })
+    // 1. Find the element to be deleted
+    val elementToDelete = elements.find { it.id == elementId } ?: return this
+
+    // 2. If deleting a container, convert children to absolute positions
+    val preparedElements = if (elementToDelete is ResumeElement.ContainerElement) {
+        elements.map { element ->
+            if (elementToDelete.children.contains(element.id)) {
+                // Convert from container-relative to page-absolute coordinates
+                val absoluteRow = elementToDelete.position.row + element.position.row
+                val absoluteCol = elementToDelete.position.col + element.position.col
+
+                element.update(
+                    position = element.position.copy(row = absoluteRow, col = absoluteCol)
+                )
+            } else {
+                element
+            }
+        }
+    } else {
+        elements
+    }
+
+    // 3. Remove the element from the elements list
+    val withoutElement = preparedElements.filter { it.id != elementId }
+
+    // 4. Clean up container references
+    val cleanedElements = withoutElement.map { element ->
+        if (element is ResumeElement.ContainerElement && element.children.contains(elementId)) {
+            element.copy(children = element.children - elementId)
+        } else {
+            element
+        }
+    }
+
+    return copy(elements = cleanedElements)
 }

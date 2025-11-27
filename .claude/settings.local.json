@@ -5,7 +5,12 @@
       "Bash(./gradlew clean:*)",
       "Bash(./gradlew compileDebugKotlin:*)",
       "Bash(nul)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git log:*)",
+      "Bash(dir /s /b \"D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\")",
+      "Bash(findstr:*)",
+      "Bash(git -C \"D:\\Workspace\\Android\\AICareerCoach\" diff app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/elements/WorkExperienceElementRenderer.kt)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

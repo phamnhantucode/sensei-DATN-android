@@ -15,12 +15,14 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.AndroidImag
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.ImageExportState
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.export.PdfExportState
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.pagination.*
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 /**
@@ -87,6 +89,37 @@ class GridEditorViewModel(
     private val _isMoveMode = MutableStateFlow(false)
     val isMoveMode: StateFlow<Boolean> = _isMoveMode.asStateFlow()
 
+    // ============================================================================
+    // Multi-Page Support
+    // ============================================================================
+    
+    // Current page index for editing
+    private val _currentPageIndex = MutableStateFlow(0)
+    val currentPageIndex: StateFlow<Int> = _currentPageIndex.asStateFlow()
+
+    // Auto-pagination enabled state
+    private val _autoPaginationEnabled = MutableStateFlow(true)
+    val autoPaginationEnabled: StateFlow<Boolean> = _autoPaginationEnabled.asStateFlow()
+
+    // Page thumbnails for UI display
+    private val _pageThumbnails = MutableStateFlow<Map<String, String>>(emptyMap())
+    val pageThumbnails: StateFlow<Map<String, String>> = _pageThumbnails.asStateFlow()
+
+    // Thumbnail generation job tracker
+    private var thumbnailGenerationJob: Job? = null
+    
+    // Overflow detection state for visual indicators
+    private val _overflowInfo = MutableStateFlow<OverflowInfo?>(null)
+    val overflowInfo: StateFlow<OverflowInfo?> = _overflowInfo.asStateFlow()
+    
+    // Pagination engine (lazy initialized)
+    private val heightCalculator by lazy { 
+        ElementHeightCalculator(context, _gridResume.value.gridConfig) 
+    }
+    private val paginationEngine by lazy { 
+        PaginationEngine(_gridResume.value.gridConfig, heightCalculator) 
+    }
+
     // Undo/Redo stacks
     private val undoStack = mutableListOf<GridResume>()
     private val redoStack = mutableListOf<GridResume>()
@@ -115,6 +148,8 @@ class GridEditorViewModel(
         try {
             // Cancel pending auto-save to avoid duplicate saves
             autoSaveJob?.cancel()
+            // Cancel thumbnail generation job
+            thumbnailGenerationJob?.cancel()
 
             // Perform final save synchronously
             val gridResumeJson = gson.toJson(_gridResume.value)
@@ -272,6 +307,9 @@ class GridEditorViewModel(
                 // Automatically sync user data from Resume Builder for tagged elements
                 // This ensures elements with tags always have the latest user information
                 syncUserDataOnLoad()
+
+                // Generate thumbnails for all pages
+                generateAllPageThumbnails()
             } catch (e: Exception) {
                 e.printStackTrace()
                 _gridResume.value = createDefaultResume()
@@ -483,7 +521,7 @@ class GridEditorViewModel(
     fun addElement(elementType: ElementType) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: ResumePage()
+        val currentPage = getCurrentPage()
 
         // Find next available position
         val elementSize = getDefaultElementSize(elementType)
@@ -508,7 +546,15 @@ class GridEditorViewModel(
         // Select the new element
         _selectedElement.value = newElement
 
+        // Regenerate thumbnail for current page
+        regenerateCurrentPageThumbnail()
+
         triggerAutoSave()
+
+        // Check for overflow after adding element
+        if (_autoPaginationEnabled.value) {
+            detectOverflow()
+        }
     }
 
     /**
@@ -517,7 +563,7 @@ class GridEditorViewModel(
     fun updateElement(updatedElement: ResumeElement) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
 
         val updatedPage = currentPage.updateElement(updatedElement.id) { updatedElement }
         updatePage(updatedPage)
@@ -527,7 +573,15 @@ class GridEditorViewModel(
             _selectedElement.value = updatedElement
         }
 
+        // Regenerate thumbnail for current page
+        regenerateCurrentPageThumbnail()
+
         triggerAutoSave()
+
+        // Check for overflow after updating element
+        if (_autoPaginationEnabled.value) {
+            detectOverflow()
+        }
     }
 
     /**
@@ -537,7 +591,7 @@ class GridEditorViewModel(
     fun updateContainerLayoutMode(container: ResumeElement.ContainerElement, newMode: LayoutMode) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         
         // Update the container's layout mode
         val updatedContainer = container.copy(layoutMode = newMode)
@@ -590,7 +644,7 @@ class GridEditorViewModel(
     fun reorderChildInContainer(containerId: String, childId: String, newIndex: Int) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement ?: return
 
         // Check if child exists in container
@@ -642,7 +696,7 @@ class GridEditorViewModel(
     fun removeElement(elementId: String) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
 
         val updatedPage = currentPage.removeElement(elementId)
         updatePage(updatedPage)
@@ -651,6 +705,9 @@ class GridEditorViewModel(
         if (_selectedElement.value?.id == elementId) {
             _selectedElement.value = null
         }
+
+        // Regenerate thumbnail for current page
+        regenerateCurrentPageThumbnail()
 
         triggerAutoSave()
     }
@@ -661,7 +718,7 @@ class GridEditorViewModel(
     fun selectElement(element: ResumeElement) {
         // Always fetch the latest version of the element from the page
         // to ensure we have the most up-to-date properties
-        val currentPage = _gridResume.value.pages.firstOrNull()
+        val currentPage = getCurrentPage()
         val latestElement = currentPage?.elements?.find { it.id == element.id } ?: element
         _selectedElement.value = latestElement
     }
@@ -679,7 +736,7 @@ class GridEditorViewModel(
     fun toggleElementVisibility(elementId: String) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         val element = currentPage.elements.find { it.id == elementId } ?: return
 
         // Use generic update extension
@@ -702,7 +759,7 @@ class GridEditorViewModel(
     fun toggleElementLock(elementId: String) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         val element = currentPage.elements.find { it.id == elementId } ?: return
 
         // Use generic update extension
@@ -727,7 +784,7 @@ class GridEditorViewModel(
     fun moveElementLayer(fromIndex: Int, toIndex: Int) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         
         // Get elements sorted by Z-index DESCENDING (Front to Back)
         // This matches the UI display order
@@ -765,7 +822,7 @@ class GridEditorViewModel(
     fun moveElementToContainer(elementId: String, containerId: String) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         val element = currentPage.elements.find { it.id == elementId } ?: return
         val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement ?: return
 
@@ -819,7 +876,7 @@ class GridEditorViewModel(
     fun moveElementOut(elementId: String) {
         saveToUndoStack()
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         val element = currentPage.elements.find { it.id == elementId } ?: return
 
         // Find parent first to calculate absolute position
@@ -877,7 +934,7 @@ class GridEditorViewModel(
      */
     fun startDrag(element: ResumeElement, originalY: Float = 0f) {
         // Get the latest version of the element from the page to ensure we have all recent changes
-        val currentPage = _gridResume.value.pages.firstOrNull()
+        val currentPage = getCurrentPage()
         val latestElement = currentPage?.elements?.find { it.id == element.id } ?: element
 
         _draggedElement.value = DragState(
@@ -894,7 +951,7 @@ class GridEditorViewModel(
      */
     fun updateDragPosition(newPosition: GridPosition, offsetYPx: Float? = null, density: Float = 1f) {
         val currentDrag = _draggedElement.value ?: return
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
 
         // Check if element is a child of a vertical layout container
         val parentContainer = currentPage.elements.find { element ->
@@ -1040,7 +1097,7 @@ class GridEditorViewModel(
             return
         }
 
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
         
         // Check if element is a child of a vertical layout container
         val parentContainer = currentPage.elements.find { element ->
@@ -1106,7 +1163,7 @@ class GridEditorViewModel(
      */
     fun onDragOverContainer(containerId: String, context: android.content.Context) {
         val dragState = _draggedElement.value ?: return
-        val currentPage = _gridResume.value.pages.firstOrNull() ?: return
+        val currentPage = getCurrentPage()
 
         // Find the container element
         val container = currentPage.elements.find { it.id == containerId } as? ResumeElement.ContainerElement
@@ -1258,6 +1315,32 @@ class GridEditorViewModel(
             resume.copy(
                 gridConfig = resume.gridConfig.copy(
                     showGrid = !resume.gridConfig.showGrid
+                )
+            )
+        }
+    }
+
+    /**
+     * Toggles page number display on exported PDF
+     */
+    fun togglePageNumbers() {
+        _gridResume.update { resume ->
+            resume.copy(
+                gridConfig = resume.gridConfig.copy(
+                    showPageNumbers = !resume.gridConfig.showPageNumbers
+                )
+            )
+        }
+    }
+
+    /**
+     * Sets page number position
+     */
+    fun setPageNumberPosition(position: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition) {
+        _gridResume.update { resume ->
+            resume.copy(
+                gridConfig = resume.gridConfig.copy(
+                    pageNumberPosition = position
                 )
             )
         }
@@ -1716,7 +1799,10 @@ class GridEditorViewModel(
                     col = 0,
                     colSpan = _gridResume.value.gridConfig.columns
                 ),
-                shapeType = ShapeType.DIVIDER
+                shapeType = ShapeType.DIVIDER,
+                style = ElementStyle(
+                    borderColor = 0xFF9E9E9E // Gray 500 color
+                )
             )
             ElementType.CHART -> ResumeElement.ChartElement(position = position)
             ElementType.ICON -> ResumeElement.IconElement(position = position, iconName = "star")
@@ -1740,6 +1826,538 @@ class GridEditorViewModel(
             page.copy(layoutMode = LayoutMode.FREE)
         }
         return resume.copy(pages = updatedPages)
+    }
+    
+    // ============================================================================
+    // Multi-Page Management
+    // ============================================================================
+    
+    /**
+     * Get current page being edited
+     */
+    fun getCurrentPage(): ResumePage {
+        return _gridResume.value.pages.getOrElse(_currentPageIndex.value) {
+            getCurrentPage()
+        }
+    }
+    
+    /**
+     * Get total page count
+     */
+    fun getPageCount(): Int = _gridResume.value.pages.size
+    
+    /**
+     * Navigate to a specific page
+     * 
+     * @param index Zero-based page index
+     */
+    fun setCurrentPage(index: Int) {
+        val maxIndex = (_gridResume.value.pages.size - 1).coerceAtLeast(0)
+        val newIndex = index.coerceIn(0, maxIndex)
+        
+        if (newIndex != _currentPageIndex.value) {
+            _currentPageIndex.value = newIndex
+            _selectedElement.value = null // Deselect when changing pages
+            _events.tryEmit(GridEditorEvent.PageChanged(newIndex, _gridResume.value.pages.size))
+        }
+    }
+    
+    /**
+     * Navigate to the next page (if available)
+     */
+    fun nextPage() {
+        if (_currentPageIndex.value < _gridResume.value.pages.size - 1) {
+            setCurrentPage(_currentPageIndex.value + 1)
+        }
+    }
+    
+    /**
+     * Navigate to the previous page (if available)
+     */
+    fun previousPage() {
+        if (_currentPageIndex.value > 0) {
+            setCurrentPage(_currentPageIndex.value - 1)
+        }
+    }
+    
+    /**
+     * Add a new blank page after the current page
+     */
+    fun addPage() {
+        saveToUndoStack()
+        
+        val currentPage = getCurrentPage()
+        val insertIndex = _currentPageIndex.value + 1
+        
+        val newPage = ResumePage(
+            backgroundColor = currentPage.backgroundColor,
+            layoutMode = currentPage.layoutMode,
+            paginationInfo = PagePaginationInfo(
+                pageIndex = insertIndex,
+                isOverflowPage = false
+            )
+        )
+        
+        val updatedPages = _gridResume.value.pages.toMutableList().apply {
+            add(insertIndex, newPage)
+        }
+        
+        // Update page indices for all pages after the insertion
+        val reindexedPages = updatedPages.mapIndexed { index, page ->
+            page.copy(
+                paginationInfo = page.paginationInfo?.copy(pageIndex = index)
+                    ?: PagePaginationInfo(pageIndex = index)
+            )
+        }
+        
+        _gridResume.update { resume ->
+            resume.copy(pages = reindexedPages)
+        }
+        
+        // Navigate to new page
+        _currentPageIndex.value = insertIndex
+        _events.tryEmit(GridEditorEvent.PageAdded(insertIndex))
+
+        // Generate thumbnail for the new page
+        generatePageThumbnail(newPage.id)
+
+        triggerAutoSave()
+    }
+    
+    /**
+     * Add a new page at a specific index
+     * 
+     * @param index Where to insert the new page
+     */
+    fun addPageAt(index: Int) {
+        saveToUndoStack()
+        
+        val clampedIndex = index.coerceIn(0, _gridResume.value.pages.size)
+        val currentPage = getCurrentPage()
+        
+        val newPage = ResumePage(
+            backgroundColor = currentPage.backgroundColor,
+            layoutMode = currentPage.layoutMode,
+            paginationInfo = PagePaginationInfo(pageIndex = clampedIndex)
+        )
+        
+        val updatedPages = _gridResume.value.pages.toMutableList().apply {
+            add(clampedIndex, newPage)
+        }
+        
+        val reindexedPages = updatedPages.mapIndexed { idx, page ->
+            page.copy(
+                paginationInfo = page.paginationInfo?.copy(pageIndex = idx)
+                    ?: PagePaginationInfo(pageIndex = idx)
+            )
+        }
+        
+        _gridResume.update { resume ->
+            resume.copy(pages = reindexedPages)
+        }
+        
+        _events.tryEmit(GridEditorEvent.PageAdded(clampedIndex))
+        triggerAutoSave()
+    }
+    
+    /**
+     * Remove a page by index
+     * Cannot remove the last remaining page
+     * 
+     * @param index Page index to remove
+     * @return true if page was removed, false if not possible
+     */
+    fun removePage(index: Int): Boolean {
+        if (_gridResume.value.pages.size <= 1) {
+            return false // Cannot remove last page
+        }
+
+        if (index !in _gridResume.value.pages.indices) {
+            return false
+        }
+
+        saveToUndoStack()
+
+        // Get the page ID before removing it
+        val removedPageId = _gridResume.value.pages[index].id
+
+        val updatedPages = _gridResume.value.pages.toMutableList().apply {
+            removeAt(index)
+        }
+        
+        // Reindex remaining pages
+        val reindexedPages = updatedPages.mapIndexed { idx, page ->
+            page.copy(
+                paginationInfo = page.paginationInfo?.copy(pageIndex = idx)
+                    ?: PagePaginationInfo(pageIndex = idx)
+            )
+        }
+        
+        _gridResume.update { resume ->
+            resume.copy(pages = reindexedPages)
+        }
+        
+        // Adjust current page index if needed
+        if (_currentPageIndex.value >= _gridResume.value.pages.size) {
+            _currentPageIndex.value = _gridResume.value.pages.size - 1
+        } else if (_currentPageIndex.value > index) {
+            _currentPageIndex.value = _currentPageIndex.value - 1
+        }
+        
+        // Clear thumbnail for removed page
+        clearPageThumbnail(removedPageId)
+
+        _events.tryEmit(GridEditorEvent.PageRemoved(index))
+        triggerAutoSave()
+
+        return true
+    }
+    
+    /**
+     * Remove current page
+     */
+    fun removeCurrentPage(): Boolean {
+        return removePage(_currentPageIndex.value)
+    }
+    
+    /**
+     * Duplicate a page
+     * 
+     * @param index Page index to duplicate
+     */
+    fun duplicatePage(index: Int) {
+        if (index !in _gridResume.value.pages.indices) return
+        
+        saveToUndoStack()
+        
+        val sourcePage = _gridResume.value.pages[index]
+        val insertIndex = index + 1
+        
+        // Create deep copy of elements with new IDs
+        val copiedElements = sourcePage.elements.map { element ->
+            copyElementWithNewId(element)
+        }
+        
+        val newPage = sourcePage.copy(
+            id = UUID.randomUUID().toString(),
+            elements = copiedElements,
+            paginationInfo = PagePaginationInfo(pageIndex = insertIndex, isOverflowPage = false)
+        )
+        
+        val updatedPages = _gridResume.value.pages.toMutableList().apply {
+            add(insertIndex, newPage)
+        }
+        
+        val reindexedPages = updatedPages.mapIndexed { idx, page ->
+            page.copy(
+                paginationInfo = page.paginationInfo?.copy(pageIndex = idx)
+                    ?: PagePaginationInfo(pageIndex = idx)
+            )
+        }
+        
+        _gridResume.update { resume ->
+            resume.copy(pages = reindexedPages)
+        }
+        
+        _currentPageIndex.value = insertIndex
+        _events.tryEmit(GridEditorEvent.PageAdded(insertIndex))
+        triggerAutoSave()
+    }
+    
+    /**
+     * Create a copy of an element with a new ID
+     */
+    private fun copyElementWithNewId(element: ResumeElement): ResumeElement {
+        val newId = UUID.randomUUID().toString()
+        return when (element) {
+            is ResumeElement.TextElement -> element.copy(id = newId)
+            is ResumeElement.ImageElement -> element.copy(id = newId)
+            is ResumeElement.ShapeElement -> element.copy(id = newId)
+            is ResumeElement.ChartElement -> element.copy(id = newId)
+            is ResumeElement.ContainerElement -> element.copy(
+                id = newId,
+                children = element.children // Note: child IDs remain same - may need updating
+            )
+            is ResumeElement.IconElement -> element.copy(id = newId)
+            is ResumeElement.ContactElement -> element.copy(id = newId)
+            is ResumeElement.WorkExperienceElement -> element.copy(id = newId)
+            is ResumeElement.EducationElement -> element.copy(id = newId)
+            is ResumeElement.SkillElement -> element.copy(id = newId)
+            is ResumeElement.ProjectElement -> element.copy(id = newId)
+            is ResumeElement.CertificationElement -> element.copy(id = newId)
+            is ResumeElement.LanguageElement -> element.copy(id = newId)
+        }
+    }
+    
+    // ============================================================================
+    // Pagination & Overflow Detection
+    // ============================================================================
+    
+    /**
+     * Enable or disable auto-pagination
+     */
+    fun setAutoPaginationEnabled(enabled: Boolean) {
+        _autoPaginationEnabled.value = enabled
+        if (enabled) {
+            checkAndAutoPaginate()
+        }
+    }
+    
+    /**
+     * Manually trigger pagination
+     * Analyzes all pages and splits/moves content as needed
+     */
+    fun triggerPagination() {
+        viewModelScope.launch(Dispatchers.Default) {
+            saveToUndoStack()
+            
+            val originalPageCount = _gridResume.value.pages.size
+            val result = paginationEngine.paginate(_gridResume.value)
+            
+            withContext(Dispatchers.Main) {
+                _gridResume.update { resume ->
+                    resume.copy(
+                        pages = result.pages,
+                        linkedElementGroups = result.linkedElementGroups
+                    )
+                }
+                
+                // Count elements that were moved/split
+                val elementsMovedCount = result.linkedElementGroups.sumOf { 
+                    it.linkedElementIds.size 
+                }
+                
+                _events.emit(GridEditorEvent.PaginationCompleted(
+                    pageCount = result.pages.size,
+                    elementsMovedCount = elementsMovedCount
+                ))
+                
+                // Adjust current page if needed
+                if (_currentPageIndex.value >= result.pages.size) {
+                    _currentPageIndex.value = (result.pages.size - 1).coerceAtLeast(0)
+                }
+                
+                // Clear overflow info after successful pagination
+                _overflowInfo.value = null
+                
+                triggerAutoSave()
+            }
+        }
+    }
+    
+    /**
+     * Check for overflow and auto-paginate if enabled
+     * Called internally after content changes
+     */
+    private fun checkAndAutoPaginate() {
+        if (!_autoPaginationEnabled.value) return
+        
+        viewModelScope.launch(Dispatchers.Default) {
+            // First detect overflow
+            val allElements = _gridResume.value.pages.flatMap { it.elements }
+            val currentPage = getCurrentPage()
+            val overflow = paginationEngine.detectOverflow(currentPage, allElements)
+            
+            withContext(Dispatchers.Main) {
+                _overflowInfo.value = overflow
+            }
+            
+            // If significant overflow, auto-paginate
+            if (overflow != null && overflow.overflowAmountDp > 10f) {
+                val result = paginationEngine.paginate(_gridResume.value)
+                
+                // Only update if pages actually changed
+                if (result.pages.size != _gridResume.value.pages.size ||
+                    result.pages != _gridResume.value.pages) {
+                    
+                    withContext(Dispatchers.Main) {
+                        _gridResume.update { resume ->
+                            resume.copy(
+                                pages = result.pages,
+                                linkedElementGroups = result.linkedElementGroups
+                            )
+                        }
+                        
+                        _events.emit(GridEditorEvent.PaginationCompleted(
+                            pageCount = result.pages.size,
+                            elementsMovedCount = result.linkedElementGroups.sumOf { it.linkedElementIds.size }
+                        ))
+                        
+                        _overflowInfo.value = null
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Detect overflow on current page without paginating
+     * Updates the overflowInfo state for visual indicators
+     */
+    fun detectOverflow() {
+        viewModelScope.launch(Dispatchers.Default) {
+            val allElements = _gridResume.value.pages.flatMap { it.elements }
+            val currentPage = getCurrentPage()
+            val overflow = paginationEngine.detectOverflow(currentPage, allElements)
+            
+            withContext(Dispatchers.Main) {
+                _overflowInfo.value = overflow
+                
+                if (overflow != null) {
+                    _events.tryEmit(GridEditorEvent.OverflowDetected(
+                        overflowAmountDp = overflow.overflowAmountDp,
+                        elementCount = overflow.overflowingElementIds.size
+                    ))
+                }
+            }
+        }
+    }
+    
+    /**
+     * Move an element to a different page
+     * 
+     * @param elementId Element to move
+     * @param targetPageIndex Destination page
+     */
+    fun moveElementToPage(elementId: String, targetPageIndex: Int) {
+        if (targetPageIndex !in _gridResume.value.pages.indices) return
+        
+        saveToUndoStack()
+        
+        // Find current page containing the element
+        val sourcePageIndex = _gridResume.value.pages.indexOfFirst { page ->
+            page.elements.any { it.id == elementId }
+        }
+        
+        if (sourcePageIndex == -1 || sourcePageIndex == targetPageIndex) return
+        
+        val element = _gridResume.value.pages[sourcePageIndex].elements
+            .find { it.id == elementId } ?: return
+        
+        val updatedPages = _gridResume.value.pages.toMutableList()
+        
+        // Remove from source page
+        updatedPages[sourcePageIndex] = updatedPages[sourcePageIndex].copy(
+            elements = updatedPages[sourcePageIndex].elements.filter { it.id != elementId }
+        )
+        
+        // Add to target page (position at top)
+        val elementAtTop = updateElementPosition(element, element.position.copy(row = 0))
+        updatedPages[targetPageIndex] = updatedPages[targetPageIndex].copy(
+            elements = updatedPages[targetPageIndex].elements + elementAtTop
+        )
+        
+        _gridResume.update { resume ->
+            resume.copy(pages = updatedPages)
+        }
+        
+        // Select the moved element on the target page
+        _currentPageIndex.value = targetPageIndex
+        _selectedElement.value = elementAtTop
+        
+        triggerAutoSave()
+    }
+    
+    /**
+     * Helper to update element position
+     */
+    private fun updateElementPosition(element: ResumeElement, newPosition: GridPosition): ResumeElement {
+        return when (element) {
+            is ResumeElement.TextElement -> element.copy(position = newPosition)
+            is ResumeElement.ImageElement -> element.copy(position = newPosition)
+            is ResumeElement.ShapeElement -> element.copy(position = newPosition)
+            is ResumeElement.ChartElement -> element.copy(position = newPosition)
+            is ResumeElement.ContainerElement -> element.copy(position = newPosition)
+            is ResumeElement.IconElement -> element.copy(position = newPosition)
+            is ResumeElement.ContactElement -> element.copy(position = newPosition)
+            is ResumeElement.WorkExperienceElement -> element.copy(position = newPosition)
+            is ResumeElement.EducationElement -> element.copy(position = newPosition)
+            is ResumeElement.SkillElement -> element.copy(position = newPosition)
+            is ResumeElement.ProjectElement -> element.copy(position = newPosition)
+            is ResumeElement.CertificationElement -> element.copy(position = newPosition)
+            is ResumeElement.LanguageElement -> element.copy(position = newPosition)
+        }
+    }
+    
+    /**
+     * Get information about linked element groups (for UI display)
+     */
+    fun getLinkedGroupForElement(elementId: String): LinkedElementGroup? {
+        return _gridResume.value.getLinkedGroupForElement(elementId)
+    }
+    
+    /**
+     * Check if an element is a continuation from a previous page
+     */
+    fun isElementContinuation(elementId: String): Boolean {
+        return _gridResume.value.linkedElementGroups.any { group ->
+            group.linkedElementIds.contains(elementId)
+        }
+    }
+    
+    /**
+     * Check if an element continues on the next page
+     */
+    fun elementContinuesOnNextPage(elementId: String): Boolean {
+        return _gridResume.value.linkedElementGroups.any { group ->
+            group.sourceElementId == elementId && group.linkedElementIds.isNotEmpty()
+        }
+    }
+
+    // ============================================================================
+    // Page Thumbnail Management
+    // ============================================================================
+
+    /**
+     * Generate thumbnail for a specific page
+     */
+    private fun generatePageThumbnail(pageId: String, forceRegenerate: Boolean = false) {
+        if (!forceRegenerate && _pageThumbnails.value.containsKey(pageId)) return
+
+        val page = _gridResume.value.pages.find { it.id == pageId } ?: return
+
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val singlePageResume = _gridResume.value.copy(pages = listOf(page))
+                val thumbnailBase64 = thumbnailGenerator.generateThumbnail(singlePageResume)
+
+                if (thumbnailBase64.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _pageThumbnails.update { it + (pageId to thumbnailBase64) }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("GridEditorViewModel", "Thumbnail generation failed", e)
+            }
+        }
+    }
+
+    /**
+     * Generate thumbnails for all pages
+     */
+    fun generateAllPageThumbnails() {
+        _gridResume.value.pages.forEach { page ->
+            generatePageThumbnail(page.id, forceRegenerate = false)
+        }
+    }
+
+    /**
+     * Regenerate thumbnail for current page with debouncing
+     */
+    private fun regenerateCurrentPageThumbnail() {
+        thumbnailGenerationJob?.cancel()
+        thumbnailGenerationJob = viewModelScope.launch {
+            delay(500) // Debounce: avoid excessive regeneration
+            val currentPage = getCurrentPage()
+            generatePageThumbnail(currentPage.id, forceRegenerate = true)
+        }
+    }
+
+    /**
+     * Clear thumbnail for a specific page
+     */
+    private fun clearPageThumbnail(pageId: String) {
+        _pageThumbnails.update { it - pageId }
     }
 }
 
@@ -1766,5 +2384,12 @@ sealed class GridEditorEvent {
     data class SaveSuccess(val message: String) : GridEditorEvent()
     data class SaveError(val message: String) : GridEditorEvent()
     data class TemplateApplied(val template: GridTemplateType) : GridEditorEvent()
+    
+    // Multi-page events
+    data class PageChanged(val pageIndex: Int, val totalPages: Int) : GridEditorEvent()
+    data class PageAdded(val pageIndex: Int) : GridEditorEvent()
+    data class PageRemoved(val pageIndex: Int) : GridEditorEvent()
+    data class PaginationCompleted(val pageCount: Int, val elementsMovedCount: Int) : GridEditorEvent()
+    data class OverflowDetected(val overflowAmountDp: Float, val elementCount: Int) : GridEditorEvent()
 }
 

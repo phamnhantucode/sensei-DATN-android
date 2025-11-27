@@ -56,7 +56,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.TextFormat
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
@@ -75,6 +75,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -119,6 +120,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ElementType
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumePage
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.utils.elementsByZIndex
 import kotlinx.coroutines.launch
@@ -147,6 +149,12 @@ fun GridEditorScreen(
     val imageExportState by viewModel.imageExportState.collectAsState()
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val isMoveMode by viewModel.isMoveMode.collectAsState()
+    
+    // Multi-page state
+    val currentPageIndex by viewModel.currentPageIndex.collectAsState()
+    val overflowInfo by viewModel.overflowInfo.collectAsState()
+    val autoPaginationEnabled by viewModel.autoPaginationEnabled.collectAsState()
+    val pageThumbnails by viewModel.pageThumbnails.collectAsState()
 
     var showPropertyPanel by remember { mutableStateOf(false) }
     var showLayersPanel by remember { mutableStateOf(false) }
@@ -154,7 +162,9 @@ fun GridEditorScreen(
     var showElementPicker by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showImageExportDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var applyingTemplateData by remember { mutableStateOf(false) }
+    var showPageSelector by remember { mutableStateOf(true) } // Show page selector by default
 
     // Load resume data for template application
     val scope = rememberCoroutineScope()
@@ -200,7 +210,7 @@ fun GridEditorScreen(
                 onSave = { viewModel.save() },
                 onExport = { showExportDialog = true },
                 onExportImage = { showImageExportDialog = true },
-                onPreview = onNavigateToPreview,
+                onSettings = { showSettingsDialog = true },
                 onSwitchMode = onSwitchToFormEditor,
                 onShowTemplates = { showTemplateDialog = true },
                 onApplyTemplateData = {
@@ -236,29 +246,61 @@ fun GridEditorScreen(
             )
         }
     ) { padding ->
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Main canvas area
-            Box(
+            // Page selector (when multiple pages or always shown)
+            if (showPageSelector && (gridResume.pages.size > 1 || true)) {
+                com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.components.PageSelector(
+                    pages = gridResume.pages,
+                    currentPageIndex = currentPageIndex,
+                    onPageSelected = { viewModel.setCurrentPage(it) },
+                    onAddPage = { viewModel.addPage() },
+                    onRemovePage = { viewModel.removePage(it) },
+                    onDuplicatePage = { viewModel.duplicatePage(it) },
+                    pageThumbnails = pageThumbnails,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    compactMode = true
+                )
+            }
+            
+            // Overflow indicator
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.components.OverflowIndicator(
+                overflowInfo = overflowInfo,
+                onAutoSplit = { viewModel.triggerPagination() },
+                onDismiss = { /* Overflow info will clear after pagination */ },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            // Main content area
+            Row(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxWidth()
             ) {
-                GridCanvas(
-                    gridResume = gridResume,
-                    selectedElement = selectedElement,
-                    draggedElement = draggedElement,
-                    zoomLevel = zoomLevel,
+                // Main canvas area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    GridCanvas(
+                        gridResume = gridResume,
+                        currentPageIndex = currentPageIndex,
+                        selectedElement = selectedElement,
+                        draggedElement = draggedElement,
+                        zoomLevel = zoomLevel,
                     isMoveMode = isMoveMode,
                     onElementSelect = { viewModel.selectElement(it) },
                     onElementDeselect = { viewModel.deselectElement() },
                     onDragStart = { element -> 
                         // Calculate originalY for vertical layout to ensure smooth dragging
                         var originalY = 0f
-                        val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                        val allElements = viewModel.getCurrentPage().elements
                         val parent = allElements.filterIsInstance<ResumeElement.ContainerElement>()
                             .find { it.children.contains(element.id) }
                             
@@ -286,21 +328,19 @@ fun GridEditorScreen(
                         viewModel.updateDragPosition(position, offsetY, density)
 
                         // Check if dragging over any unlocked container
-                        val currentPage = gridResume.pages.firstOrNull()
-                        if (currentPage != null) {
-                            val hoveredContainer = currentPage.elements
-                                .filterIsInstance<ResumeElement.ContainerElement>()
-                                .filter { it.locked && it.id != element.id }
-                                .firstOrNull { container ->
-                                    // Check if drag position overlaps with container position
-                                    position.overlaps(container.position)
-                                }
-
-                            if (hoveredContainer != null) {
-                                viewModel.onDragOverContainer(hoveredContainer.id, context)
-                            } else {
-                                viewModel.cancelHoverTimer()
+                        val currentPageElements = viewModel.getCurrentPage()
+                        val hoveredContainer = currentPageElements.elements
+                            .filterIsInstance<ResumeElement.ContainerElement>()
+                            .filter { it.locked && it.id != element.id }
+                            .firstOrNull { container ->
+                                // Check if drag position overlaps with container position
+                                position.overlaps(container.position)
                             }
+
+                        if (hoveredContainer != null) {
+                            viewModel.onDragOverContainer(hoveredContainer.id, context)
+                        } else {
+                            viewModel.cancelHoverTimer()
                         }
                     },
                     onDragEnd = { element, position ->
@@ -331,6 +371,7 @@ fun GridEditorScreen(
                         viewModel.updateElement(updatedElement)
                     },
                     onOpenProperties = { showPropertyPanel = true },
+                    onDelete = { element -> viewModel.removeElement(element.id) },
                     onZoomChange = { viewModel.setZoomLevel(it) },
                     onExitMoveMode = { viewModel.toggleMoveMode() }
                 )
@@ -360,7 +401,7 @@ fun GridEditorScreen(
                             tonalElevation = 2.dp
                         ) {
                             LayersPanel(
-                                elements = gridResume.pages.firstOrNull()?.elements ?: emptyList(),
+                                elements = viewModel.getCurrentPage().elements,
                                 selectedElementId = selectedElement?.id,
                                 onSelectElement = { viewModel.selectElement(it) },
                                 onToggleVisibility = { viewModel.toggleElementVisibility(it) },
@@ -386,7 +427,7 @@ fun GridEditorScreen(
                             tonalElevation = 2.dp
                         ) {
                             // Find parent container
-                            val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                            val allElements = viewModel.getCurrentPage().elements
                             val parentContainer = allElements.filterIsInstance<ResumeElement.ContainerElement>()
                                 .find { it.children.contains(selectedElement!!.id) }
 
@@ -410,8 +451,9 @@ fun GridEditorScreen(
                     }
                 }
             }
-        }
-    }
+        } // Close Row
+    } // Close Column
+}
 
     // Element picker dialog
     if (showElementPicker) {
@@ -507,6 +549,23 @@ fun GridEditorScreen(
         )
     }
 
+    // Settings dialog
+    if (showSettingsDialog) {
+        GridEditorSettingsDialog(
+            autoPaginationEnabled = autoPaginationEnabled,
+            showPageSelector = showPageSelector,
+            showGrid = gridResume.gridConfig.showGrid,
+            showPageNumbers = gridResume.gridConfig.showPageNumbers,
+            pageNumberPosition = gridResume.gridConfig.pageNumberPosition,
+            onAutoPaginationChanged = { viewModel.setAutoPaginationEnabled(it) },
+            onShowPageSelectorChanged = { showPageSelector = it },
+            onShowGridChanged = { viewModel.toggleGrid() },
+            onShowPageNumbersChanged = { viewModel.togglePageNumbers() },
+            onPageNumberPositionChanged = { viewModel.setPageNumberPosition(it) },
+            onDismiss = { showSettingsDialog = false }
+        )
+    }
+
     // Close property panel when element is deselected
     LaunchedEffect(selectedElement) {
         if (selectedElement == null) {
@@ -528,7 +587,7 @@ private fun GridEditorTopBar(
     onSave: () -> Unit,
     onExport: () -> Unit,
     onExportImage: () -> Unit,
-    onPreview: () -> Unit,
+    onSettings: () -> Unit,
     onSwitchMode: () -> Unit,
     onShowTemplates: () -> Unit,
     onApplyTemplateData: () -> Unit = {},
@@ -569,9 +628,9 @@ private fun GridEditorTopBar(
                 }
             }
 
-            // Preview
-            IconButton(onClick = onPreview) {
-                Icon(Icons.Default.Visibility, contentDescription = "Preview")
+            // Settings
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings")
             }
 
             // More options menu
@@ -758,6 +817,7 @@ private fun GridEditorBottomBar(
 @Composable
 private fun GridCanvas(
     gridResume: GridResume,
+    currentPageIndex: Int,
     selectedElement: ResumeElement?,
     draggedElement: DragState?,
     zoomLevel: Float,
@@ -769,6 +829,7 @@ private fun GridCanvas(
     onDragEnd: (ResumeElement, GridPosition) -> Unit,
     onResize: (ResumeElement, GridPosition) -> Unit,
     onOpenProperties: () -> Unit,
+    onDelete: (ResumeElement) -> Unit,
     onZoomChange: (Float) -> Unit,
     onExitMoveMode: () -> Unit,
 ) {
@@ -778,6 +839,11 @@ private fun GridCanvas(
         gridResume.gridConfig,
         cellSizePx
     )
+    
+    // Get current page to render
+    val currentPage = gridResume.pages.getOrElse(currentPageIndex) { 
+        gridResume.pages.firstOrNull() ?: ResumePage() 
+    }
 
     // Track zoom level
     var currentZoom by remember { mutableFloatStateOf(zoomLevel) }
@@ -1021,36 +1087,48 @@ private fun GridCanvas(
                         zoomLevel = currentZoom
                     )
 
-                    // Elements
-                    gridResume.pages.firstOrNull()?.let { page ->
-                        // Identify children to exclude from top-level rendering
-                        val childIds = remember(page.elements) {
-                            page.elements.filterIsInstance<ResumeElement.ContainerElement>()
-                                .flatMap { it.children }
-                                .toSet()
-                        }
+                    // Page Number Overlay (when enabled)
+                    if (gridResume.gridConfig.showPageNumbers) {
+                        PageNumberOverlay(
+                            pageNumber = currentPageIndex + 1,
+                            totalPages = gridResume.pages.size,
+                            position = gridResume.gridConfig.pageNumberPosition,
+                            zoomLevel = currentZoom,
+                            gridConfig = gridResume.gridConfig
+                        )
+                    }
 
-                        page.elementsByZIndex()
-                            .filter { it.isVisible && !childIds.contains(it.id) } // Only render visible top-level elements
-                            .forEach { element ->
-                                key(element.id) {
-                                    val isSelected = selectedElement?.id == element.id
-                                    val isDragging = draggedElement?.element?.id == element.id
+                    // Elements - render current page
+                    // Identify children to exclude from top-level rendering
+                    val childIds = remember(currentPage.elements) {
+                        currentPage.elements.filterIsInstance<ResumeElement.ContainerElement>()
+                            .flatMap { it.children }
+                            .toSet()
+                    }
 
-                                    DraggableElement(
-                                        element = element,
-                                        gridConfig = gridResume.gridConfig,
-                                        zoomLevel = currentZoom,
-                                        isSelected = isSelected && !isMoveMode,
-                                        isDragging = isDragging && !isMoveMode,
-                                        enabled = !isMoveMode,
-                                        onDragStart = onDragStart,
-                                        onDrag = onDrag,
-                                        onDragEnd = onDragEnd,
-                                        onResize = onResize,
-                                        onSelect = onElementSelect,
+                    currentPage.elementsByZIndex()
+                        .filter { it.isVisible && !childIds.contains(it.id) } // Only render visible top-level elements
+                        .forEach { element ->
+                            key(element.id) {
+                                val isSelected = selectedElement?.id == element.id
+                                val isDragging = draggedElement?.element?.id == element.id
+
+                                DraggableElement(
+                                    element = element,
+                                    gridConfig = gridResume.gridConfig,
+                                    zoomLevel = currentZoom,
+                                    isSelected = isSelected && !isMoveMode,
+                                    isDragging = isDragging && !isMoveMode,
+                                    enabled = !isMoveMode,
+                                    onDragStart = onDragStart,
+                                    onDrag = onDrag,
+                                    onDragEnd = onDragEnd,
+                                    onResize = onResize,
+                                    onSelect = onElementSelect,
                                         onDeselect = onElementDeselect,
-                                        onOpenProperties = { _ -> onOpenProperties() }
+                                        onOpenProperties = { _ -> onOpenProperties() },
+                                        onDelete = onDelete,
+                                        allElements = currentPage.elements
                                     ) {
                                         when (element) {
                                             is ResumeElement.TextElement -> {
@@ -1135,9 +1213,9 @@ private fun GridCanvas(
                                             is ResumeElement.ContainerElement -> {
                                                 // Resolve children
                                                 val children =
-                                                    remember(element.children, page.elements) {
+                                                    remember(element.children, currentPage.elements) {
                                                         element.children.mapNotNull { childId ->
-                                                            page.elements.find { it.id == childId }
+                                                            currentPage.elements.find { it.id == childId }
                                                         }
                                                     }
 
@@ -1236,10 +1314,12 @@ private fun GridCanvas(
                                                                         onSelect = onElementSelect,
                                                                         onDeselect = onElementDeselect,
                                                                         onOpenProperties = { _ -> onOpenProperties() },
+                                                                        onDelete = onDelete,
                                                                         maxColumns = element.position.colSpan,
                                                                         maxRows = element.position.rowSpan,
-                                                                        containerWidth = (element.position.colSpan * gridResume.gridConfig.cellSizeDp * density * currentZoom) - 
-                                                                                ((element.padding.left + element.padding.right) * density * currentZoom)
+                                                                        containerWidth = (element.position.colSpan * gridResume.gridConfig.cellSizeDp * density * currentZoom) -
+                                                                                ((element.padding.left + element.padding.right) * density * currentZoom),
+                                                                        allElements = currentPage.elements
                                                                     ) {
                                                                     // Render child content
                                                                     when (child) {
@@ -1337,8 +1417,10 @@ private fun GridCanvas(
                                                                     onSelect = onElementSelect,
                                                                     onDeselect = onElementDeselect,
                                                                     onOpenProperties = { _ -> onOpenProperties() },
+                                                                    onDelete = onDelete,
                                                                     maxColumns = element.position.colSpan,
-                                                                    maxRows = element.position.rowSpan
+                                                                    maxRows = element.position.rowSpan,
+                                                                    allElements = currentPage.elements
                                                                 ) {
                                                                     // Render child content
                                                                     when (child) {
@@ -1442,12 +1524,11 @@ private fun GridCanvas(
                                     }
                                 }
                             }
-                    }
 
                     // Drag Ghost
                     draggedElement?.let { drag ->
                         // Calculate absolute offset by traversing up the parent chain
-                        val allElements = gridResume.pages.firstOrNull()?.elements ?: emptyList()
+                        val allElements = currentPage.elements
                         var parent = allElements.filterIsInstance<ResumeElement.ContainerElement>()
                             .find { it.children.contains(drag.element.id) }
 
@@ -1506,7 +1587,8 @@ private fun GridCanvas(
                                 zoomLevel = currentZoom,
                                 isValid = drag.isValidPosition,
                                 useVerticalLayout = isInVerticalContainer,
-                                containerWidthPx = containerWidthPx
+                                containerWidthPx = containerWidthPx,
+                                allElements = currentPage.elements
                             ) {}
                         }
                     }
@@ -1930,6 +2012,227 @@ private fun ImageExportDialog(
             }
         }
     )
+}
+
+/**
+ * Settings dialog for grid editor
+ */
+@Composable
+private fun GridEditorSettingsDialog(
+    autoPaginationEnabled: Boolean,
+    showPageSelector: Boolean,
+    showGrid: Boolean,
+    showPageNumbers: Boolean,
+    pageNumberPosition: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition,
+    onAutoPaginationChanged: (Boolean) -> Unit,
+    onShowPageSelectorChanged: (Boolean) -> Unit,
+    onShowGridChanged: () -> Unit,
+    onShowPageNumbersChanged: () -> Unit,
+    onPageNumberPositionChanged: (com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showPositionDropdown by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editor Settings") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Auto Split / Pagination setting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Auto Split Pages",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Automatically split content across pages when it overflows",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = autoPaginationEnabled,
+                        onCheckedChange = onAutoPaginationChanged
+                    )
+                }
+
+                // Show Page Selector setting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show Page Selector",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Display page thumbnails at the top of the editor",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = showPageSelector,
+                        onCheckedChange = onShowPageSelectorChanged
+                    )
+                }
+
+                // Show Grid setting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show Grid",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Display grid lines for element alignment",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = showGrid,
+                        onCheckedChange = { onShowGridChanged() }
+                    )
+                }
+
+                // Show Page Numbers setting
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show Page Numbers",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Display page numbers on exported PDF",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = showPageNumbers,
+                        onCheckedChange = { onShowPageNumbersChanged() }
+                    )
+                }
+
+                // Page Number Position (only shown when page numbers are enabled)
+                if (showPageNumbers) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Position",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Box {
+                            OutlinedButton(onClick = { showPositionDropdown = true }) {
+                                Text(
+                                    text = when (pageNumberPosition) {
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_LEFT -> "Bottom Left"
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_CENTER -> "Bottom Center"
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_RIGHT -> "Bottom Right"
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_LEFT -> "Top Left"
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_CENTER -> "Top Center"
+                                        com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_RIGHT -> "Top Right"
+                                    }
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showPositionDropdown,
+                                onDismissRequest = { showPositionDropdown = false }
+                            ) {
+                                com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.entries.forEach { position ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                when (position) {
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_LEFT -> "Bottom Left"
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_CENTER -> "Bottom Center"
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_RIGHT -> "Bottom Right"
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_LEFT -> "Top Left"
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_CENTER -> "Top Center"
+                                                    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_RIGHT -> "Top Right"
+                                                }
+                                            )
+                                        },
+                                        onClick = {
+                                            onPageNumberPositionChanged(position)
+                                            showPositionDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+/**
+ * Page number overlay displayed on the canvas
+ */
+@Composable
+private fun PageNumberOverlay(
+    pageNumber: Int,
+    totalPages: Int,
+    position: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition,
+    zoomLevel: Float,
+    gridConfig: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridConfig,
+) {
+    val density = LocalDensity.current.density
+    val pageWidthDp = (gridConfig.columns * gridConfig.cellSizeDp * zoomLevel)
+    val pageHeightDp = (gridConfig.rows * gridConfig.cellSizeDp * zoomLevel)
+    val margin = 12.dp * zoomLevel
+    val fontSize = (10 * zoomLevel).sp
+
+    Box(
+        modifier = Modifier
+            .size(width = pageWidthDp.dp, height = pageHeightDp.dp)
+    ) {
+        val alignment = when (position) {
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_LEFT -> Alignment.TopStart
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_CENTER -> Alignment.TopCenter
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.TOP_RIGHT -> Alignment.TopEnd
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_LEFT -> Alignment.BottomStart
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_CENTER -> Alignment.BottomCenter
+            com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
+        }
+
+        Text(
+            text = "$pageNumber / $totalPages",
+            fontSize = fontSize,
+            color = Color.DarkGray,
+            modifier = Modifier
+                .align(alignment)
+                .padding(margin)
+        )
+    }
 }
 
 

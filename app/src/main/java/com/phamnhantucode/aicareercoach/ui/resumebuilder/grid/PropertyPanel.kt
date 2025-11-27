@@ -2565,7 +2565,7 @@ private fun SliderField(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Text(label, fontSize = 12.sp)
+        Text("$label: ${value.toInt()}", fontSize = 12.sp)
         Slider(
             value = value,
             onValueChange = onValueChange,
@@ -4138,33 +4138,33 @@ private fun PaddingControl(
             PaddingMode.ALL -> {
                 // Single slider/input for all sides
                 // Assuming top is representative
-                NumberField(
+                SliderField(
                     label = "All Sides",
-                    value = padding.top.toInt(),
+                    value = padding.top,
+                    valueRange = 0f..64f,
                     onValueChange = { value ->
-                        val fValue = value.toFloat()
-                        onPaddingChange(Padding(fValue, fValue, fValue, fValue))
+                        onPaddingChange(Padding(value, value, value, value))
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
             PaddingMode.SYMMETRIC -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
+                    SliderField(
                         label = "Vertical",
-                        value = padding.top.toInt(),
+                        value = padding.top,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            val fValue = value.toFloat()
-                            onPaddingChange(padding.copy(top = fValue, bottom = fValue))
+                            onPaddingChange(padding.copy(top = value, bottom = value))
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    NumberField(
+                    SliderField(
                         label = "Horizontal",
-                        value = padding.left.toInt(),
+                        value = padding.left,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            val fValue = value.toFloat()
-                            onPaddingChange(padding.copy(left = fValue, right = fValue))
+                            onPaddingChange(padding.copy(left = value, right = value))
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -4172,37 +4172,41 @@ private fun PaddingControl(
             }
             PaddingMode.INDIVIDUAL -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
+                    SliderField(
                         label = "Top",
-                        value = padding.top.toInt(),
+                        value = padding.top,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            onPaddingChange(padding.copy(top = value.toFloat()))
+                            onPaddingChange(padding.copy(top = value))
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    NumberField(
+                    SliderField(
                         label = "Bottom",
-                        value = padding.bottom.toInt(),
+                        value = padding.bottom,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            onPaddingChange(padding.copy(bottom = value.toFloat()))
+                            onPaddingChange(padding.copy(bottom = value))
                         },
                         modifier = Modifier.weight(1f)
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
+                    SliderField(
                         label = "Left",
-                        value = padding.left.toInt(),
+                        value = padding.left,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            onPaddingChange(padding.copy(left = value.toFloat()))
+                            onPaddingChange(padding.copy(left = value))
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    NumberField(
+                    SliderField(
                         label = "Right",
-                        value = padding.right.toInt(),
+                        value = padding.right,
+                        valueRange = 0f..64f,
                         onValueChange = { value ->
-                            onPaddingChange(padding.copy(right = value.toFloat()))
+                            onPaddingChange(padding.copy(right = value))
                         },
                         modifier = Modifier.weight(1f)
                     )

@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -62,9 +64,11 @@ fun DraggableElement(
     onSelect: (ResumeElement) -> Unit = { _ -> },
     onDeselect: () -> Unit = {},
     onOpenProperties: (ResumeElement) -> Unit = { _ -> },
+    onDelete: (ResumeElement) -> Unit = { _ -> },
     maxColumns: Int = gridConfig.columns,
     maxRows: Int = gridConfig.rows,
     containerWidth: Float? = null,
+    allElements: List<ResumeElement> = emptyList(),  // All elements for container height calculation
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
@@ -121,7 +125,7 @@ fun DraggableElement(
         
         // Calculate actual content height for wrap content mode
         // We ALWAYS calculate this to ensure updates (like padding changes) are reflected immediately
-        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context, allElements, gridConfig.cellSizeDp)
         val fallbackHeight = element.position.rowSpan * cellSizePx
         
         val finalHeight = actualContentHeight ?: fallbackHeight
@@ -398,8 +402,9 @@ fun DraggableElement(
 
         // Properties button (rendered last, on top of everything)
         if (isSelected && !element.locked) {
-            PropertiesButton(
-                onOpenProperties = { onOpenProperties(element) }
+            FloatingToolbar(
+                onOpenProperties = { onOpenProperties(element) },
+                onDelete = { onDelete(element) }
             )
         }
     }
@@ -646,27 +651,63 @@ private fun BoxScope.TemplateTagIndicator(tag: UserInfoTag) {
 }
 
 /**
- * Properties button for opening property panel
+ * Floating toolbar with Settings and Delete buttons
  */
 @Composable
-private fun BoxScope.PropertiesButton(
-    onOpenProperties: () -> Unit
+private fun BoxScope.FloatingToolbar(
+    onOpenProperties: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    androidx.compose.material3.FloatingActionButton(
-        onClick = onOpenProperties,
+    Surface(
         modifier = Modifier
-            .align(Alignment.TopEnd)
-            .offset(x = 28.dp, y = (-8).dp)
-            .size(28.dp),
-        containerColor = Color(0xFF2196F3),
-        contentColor = Color.White,
-        shape = RoundedCornerShape(14.dp)
+            .wrapContentSize(unbounded = true)
+            .align(Alignment.TopCenter)
+            .offset(y = (-36).dp) // Float above the element
+            .height(32.dp)
+            .zIndex(200f), // Ensure it's above everything
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFFFC107), // Amber/Yellow color
+        shadowElevation = 4.dp
     ) {
-        Icon(
-            imageVector = Icons.Default.Settings,
-            contentDescription = "Properties",
-            modifier = Modifier.size(16.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            // Settings Button
+            IconButton(
+                onClick = onOpenProperties,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Properties",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            // Separator
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(16.dp)
+                    .background(Color.White.copy(alpha = 0.5f))
+            )
+
+            // Delete Button
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 
@@ -682,6 +723,7 @@ fun DragGhost(
     isValid: Boolean = true,
     useVerticalLayout: Boolean = false,
     containerWidthPx: Float? = null,
+    allElements: List<ResumeElement> = emptyList(),
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
@@ -711,7 +753,7 @@ fun DragGhost(
     } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
         // Calculate actual content height for wrap content mode
         // We use the element's original position heightMode, but the current width (which depends on colSpan)
-        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context)
+        val actualContentHeight = calculateContentHeight(element, width, density, zoomLevel, context, allElements, gridConfig.cellSizeDp)
         actualContentHeight ?: (position.rowSpan * cellSizePx)
     } else {
         position.rowSpan * cellSizePx
@@ -921,7 +963,9 @@ private fun calculateContentHeight(
     width: Float,
     density: Float,
     zoomLevel: Float,
-    context: android.content.Context
+    context: android.content.Context,
+    allElements: List<ResumeElement> = emptyList(),
+    cellSizeDp: Float = 8f
 ): Float? {
     return when (element) {
         is ResumeElement.TextElement -> {
@@ -944,6 +988,9 @@ private fun calculateContentHeight(
         }
         is ResumeElement.EducationElement -> {
             calculateEducationContentHeight(element, width, density, zoomLevel, context)
+        }
+        is ResumeElement.ContainerElement -> {
+            calculateContainerContentHeight(element, width, density, zoomLevel, context, allElements, cellSizeDp)
         }
         // Add more element types as needed
         else -> null
@@ -1029,6 +1076,72 @@ private fun calculateTextContentHeight(
 }
 
 /**
+ * Calculate container content height by summing children heights (for VERTICAL layout with WRAP_CONTENT)
+ */
+private fun calculateContainerContentHeight(
+    element: ResumeElement.ContainerElement,
+    width: Float,
+    density: Float,
+    zoomLevel: Float,
+    context: android.content.Context,
+    allElements: List<ResumeElement>,
+    cellSizeDp: Float = 8f
+): Float? {
+    // Only calculate for VERTICAL layout containers
+    if (element.effectiveLayoutMode != LayoutMode.VERTICAL) {
+        // For non-vertical layouts, use cached height or return null
+        return element.position.cachedHeightDp?.let { it * density * zoomLevel }
+    }
+    
+    // If no children, return minimum height with padding
+    if (element.children.isEmpty()) {
+        val safePadding = element.padding
+        val paddingTop = safePadding.top * density
+        val paddingBottom = safePadding.bottom * density
+        return (paddingTop + paddingBottom) * zoomLevel
+    }
+    
+    // Calculate content width (container width minus padding)
+    val safePadding = element.padding
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val contentWidth = (width / zoomLevel) - paddingLeft - paddingRight
+    val contentWidthPx = contentWidth * zoomLevel
+    
+    var totalHeight = (paddingTop + paddingBottom) * zoomLevel
+    val defaultChildSpacing = 0f // Children are stacked without additional spacing in vertical layout
+    
+    // Sum heights of all children
+    element.children.forEachIndexed { index, childId ->
+        val child = allElements.find { it.id == childId } ?: return@forEachIndexed
+        
+        // Calculate child height
+        val childHeight = if (child.position.heightMode == SizeMode.WRAP_CONTENT) {
+            // Recursively calculate child content height
+            val calculatedHeight = calculateContentHeight(child, contentWidthPx, density, zoomLevel, context, allElements, cellSizeDp)
+            calculatedHeight ?: child.position.cachedHeightDp?.let { it * density * zoomLevel }
+            ?: (child.position.rowSpan * cellSizeDp * density * zoomLevel)
+        } else {
+            // Use fixed height (rowSpan * cellSize)
+            child.position.cachedHeightDp?.let { it * density * zoomLevel }
+            ?: (child.position.rowSpan * cellSizeDp * density * zoomLevel)
+        }
+        
+        totalHeight += childHeight
+        
+        // Add spacing between children (not after last)
+        if (index < element.children.size - 1) {
+            totalHeight += defaultChildSpacing * density * zoomLevel
+        }
+    }
+    
+    return totalHeight
+}
+
+/**
  * Calculate work experience content height using StaticLayout (matching PDF renderer logic)
  */
 private fun calculateWorkExperienceContentHeight(
@@ -1042,9 +1155,14 @@ private fun calculateWorkExperienceContentHeight(
         return 16f * density * zoomLevel // Minimum height for empty content
     }
 
-    // Calculate base dimensions (unscaled)
-    val basePadding = 8f * density // 8dp in pixels
-    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    // Calculate base dimensions (unscaled) - matching WorkExperienceElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
     
     // Create text paints for different styles (no zoom applied)
     val titlePaint = createWorkExperienceTextPaint(element.titleStyle, density, context)
@@ -1185,8 +1303,8 @@ private fun calculateWorkExperienceContentHeight(
         }
     }
     
-    // Add padding and apply zoom
-    val finalHeight = (totalHeight + (basePadding * 2)) * zoomLevel
+    // Add padding and apply zoom - use actual padding values
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
     
     return finalHeight
 }
@@ -1299,9 +1417,14 @@ private fun calculateProjectContentHeight(
         return 16f * density * zoomLevel // Minimum height for empty content
     }
 
-    // Calculate base dimensions (unscaled)
-    val basePadding = 8f * density // 8dp in pixels
-    val baseWidth = (width / zoomLevel) - (basePadding * 2)
+    // Calculate base dimensions (unscaled) - matching ProjectElementRenderer logic
+    val safePadding = element.padding ?: Padding(8f, 8f, 8f, 8f)
+    val paddingLeft = safePadding.left * density
+    val paddingTop = safePadding.top * density
+    val paddingRight = safePadding.right * density
+    val paddingBottom = safePadding.bottom * density
+    
+    val baseWidth = (width / zoomLevel) - (paddingLeft + paddingRight)
     
     // Create text paints for different styles (no zoom applied)
     val namePaint = createWorkExperienceTextPaint(element.nameStyle, density, context)
@@ -1499,8 +1622,8 @@ private fun calculateProjectContentHeight(
         }
     }
     
-    // Add padding and apply zoom
-    val finalHeight = (totalHeight + (basePadding * 2)) * zoomLevel
+    // Add padding and apply zoom - use actual padding values
+    val finalHeight = (totalHeight + paddingTop + paddingBottom) * zoomLevel
     
     return finalHeight
 }

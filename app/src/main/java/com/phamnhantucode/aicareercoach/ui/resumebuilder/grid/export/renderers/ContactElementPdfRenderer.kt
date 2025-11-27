@@ -31,13 +31,18 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
         // Draw background and borders
         drawElementStyle(canvas, element.style, bounds, mapper, context)
 
-        // Apply 8dp content padding (matching canvas editor behavior)
-        val contentPadding = mapper.borderWidthToPdfPoints(8f)
+        // Use element's padding or default to 8dp for backward compatibility
+        val paddingDp = element.padding ?: Padding(8f, 8f, 8f, 8f)
+        val paddingLeft = mapper.borderWidthToPdfPoints(paddingDp.left)
+        val paddingRight = mapper.borderWidthToPdfPoints(paddingDp.right)
+        val paddingTop = mapper.borderWidthToPdfPoints(paddingDp.top)
+        val paddingBottom = mapper.borderWidthToPdfPoints(paddingDp.bottom)
+
         val contentBounds = RectF(
-            bounds.left + contentPadding,
-            bounds.top + contentPadding,
-            bounds.right - contentPadding,
-            bounds.bottom - contentPadding
+            bounds.left + paddingLeft,
+            bounds.top + paddingTop,
+            bounds.right - paddingRight,
+            bounds.bottom - paddingBottom
         )
 
         // Create text paint

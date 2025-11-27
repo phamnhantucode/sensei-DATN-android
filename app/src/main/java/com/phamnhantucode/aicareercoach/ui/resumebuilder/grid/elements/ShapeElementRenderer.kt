@@ -32,11 +32,12 @@ fun ShapeElementRenderer(
     isSelected: Boolean = false
 ) {
     // Determine background color
-    // For DIVIDER: if selected, use selection color (Blue), otherwise use element color (or Black default)
+    // For DIVIDER: if selected, use selection color (Blue), otherwise use element color with borderColor fallback
     val backgroundColor = if (element.shapeType == ShapeType.DIVIDER && isSelected) {
         Color(0xFF2196F3) // Selection Blue
     } else {
-        element.style.backgroundColor?.let { Color(it) } ?: Color.Black
+        val colorValue = element.style.backgroundColor ?: element.style.borderColor
+        colorValue?.let { Color(it) } ?: Color.Transparent
     }
     
     val borderColor = element.style.borderColor?.let { Color(it) }

@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.PageNumberPosition
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridPosition
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode
@@ -71,6 +72,16 @@ class AndroidPdfGenerator(
                 // Render all elements (sorted by z-index)
                 val sortedElements = page.elements.sortedBy { it.zIndex }
                 renderElements(canvas, sortedElements, resume.gridConfig)
+
+                // Render page numbers if enabled
+                if (resume.gridConfig.showPageNumbers) {
+                    renderPageNumber(
+                        canvas = canvas,
+                        pageNumber = index + 1,
+                        totalPages = resume.pages.size,
+                        position = resume.gridConfig.pageNumberPosition
+                    )
+                }
 
                 pdfDocument.finishPage(pdfPage)
             }
@@ -156,6 +167,43 @@ class AndroidPdfGenerator(
     ) {
         val renderer = ResumeCanvasRenderer(context, config, imageCache, colorConverter)
         renderer.renderElements(canvas, elements, gridConfig)
+    }
+
+    /**
+     * Render page number on the canvas
+     */
+    private fun renderPageNumber(
+        canvas: android.graphics.Canvas,
+        pageNumber: Int,
+        totalPages: Int,
+        position: PageNumberPosition
+    ) {
+        val paint = android.graphics.Paint().apply {
+            color = Color.DKGRAY
+            textSize = 10f
+            isAntiAlias = true
+            textAlign = when (position) {
+                PageNumberPosition.BOTTOM_LEFT, PageNumberPosition.TOP_LEFT -> android.graphics.Paint.Align.LEFT
+                PageNumberPosition.BOTTOM_CENTER, PageNumberPosition.TOP_CENTER -> android.graphics.Paint.Align.CENTER
+                PageNumberPosition.BOTTOM_RIGHT, PageNumberPosition.TOP_RIGHT -> android.graphics.Paint.Align.RIGHT
+            }
+        }
+
+        val text = "$pageNumber / $totalPages"
+        val margin = 20f
+
+        val x = when (position) {
+            PageNumberPosition.BOTTOM_LEFT, PageNumberPosition.TOP_LEFT -> margin
+            PageNumberPosition.BOTTOM_CENTER, PageNumberPosition.TOP_CENTER -> config.pageWidth / 2f
+            PageNumberPosition.BOTTOM_RIGHT, PageNumberPosition.TOP_RIGHT -> config.pageWidth - margin
+        }
+
+        val y = when (position) {
+            PageNumberPosition.TOP_LEFT, PageNumberPosition.TOP_CENTER, PageNumberPosition.TOP_RIGHT -> margin + paint.textSize
+            PageNumberPosition.BOTTOM_LEFT, PageNumberPosition.BOTTOM_CENTER, PageNumberPosition.BOTTOM_RIGHT -> config.pageHeight - margin
+        }
+
+        canvas.drawText(text, x, y, paint)
     }
 
     /**
