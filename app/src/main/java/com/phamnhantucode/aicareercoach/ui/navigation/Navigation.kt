@@ -7,7 +7,17 @@ sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Login : Screen("login")
     object IndustryInsights : Screen("industry_insights")
-    object ResumeBuilder : Screen("resume_builder")
+    object ResumeBuilder : Screen("resume_builder") {
+        private const val IsEditOnlyArg = "isEditOnly"
+
+        val routeWithArgs: String = "$route?$IsEditOnlyArg={$IsEditOnlyArg}"
+
+        fun buildRoute(isEditOnly: Boolean = false): String {
+            return "$route?$IsEditOnlyArg=$isEditOnly"
+        }
+
+        fun isEditOnlyKey(): String = IsEditOnlyArg
+    }
     object ResumeMarkdown : Screen("resume_markdown")
     object ResumeDesignScreen : Screen("resume_design_screen")
     object GridEditor : Screen("grid_editor") {

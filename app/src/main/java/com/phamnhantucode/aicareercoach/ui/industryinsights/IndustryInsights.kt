@@ -1,7 +1,28 @@
 package com.phamnhantucode.aicareercoach.ui.industryinsights
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,29 +35,34 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LineAxis
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material.icons.outlined.Analytics
-import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedFilterChip
@@ -50,6 +76,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,8 +84,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -66,8 +98,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -77,6 +111,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun IndustryInsightsScreen(
@@ -289,15 +324,43 @@ private fun HeaderSection(
                     DropdownMenu(
                         expanded = growthToolsExpanded,
                         onDismissRequest = { growthToolsExpanded = false },
-                        modifier = if (growthToolsButtonWidth > 0) {
-                            Modifier.width(with(density) { growthToolsButtonWidth.toDp() })
-                        } else {
-                            Modifier
-                        }
+                        modifier = Modifier
+                            .then(
+                                if (growthToolsButtonWidth > 0) {
+                                    Modifier.width(with(density) { growthToolsButtonWidth.toDp() })
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .background(MaterialTheme.colorScheme.surface),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        growthTools.forEach { item ->
+                        growthTools.forEachIndexed { index, item ->
+                            val icon = when (item) {
+                                "Build Resume" -> Icons.Filled.Person
+                                "Interview Prep" -> Icons.Filled.Groups
+                                "Cover Letter" -> Icons.Outlined.Insights
+                                else -> Icons.Filled.ChevronRight
+                            }
                             DropdownMenuItem(
-                                text = { Text(text = item) },
+                                text = {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = item,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                },
                                 onClick = {
                                     growthToolsExpanded = false
                                     when (item) {
@@ -305,8 +368,15 @@ private fun HeaderSection(
                                         "Interview Prep" -> onNavigateToInterviewPrep()
                                         "Cover Letter" -> onNavigateToCoverLetter()
                                     }
-                                }
+                                },
+                                modifier = Modifier.padding(horizontal = 4.dp)
                             )
+                            if (index < growthTools.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+                            }
                         }
                     }
                 }
@@ -349,60 +419,176 @@ private fun DataFreshnessRow(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = RoundedCornerShape(999.dp),
-                modifier = Modifier.padding(end = 8.dp)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(999.dp),
+                ) {
+                    Text(
+                        text = "Last updated: ${lastUpdated.format(formatter)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+
                 Text(
-                    text = "Last updated: ${lastUpdated.format(formatter)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    text = "Next update ${relativeDate(nextUpdate)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "Next update ${relativeDate(nextUpdate)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            IconButton(
+                onClick = onRefresh,
+                enabled = !isRefreshing
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = "Refresh insights",
+                    tint = if (isRefreshing)
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    else
+                        MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         if (isRefreshing) {
             LinearProgressIndicator(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
+                    .height(4.dp)
                     .clip(RoundedCornerShape(999.dp))
             )
-        } else {
-            OutlinedButton(
-                onClick = onRefresh,
-                shape = RoundedCornerShape(999.dp)
-            ) {
-                Text("Refresh insights")
-            }
         }
     }
 }
 
 @Composable
 private fun IndustryInsightsLoading() {
-    Box(
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+    
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator()
+        // Header shimmer
+        ShimmerBox(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .clip(RoundedCornerShape(16.dp)),
+            shimmerProgress = shimmerProgress
+        )
+        
+        // Title shimmer
+        ShimmerBox(
+            modifier = Modifier
+                .width(200.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            shimmerProgress = shimmerProgress
+        )
+        
+        // Industry chips shimmer
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            repeat(3) {
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(18.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+            }
+        }
+        
+        // Stats cards shimmer
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            repeat(2) {
+                ShimmerBox(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+            }
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            repeat(2) {
+                ShimmerBox(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+            }
+        }
+        
+        // Salary card shimmer
+        ShimmerBox(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .clip(RoundedCornerShape(16.dp)),
+            shimmerProgress = shimmerProgress
+        )
     }
+}
+
+@Composable
+private fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    shimmerProgress: Float
+) {
+    val shimmerColors = listOf(
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    )
+    
+    Box(
+        modifier = modifier
+            .background(
+                brush = Brush.linearGradient(
+                    colors = shimmerColors,
+                    start = Offset(shimmerProgress * 1000f - 500f, 0f),
+                    end = Offset(shimmerProgress * 1000f, 0f)
+                )
+            )
+    )
 }
 
 @Composable
@@ -476,18 +662,98 @@ private fun IndustrySelector(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(insights) { insight ->
-            ElevatedFilterChip(
-                selected = insight.id == selectedId,
-                onClick = { onIndustrySelected(insight.id) },
-                label = { Text(insight.name) },
-                shape = RoundedCornerShape(20.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    selectedLabelColor = MaterialTheme.colorScheme.primary
-                )
+        itemsIndexed(insights) { index, insight ->
+            val isSelected = insight.id == selectedId
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            
+            val scale by animateFloatAsState(
+                targetValue = when {
+                    isPressed -> 0.95f
+                    isSelected -> 1.0f
+                    else -> 1.0f
+                },
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                label = "chipScale"
             )
+            
+            val containerColor by animateColorAsState(
+                targetValue = if (isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+                animationSpec = tween(300),
+                label = "chipColor"
+            )
+            
+            Surface(
+                modifier = Modifier
+                    .scale(scale)
+                    .graphicsLayer {
+                        shadowElevation = if (isSelected) 8f else 2f
+                    },
+                shape = RoundedCornerShape(24.dp),
+                color = containerColor,
+                onClick = { onIndustrySelected(insight.id) },
+                interactionSource = interactionSource
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Industry icon
+                    val icon = getIndustryIcon(insight.id)
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    
+                    Text(
+                        text = insight.name,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    
+                    // Demand indicator dot
+                    if (isSelected) {
+                        val demandColor = when (insight.demandLevel) {
+                            DemandLevel.HIGH -> Color(0xFF22C55E)
+                            DemandLevel.MEDIUM -> Color(0xFFF97316)
+                            DemandLevel.LOW -> MaterialTheme.colorScheme.error
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(demandColor)
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun getIndustryIcon(industryId: String): ImageVector {
+    return when (industryId.lowercase()) {
+        "technology" -> Icons.Filled.ShowChart
+        "finance" -> Icons.Filled.AttachMoney
+        "healthcare" -> Icons.Filled.Verified
+        else -> Icons.Outlined.Insights
     }
 }
 
@@ -496,41 +762,136 @@ private fun MarketOverviewSection(
     insight: IndustryInsightUiModel,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            MarketOutlookCard(
-                modifier = Modifier.weight(1f),
-                outlook = insight.marketOutlook,
-                nextUpdate = insight.nextUpdate
-            )
-            GrowthCard(
-                modifier = Modifier.weight(1f),
-                growthRate = insight.growthRate
-            )
-        }
-
+        // Quick Stats Summary Row
+        QuickStatsSummary(insight = insight)
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            DemandLevelCard(
+            MarketOutlookCard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                level = insight.demandLevel
+                outlook = insight.marketOutlook,
+                nextUpdate = insight.nextUpdate
             )
-            HighlightSkillsCard(
+            GrowthCard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                skills = insight.topSkills
+                growthRate = insight.growthRate
+            )
+        }
+
+        DemandLevelCard(
+            modifier = Modifier.fillMaxWidth(),
+            level = insight.demandLevel
+        )
+
+        HighlightSkillsCard(
+            modifier = Modifier.fillMaxWidth(),
+            skills = insight.topSkills
+        )
+    }
+}
+
+@Composable
+private fun QuickStatsSummary(
+    insight: IndustryInsightUiModel
+) {
+    val avgSalary = insight.salaryRanges.map { it.median }.average().roundToInt()
+    val topSkillsCount = insight.topSkills.size
+    val trendsCount = insight.keyTrends.size
+    
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            QuickStatItem(
+                icon = Icons.Filled.AttachMoney,
+                value = "$${avgSalary / 1000}k",
+                label = "Avg Salary",
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            QuickStatDivider()
+            
+            QuickStatItem(
+                icon = Icons.Filled.TrendingUp,
+                value = "${String.format("%.1f", insight.growthRate)}%",
+                label = "Growth",
+                color = if (insight.growthRate >= 0) Color(0xFF22C55E) else MaterialTheme.colorScheme.error
+            )
+            
+            QuickStatDivider()
+            
+            QuickStatItem(
+                icon = Icons.Filled.Groups,
+                value = insight.demandLevel.name.lowercase().replaceFirstChar { it.uppercase() },
+                label = "Demand",
+                color = when (insight.demandLevel) {
+                    DemandLevel.HIGH -> Color(0xFF22C55E)
+                    DemandLevel.MEDIUM -> Color(0xFFF97316)
+                    DemandLevel.LOW -> MaterialTheme.colorScheme.error
+                }
             )
         }
     }
+}
+
+@Composable
+private fun QuickStatItem(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = color
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun QuickStatDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(40.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 
 @Composable
@@ -540,6 +901,21 @@ private fun MarketOutlookCard(
     nextUpdate: LocalDate,
 ) {
     val (icon, tint) = marketOutlookVisuals(outlook)
+    
+    val gradientColors = when (outlook) {
+        MarketOutlook.POSITIVE -> listOf(
+            Color(0xFF22C55E).copy(alpha = 0.1f),
+            Color(0xFF22C55E).copy(alpha = 0.02f)
+        )
+        MarketOutlook.NEUTRAL -> listOf(
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.02f)
+        )
+        MarketOutlook.NEGATIVE -> listOf(
+            MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+            MaterialTheme.colorScheme.error.copy(alpha = 0.02f)
+        )
+    }
 
     Card(
         modifier = modifier,
@@ -547,38 +923,82 @@ private fun MarketOutlookCard(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Market Outlook",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                .fillMaxSize()
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = gradientColors,
+                        center = Offset(0f, 0f),
+                        radius = 500f
+                    )
                 )
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Market Outlook",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(tint.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = tint
+                        )
+                    }
+                }
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = outlook.name.lowercase().replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    // Status indicator
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = tint.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = when (outlook) {
+                                MarketOutlook.POSITIVE -> "↑"
+                                MarketOutlook.NEUTRAL -> "→"
+                                MarketOutlook.NEGATIVE -> "↓"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = tint,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                
+                Text(
+                    text = "Next update ${relativeDate(nextUpdate)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = outlook.name.lowercase().replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Next update ${relativeDate(nextUpdate)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -588,6 +1008,27 @@ private fun GrowthCard(
     modifier: Modifier = Modifier,
     growthRate: Float,
 ) {
+    // Animated progress value
+    val animatedProgress = remember { Animatable(0f) }
+    LaunchedEffect(growthRate) {
+        animatedProgress.animateTo(
+            targetValue = (growthRate / 20f).coerceIn(0f, 1f),
+            animationSpec = tween(
+                durationMillis = 1000,
+                easing = FastOutSlowInEasing
+            )
+        )
+    }
+    
+    // Animated counter
+    val displayValue = remember { Animatable(0f) }
+    LaunchedEffect(growthRate) {
+        displayValue.animateTo(
+            targetValue = growthRate,
+            animationSpec = tween(1000, easing = FastOutSlowInEasing)
+        )
+    }
+    
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -610,25 +1051,68 @@ private fun GrowthCard(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Icon(
-                    imageVector = Icons.Filled.TrendingUp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (growthRate >= 0) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (growthRate >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = String.format("%.1f", displayValue.value),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            Text(
-                text = "${String.format("%.1f", growthRate)}%",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            LinearProgressIndicator(
-                progress = { (growthRate / 20f).coerceIn(0f, 1f) },
+            
+            // Animated progress bar
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress.value)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        )
+                )
+            }
+            
+            Text(
+                text = "Year-over-year growth rate",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -643,6 +1127,19 @@ private fun DemandLevelCard(
         DemandLevel.HIGH -> "High" to Color(0xFF22C55E)
         DemandLevel.MEDIUM -> "Medium" to Color(0xFFF97316)
         DemandLevel.LOW -> "Low" to MaterialTheme.colorScheme.error
+    }
+    
+    // Animated demand level indicator
+    val demandProgress = remember { Animatable(0f) }
+    LaunchedEffect(level) {
+        demandProgress.animateTo(
+            targetValue = when (level) {
+                DemandLevel.HIGH -> 1f
+                DemandLevel.MEDIUM -> 0.6f
+                DemandLevel.LOW -> 0.3f
+            },
+            animationSpec = tween(800, easing = FastOutSlowInEasing)
+        )
     }
 
     Card(
@@ -667,24 +1164,73 @@ private fun DemandLevelCard(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Icon(
-                    imageVector = Icons.Filled.TrendingUp,
-                    contentDescription = null,
-                    tint = color
-                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Groups,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = color
+                    )
+                }
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(color.copy(alpha = 0.6f))
-            )
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                // Animated pulse for high demand
+                if (level == DemandLevel.HIGH) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.5f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .alpha(pulseAlpha)
+                            .background(color)
+                    )
+                }
+            }
+            
+            // Demand level bar with segments
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                repeat(5) { index ->
+                    val segmentProgress = ((demandProgress.value * 5) - index).coerceIn(0f, 1f)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (segmentProgress > 0) color.copy(alpha = 0.3f + (segmentProgress * 0.7f))
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                    )
+                }
+            }
+            
             Text(
                 text = "Based on hiring velocity across the past 90 days.",
                 style = MaterialTheme.typography.bodySmall,
@@ -745,6 +1291,7 @@ private fun SalaryRangesCard(
     salaryRanges: List<SalaryRangeUiModel>,
 ) {
     val maxSalary = salaryRanges.maxOfOrNull { it.max }?.coerceAtLeast(1) ?: 1
+    var expandedRoleIndex by remember { mutableStateOf<Int?>(null) }
 
     Card(
         colors = CardDefaults.cardColors(
@@ -757,25 +1304,61 @@ private fun SalaryRangesCard(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Salary Ranges by Role",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Minimum, median, and maximum annual compensation (USD)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Salary Ranges by Role",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tap a role to see detailed breakdown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.AttachMoney,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                        .padding(4.dp)
                 )
             }
+            
+            // Legend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                SalaryLegendItem(color = MaterialTheme.colorScheme.surfaceVariant, label = "Min")
+                SalaryLegendItem(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), label = "Median")
+                SalaryLegendItem(color = MaterialTheme.colorScheme.primary, label = "Max")
+            }
 
-            salaryRanges.forEach { range ->
-                SalaryRangeRow(range = range, maxSalary = maxSalary)
+            salaryRanges.forEachIndexed { index, range ->
+                SalaryRangeRow(
+                    range = range,
+                    maxSalary = maxSalary,
+                    isExpanded = expandedRoleIndex == index,
+                    onClick = {
+                        expandedRoleIndex = if (expandedRoleIndex == index) null else index
+                    }
+                )
                 if (range != salaryRanges.last()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                 }
             }
         }
@@ -783,11 +1366,58 @@ private fun SalaryRangesCard(
 }
 
 @Composable
+private fun SalaryLegendItem(
+    color: Color,
+    label: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(color)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun SalaryRangeRow(
     range: SalaryRangeUiModel,
     maxSalary: Int,
+    isExpanded: Boolean,
+    onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "scale"
+    )
+    
     Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .background(
+                if (isExpanded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                else Color.Transparent
+            )
+            .padding(if (isExpanded) 12.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -795,11 +1425,13 @@ private fun SalaryRangeRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = range.role,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = range.location,
@@ -807,79 +1439,150 @@ private fun SalaryRangeRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "$${range.median / 1000}k median",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            
+            // Median salary badge
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            ) {
+                Text(
+                    text = "$${range.median / 1000}k",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Range visualization bar
+        SalaryRangeVisualization(
+            min = range.min,
+            median = range.median,
+            max = range.max,
+            maxSalary = maxSalary
+        )
+        
+        // Expanded details
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + slideInVertically { -it / 2 },
+            exit = fadeOut()
         ) {
-            SalaryBar(
-                modifier = Modifier.weight(1f),
-                label = "Min",
-                value = range.min,
-                maxSalary = maxSalary,
-                color = MaterialTheme.colorScheme.surfaceVariant
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                SalaryDetailItem(label = "Minimum", value = "$${range.min / 1000}k")
+                SalaryDetailItem(label = "Median", value = "$${range.median / 1000}k")
+                SalaryDetailItem(label = "Maximum", value = "$${range.max / 1000}k")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SalaryRangeVisualization(
+    min: Int,
+    median: Int,
+    max: Int,
+    maxSalary: Int
+) {
+    val animatedMin = remember { Animatable(0f) }
+    val animatedMedian = remember { Animatable(0f) }
+    val animatedMax = remember { Animatable(0f) }
+    
+    LaunchedEffect(min, median, max) {
+        animatedMin.animateTo((min.toFloat() / maxSalary).coerceIn(0f, 1f), tween(600))
+    }
+    LaunchedEffect(min, median, max) {
+        animatedMedian.animateTo((median.toFloat() / maxSalary).coerceIn(0f, 1f), tween(800))
+    }
+    LaunchedEffect(min, median, max) {
+        animatedMax.animateTo((max.toFloat() / maxSalary).coerceIn(0f, 1f), tween(1000))
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp)
+    ) {
+        // Background track
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .align(Alignment.Center)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        )
+        
+        // Range bar (from min to max)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(animatedMax.value)
+                .padding(start = (animatedMin.value * 100).dp.coerceAtMost(200.dp))
+                .height(8.dp)
+                .align(Alignment.CenterStart)
+                .offset(x = (animatedMin.value * 100).dp.coerceAtMost(50.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    )
             )
-            SalaryBar(
-                modifier = Modifier.weight(1f),
-                label = "Median",
-                value = range.median,
-                maxSalary = maxSalary,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-            )
-            SalaryBar(
-                modifier = Modifier.weight(1f),
-                label = "Max",
-                value = range.max,
-                maxSalary = maxSalary,
-                color = MaterialTheme.colorScheme.primary
+        }
+        
+        // Median indicator dot
+        Box(
+            modifier = Modifier
+                .offset(x = (animatedMedian.value * 280).dp.coerceAtMost(280.dp))
+                .size(16.dp)
+                .align(Alignment.CenterStart)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onPrimary)
             )
         }
     }
 }
 
 @Composable
-private fun SalaryBar(
-    modifier: Modifier = Modifier,
+private fun SalaryDetailItem(
     label: String,
-    value: Int,
-    maxSalary: Int,
-    color: Color,
+    value: String
 ) {
     Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth((value / maxSalary.toFloat()).coerceIn(0f, 1f))
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(color)
-            )
-        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "$${value / 1000}k",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -916,27 +1619,52 @@ private fun KeyTrendsCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Key Industry Trends",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Signals shaping the market right now",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Key Industry Trends",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Signals shaping the market right now",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.TrendingUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
-            trends.forEach { trend ->
-                TrendBullet(text = trend)
+            
+            trends.forEachIndexed { index, trend ->
+                TrendBullet(
+                    text = trend,
+                    index = index + 1
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RecommendedSkillsCard(
     modifier: Modifier = Modifier,
@@ -952,39 +1680,95 @@ private fun RecommendedSkillsCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Recommended Skills",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Focus areas to grow your edge",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Recommended Skills",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Focus areas to grow your edge",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Verified,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
-            skills.forEach { skill ->
-                SkillChip(
-                    label = skill,
-                    emphasized = true
-                )
+            
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                skills.forEachIndexed { index, skill ->
+                    AnimatedSkillChip(
+                        label = skill,
+                        index = index,
+                        emphasized = true
+                    )
+                }
             }
-            OutlinedButton(
+            
+            Button(
                 onClick = { },
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors()
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Add to learning plan")
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedSkillChip(
+    label: String,
+    index: Int,
+    emphasized: Boolean = false,
+) {
+    var visible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 100L)
+        visible = true
+    }
+    
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(300)) + scaleIn(
+            initialScale = 0.8f,
+            animationSpec = spring(stiffness = Spring.StiffnessMedium)
+        )
+    ) {
+        SkillChip(label = label, emphasized = emphasized)
     }
 }
 
@@ -1001,33 +1785,78 @@ private fun SkillChip(
             MaterialTheme.colorScheme.surfaceVariant
         }
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (emphasized) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (emphasized) FontWeight.Medium else FontWeight.Normal,
+                color = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
 @Composable
-private fun TrendBullet(text: String) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun TrendBullet(
+    text: String,
+    index: Int
+) {
+    var visible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 150L)
+        visible = true
+    }
+    
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(400)) + slideInVertically(
+            initialOffsetY = { it / 2 },
+            animationSpec = tween(400)
+        )
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$index",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 

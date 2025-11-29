@@ -10,7 +10,8 @@
       "Bash(dir /s /b \"D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\")",
       "Bash(findstr:*)",
       "Bash(git -C \"D:\\Workspace\\Android\\AICareerCoach\" diff app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/elements/WorkExperienceElementRenderer.kt)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

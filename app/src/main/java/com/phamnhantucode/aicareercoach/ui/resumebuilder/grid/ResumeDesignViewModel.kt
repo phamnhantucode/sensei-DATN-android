@@ -9,6 +9,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -94,13 +95,20 @@ class ResumeDesignViewModel(context: Context) : ViewModel() {
      */
     fun deleteDesign(designId: String) {
         viewModelScope.launch {
+            // Optimistically update UI immediately
+            _designs.update { currentList ->
+                currentList.filter { it.id != designId }
+            }
+
+            // Perform database deletion
             val result = repository.deleteDesign(designId)
             result.fold(
                 onSuccess = {
-                    // Reload designs after successful deletion
-                    loadDesigns()
+                    // Successfully deleted - UI already updated
                 },
                 onFailure = { exception ->
+                    // Rollback on failure
+                    loadDesigns()
                     _error.value = exception.message ?: "Failed to delete design"
                 }
             )

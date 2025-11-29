@@ -93,6 +93,7 @@ import java.util.Locale
 
 @Composable
 fun ResumeBuilderScreen(
+    isEditOnly: Boolean = false,
     onBack: () -> Unit = {},
     onNavigateToPreview: ((Resume) -> Unit)? = null,
     onNavigateToGridEditor: () -> Unit = {},
@@ -211,25 +212,27 @@ fun ResumeBuilderScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Grid Editor Button with text
-                                Button(
-                                    onClick = onNavigateToGridEditor,
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Dashboard,
-                                        contentDescription = "Resume designer",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        "Resume designer",
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
+                                // Grid Editor Button - hidden in edit-only mode
+                                if (!isEditOnly) {
+                                    Button(
+                                        onClick = onNavigateToGridEditor,
+                                        shape = RoundedCornerShape(24.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Dashboard,
+                                            contentDescription = "Resume designer",
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Resume designer",
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
                                 }
 
                                 // Preview Button
@@ -499,22 +502,24 @@ fun ResumeBuilderScreen(
                 )
             }
 
-            // Floating Action Button for Create Markdown
-            ExtendedFloatingActionButton(
-                onClick = onNavigateToMarkdown,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Description,
-                    contentDescription = "Create Markdown"
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Create Markdown")
+            // Floating Action Button for Create Markdown - hidden in edit-only mode
+            if (!isEditOnly) {
+                ExtendedFloatingActionButton(
+                    onClick = onNavigateToMarkdown,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Description,
+                        contentDescription = "Create Markdown"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Create Markdown")
+                }
             }
         }
     }

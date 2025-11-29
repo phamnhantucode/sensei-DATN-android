@@ -44,9 +44,13 @@ import java.util.*
 @Composable
 fun ResumeDesignScreen(
     onBack: () -> Unit,
-    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?, isNewDesign: Boolean) -> Unit,
-    viewModel: ResumeDesignViewModel = ResumeDesignViewModel(LocalContext.current)
+    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?, isNewDesign: Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+    val viewModel: ResumeDesignViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
+        ResumeDesignViewModel(context)
+    }
+
     val designs by viewModel.designs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -212,8 +216,7 @@ private fun ResumeCard(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Thumbnail section
@@ -409,7 +412,7 @@ private fun TemplatesSection(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(templates) { template ->
+                    items(templates, key = { it.id }) { template ->
                         ResumeCard(
                             variant = ResumeCardVariant.Template(
                                 template = template,
@@ -466,7 +469,7 @@ private fun MyDesignsSection(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(designs) { design ->
+                    items(designs, key = { it.id }) { design ->
                         ResumeCard(
                             variant = ResumeCardVariant.Design(
                                 design = design,

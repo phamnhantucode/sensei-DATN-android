@@ -60,6 +60,7 @@ import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
+import com.phamnhantucode.aicareercoach.utils.IndustryFormatUtils
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -226,7 +227,15 @@ fun OnboardingScreen(
                                                         submitError = "Please select an industry."
                                                     } else if (user == null) {
                                                         submitError = "User session unavailable. Please sign in again."
+                                                    } else if (formData.subIndustry.isBlank()) {
+                                                        submitError = "Please select a specialization."
                                                     } else {
+                                                        // Format industry data for API (industryId---sub-industry-kebab)
+                                                        val formattedIndustry = IndustryFormatUtils.formatIndustryForApi(
+                                                            industryId = selectedIndustry.id,
+                                                            subIndustry = formData.subIndustry
+                                                        )
+
                                                         // Step 1: Get auth token
                                                         loadingMessage = "Setting up your account..."
                                                         val authToken = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
@@ -237,7 +246,7 @@ fun OnboardingScreen(
                                                         val authorizationHeader = "Bearer $authToken"
                                                         val repository = IndustryInsightsRepository()
                                                         repository.ensureIndustryInsightExists(
-                                                            industry = selectedIndustry.name,
+                                                            industry = formattedIndustry,
                                                             authorizationHeader = authorizationHeader,
                                                         )
 
@@ -245,7 +254,7 @@ fun OnboardingScreen(
                                                         loadingMessage = "Creating your profile..."
                                                         NeonUserService.upsertUserWithIndustry(
                                                             user = user,
-                                                            industry = selectedIndustry.name,
+                                                            industry = formattedIndustry,
                                                             authToken = authToken
                                                         )
 
@@ -256,7 +265,7 @@ fun OnboardingScreen(
                                                             .filter { it.isNotEmpty() }
                                                         val experienceYears = formData.experienceYears.trim().toIntOrNull()
                                                         val profile = NeonUserService.UserProfileUpdate(
-                                                            industry = selectedIndustry.name,
+                                                            industry = formattedIndustry,
                                                             experienceYears = experienceYears,
                                                             skills = skills,
                                                             bio = formData.bio.takeIf { it.isNotBlank() },

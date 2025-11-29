@@ -161,11 +161,14 @@ fun EditProfileBottomSheet(
 
             OutlinedTextField(
                 value = editState.formData.industry.orEmpty(),
-                onValueChange = { onFormDataChange(editState.formData.copy(industry = it.takeIf { it.isNotBlank() })) },
+                onValueChange = { }, // No-op - field is read-only
                 label = { Text("Industry") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !editState.isSaving,
-                singleLine = true
+                enabled = false,
+                singleLine = true,
+                supportingText = {
+                    Text("To change your industry, please contact support")
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))

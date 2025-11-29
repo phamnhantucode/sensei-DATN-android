@@ -97,7 +97,7 @@ fun AppNavigation() {
         composable(Screen.IndustryInsights.route) {
             IndustryInsightsScreen(
                 onNavigateToResumeBuilder = {
-                    navController.navigate(Screen.ResumeBuilder.route)
+                    navController.navigate(Screen.ResumeBuilder.buildRoute(isEditOnly = false))
                 },
                 onNavigateToInterviewPrep = {
                     navController.navigate(Screen.InterviewPrep.route)
@@ -125,8 +125,19 @@ fun AppNavigation() {
             )
         }
 
-        composable(Screen.ResumeBuilder.route) {
+        composable(
+            route = Screen.ResumeBuilder.routeWithArgs,
+            arguments = listOf(
+                navArgument(Screen.ResumeBuilder.isEditOnlyKey()) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val isEditOnly = backStackEntry.arguments?.getBoolean(Screen.ResumeBuilder.isEditOnlyKey()) ?: false
+
             ResumeBuilderScreen(
+                isEditOnly = isEditOnly,
                 onBack = { navController.popBackStack() },
                 onNavigateToGridEditor = {
                     navController.navigate(Screen.ResumeDesignScreen.route)
@@ -187,7 +198,7 @@ fun AppNavigation() {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPreview = { /* TODO: Navigate to preview if needed */ },
                 onSwitchToFormEditor = {
-                    navController.popBackStack()
+                    navController.navigate(Screen.ResumeBuilder.buildRoute(isEditOnly = true))
                 },
                 viewModel = viewModel
             )

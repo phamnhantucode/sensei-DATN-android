@@ -84,6 +84,11 @@ fun CoverLetterScreen(
     val generationState by viewModel.generationState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
 
+    val hasExistingLetters = when (val state = uiState) {
+        is CoverLetterUiState.Success -> state.coverLetters.isNotEmpty()
+        else -> false
+    }
+
     // Handle generation state
     LaunchedEffect(generationState) {
         when (generationState) {
@@ -148,23 +153,25 @@ fun CoverLetterScreen(
                         }
                     }
 
-                    Button(
-                        onClick = {
-                            showCreateDialog = true
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = "Create new cover letter"
-                        )
-                        Spacer(modifier = Modifier.size(4.dp))
-                        Text(text = "Create")
+                    if (hasExistingLetters) {
+                        Button(
+                            onClick = {
+                                showCreateDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Create new cover letter"
+                            )
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(text = "Create")
+                        }
                     }
                 }
             }
