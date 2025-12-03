@@ -9,14 +9,21 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.Layout
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.AlignmentSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import androidx.annotation.VisibleForTesting
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.phamnhantucode.aicareercoach.data.pdf.APITemplateService
 
 enum class ResumeExportFormat(
     val fileExtension: String,
@@ -688,9 +695,200 @@ object ResumeFormatter {
 
         return Language(name = name, proficiency = proficiency)
     }
+
+    fun toHtml(resume: Resume): Pair<String, String> {
+        val css = """
+            * { box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+                line-height: 1.6;
+                padding: 0;
+                margin: 0;
+                font-size: 14px;
+                color: #333;
+            }
+            h1 { font-size: 24px; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-top: 0; }
+            h2 { font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-top: 20px; margin-bottom: 12px; color: #2c3e50; }
+            h3 { font-size: 16px; margin-top: 16px; margin-bottom: 8px; font-weight: 600; }
+            p { margin: 0 0 10px 0; }
+            ul { padding-left: 20px; margin: 0 0 10px 0; }
+            li { margin: 4px 0; }
+            a { color: #3498db; text-decoration: none; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { border: none; margin-bottom: 5px; }
+            .contact-info { margin-bottom: 10px; font-size: 12px; color: #666; }
+            .section { margin-bottom: 20px; }
+            .item { margin-bottom: 15px; }
+            .item-header { display: flex; justify-content: space-between; align-items: baseline; }
+            .item-title { font-weight: bold; font-size: 15px; }
+            .item-subtitle { font-weight: bold; color: #555; }
+            .item-date { font-style: italic; color: #777; font-size: 12px; }
+            .item-location { font-style: italic; color: #777; font-size: 12px; }
+            .skills-list { line-height: 1.8; }
+        """.trimIndent()
+
+        val html = buildString {
+            append("<!DOCTYPE html><html><body>")
+            
+            // Header
+            append("<div class='header'>")
+            append("<h1>${resume.personalInfo.fullName.ifBlank { "Professional Resume" }}</h1>")
+            
+            val contactParts = buildContactLine(resume.personalInfo)
+            if (contactParts.isNotEmpty()) {
+                // Convert markdown links to HTML links for contact info
+                val htmlContactParts = contactParts.map { part ->
+                    part.replace(Regex("\\[(.+?)\\]\\((.+?)\\)"), "<a href=\"$2\">$1</a>")
+                }
+                append("<div class='contact-info'>${htmlContactParts.joinToString(" • ")}</div>")
+            }
+            append("</div>")
+
+            // Professional Summary
+            if (resume.professionalSummary.isNotBlank()) {
+                append("<div class='section'>")
+                append("<h2>Professional Summary</h2>")
+                append("<p>${resume.professionalSummary.trim()}</p>")
+                append("</div>")
+            }
+
+            // Skills
+            if (resume.skills.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Skills</h2>")
+                append("<div class='skills-list'>${resume.skills.joinToString(", ")}</div>")
+                append("</div>")
+            }
+
+            // Work Experience
+            if (resume.workExperiences.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Work Experience</h2>")
+                resume.workExperiences.forEach { exp ->
+                    append("<div class='item'>")
+                    append("<div class='item-header'>")
+                    append("<span class='item-title'>${exp.jobTitle.ifBlank { "Experience" }}</span>")
+                    append("<span class='item-date'>${dateRange(exp.startDate, exp.endDate, exp.isCurrentRole)}</span>")
+                    append("</div>")
+                    
+                    val companyLoc = listOfNotBlank(exp.company, exp.location).joinToString(" • ")
+                    if (companyLoc.isNotBlank()) {
+                        append("<div class='item-subtitle'>$companyLoc</div>")
+                    }
+                    
+                    if (exp.responsibilities.any { it.isNotBlank() }) {
+                        append("<ul>")
+                        exp.responsibilities.filter { it.isNotBlank() }.forEach { 
+                            append("<li>$it</li>") 
+                        }
+                        append("</ul>")
+                    }
+                    append("</div>")
+                }
+                append("</div>")
+            }
+
+            // Education
+            if (resume.education.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Education</h2>")
+                resume.education.forEach { edu ->
+                    append("<div class='item'>")
+                    append("<div class='item-header'>")
+                    append("<span class='item-title'>${edu.degree.ifBlank { "Education" }}</span>")
+                    append("<span class='item-date'>${dateRange(edu.startDate, edu.endDate, false)}</span>")
+                    append("</div>")
+                    
+                    val schoolLoc = listOfNotBlank(edu.institution, edu.location).joinToString(" • ")
+                    if (schoolLoc.isNotBlank()) {
+                        append("<div class='item-subtitle'>$schoolLoc</div>")
+                    }
+                    
+                    append("<ul>")
+                    if (edu.gpa.isNotBlank()) {
+                        append("<li>GPA: ${edu.gpa}</li>")
+                    }
+                    edu.achievements.filter { it.isNotBlank() }.forEach { 
+                        append("<li>$it</li>") 
+                    }
+                    append("</ul>")
+                    append("</div>")
+                }
+                append("</div>")
+            }
+
+            // Projects
+            if (resume.projects.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Projects</h2>")
+                resume.projects.forEach { project ->
+                    append("<div class='item'>")
+                    append("<div class='item-header'>")
+                    append("<span class='item-title'>${project.title.ifBlank { "Project" }}</span>")
+                    append("<span class='item-date'>${dateRange(project.startDate, project.endDate, false)}</span>")
+                    append("</div>")
+                    
+                    if (project.description.isNotBlank()) {
+                        append("<p>${project.description}</p>")
+                    }
+                    
+                    if (project.technologies.isNotEmpty()) {
+                        append("<p><strong>Technologies:</strong> ${project.technologies.joinToString(", ")}</p>")
+                    }
+                    
+                    if (project.link.isNotBlank()) {
+                        append("<p><strong>Link:</strong> <a href='${project.link}'>${project.link}</a></p>")
+                    }
+                    append("</div>")
+                }
+                append("</div>")
+            }
+
+            // Certifications
+            if (resume.certifications.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Certifications</h2>")
+                append("<ul>")
+                resume.certifications.forEach { cert ->
+                    val certName = cert.name.ifBlank { "Certification" }
+                    val details = listOfNotBlank(
+                        cert.issuer,
+                        dateString(cert.issueDate),
+                        cert.credentialId.takeIf { it.isNotBlank() }?.let { "ID: $it" }
+                    ).joinToString(" • ")
+                    
+                    if (details.isNotBlank()) {
+                        append("<li><strong>$certName</strong> - $details</li>")
+                    } else {
+                        append("<li><strong>$certName</strong></li>")
+                    }
+                }
+                append("</ul>")
+                append("</div>")
+            }
+
+            // Languages
+            if (resume.languages.isNotEmpty()) {
+                append("<div class='section'>")
+                append("<h2>Languages</h2>")
+                append("<ul>")
+                resume.languages.forEach { lang ->
+                    append("<li><strong>${lang.name}</strong> - ${lang.proficiency.displayName}</li>")
+                }
+                append("</ul>")
+                append("</div>")
+            }
+
+            append("</body></html>")
+        }
+        
+        return Pair(html, css)
+    }
 }
 
 class ResumeExporter(private val context: Context) {
+
+    private val apiTemplateService = APITemplateService()
 
     suspend fun export(format: ResumeExportFormat, resume: Resume): ResumeExportResult = when (format) {
         ResumeExportFormat.MARKDOWN -> exportMarkdown(resume)
@@ -708,8 +906,11 @@ class ResumeExporter(private val context: Context) {
 
     private fun exportPdf(resume: Resume): ResumeExportResult = runCatching {
         val fileName = buildFileName(resume, ResumeExportFormat.PDF)
-        val markdown = ResumeFormatter.toMarkdown(resume)
-        val pdfBytes = buildPdf(markdown)
+        
+        // Use APITemplate.io for PDF generation
+        val (html, css) = ResumeFormatter.toHtml(resume)
+        val pdfBytes = apiTemplateService.generatePdf(html, css)
+        
         val uri = saveToDownloads(fileName, ResumeExportFormat.PDF.mimeType, pdfBytes)
         ResumeExportResult.Success(ResumeExportFormat.PDF, uri, fileName)
     }.getOrElse { throwable ->
@@ -780,8 +981,8 @@ class ResumeExporter(private val context: Context) {
         val contentWidth = pageWidth - (margin * 2)
         val contentHeight = pageHeight - (margin * 2)
 
-        // Parse markdown into styled sections
-        val styledText = parseMarkdownForPdf(markdown)
+        // Parse markdown into styled spannable text
+        val styledText = parseMarkdownToSpannable(markdown)
 
         val textPaint = TextPaint().apply {
             isAntiAlias = true
@@ -794,7 +995,7 @@ class ResumeExporter(private val context: Context) {
             .obtain(styledText, 0, styledText.length, textPaint, contentWidth)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setIncludePad(false)
-            .setLineSpacing(2f, 1.15f)
+            .setLineSpacing(2f, 1.2f)
             .build()
 
         val document = PdfDocument()
@@ -828,54 +1029,296 @@ class ResumeExporter(private val context: Context) {
         }
     }
 
-    /**
-     * Simplified markdown parser for PDF rendering.
-     * Strips markdown syntax while preserving structure and readability.
-     */
-    private fun parseMarkdownForPdf(markdown: String): String {
-        return markdown.lines().joinToString("\n") { line ->
-            when {
-                // Remove HTML tags (like <div align="center">)
-                line.trim().startsWith("<") && line.trim().endsWith(">") -> ""
+    // Font sizes in scaled pixels for PDF
+    private val FONT_SIZE_NAME = 20       // Name (main title)
+    private val FONT_SIZE_H2 = 14         // Section headers
+    private val FONT_SIZE_H3 = 12         // Subsection headers (job title, degree)
+    private val FONT_SIZE_BODY = 11       // Body text
+    private val FONT_SIZE_SMALL = 10      // Dates, secondary info
+    
+    private val COLOR_PRIMARY = android.graphics.Color.parseColor("#1a1a1a")
+    private val COLOR_SECONDARY = android.graphics.Color.parseColor("#666666")
+    private val COLOR_LINK = android.graphics.Color.parseColor("#0066cc")
 
-                // H2 headers (##)
-                line.startsWith("## ") -> {
-                    "\n" + line.removePrefix("## ")
+    /**
+     * Parse markdown into styled SpannableStringBuilder with proper formatting.
+     * Renders headings, bold, italic, links, and lists with visual hierarchy.
+     */
+    private fun parseMarkdownToSpannable(markdown: String): SpannableStringBuilder {
+        val builder = SpannableStringBuilder()
+        val lines = markdown.lines()
+        var i = 0
+        var isFirstHeader = true
+
+        while (i < lines.size) {
+            val line = lines[i].trim()
+            
+            when {
+                // Skip empty HTML tags
+                line.startsWith("<div") || line.startsWith("</div>") || line == "<div align=\"center\">" -> {
+                    // Skip
+                }
+                
+                // Name header (## <div align="center">Name</div>)
+                line.startsWith("## <div") || (line.startsWith("## ") && isFirstHeader) -> {
+                    val name = line
+                        .removePrefix("## ")
                         .replace("<div align=\"center\">", "")
                         .replace("</div>", "")
-                        .uppercase() + "\n"
+                        .trim()
+                    
+                    if (name.isNotBlank()) {
+                        val start = builder.length
+                        builder.append(name)
+                        builder.setSpan(
+                            AbsoluteSizeSpan(FONT_SIZE_NAME, true),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            StyleSpan(Typeface.BOLD),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.append("\n")
+                        isFirstHeader = false
+                    }
                 }
-
-                // H3 headers (###)
+                
+                // Contact info line (contains emojis)
+                line.contains("📧") || line.contains("📱") || line.contains("💼") || 
+                line.contains("🔗") || line.contains("🌐") || line.contains("📍") -> {
+                    val contactText = line
+                        .replace("📧", "✉ ")
+                        .replace("📱", "☎ ")
+                        .replace("💼", "")
+                        .replace("🔗", "")
+                        .replace("🌐", "")
+                        .replace("📍", "⚲ ")
+                        .replace(Regex("\\[(.+?)\\]\\(.+?\\)"), "$1")  // Extract link text
+                        .trim()
+                    
+                    if (contactText.isNotBlank()) {
+                        val start = builder.length
+                        builder.append(contactText)
+                        builder.setSpan(
+                            AbsoluteSizeSpan(FONT_SIZE_SMALL, true),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            ForegroundColorSpan(COLOR_SECONDARY),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            AlignmentSpan.Standard(Layout.Alignment.ALIGN_CENTER),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.append("\n\n")
+                    }
+                }
+                
+                // Section headers (## Header)
+                line.startsWith("## ") && !line.contains("<div") -> {
+                    val header = line.removePrefix("## ").trim().uppercase()
+                    if (header.isNotBlank()) {
+                        builder.append("\n")
+                        val start = builder.length
+                        builder.append(header)
+                        builder.setSpan(
+                            AbsoluteSizeSpan(FONT_SIZE_H2, true),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            StyleSpan(Typeface.BOLD),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            ForegroundColorSpan(COLOR_PRIMARY),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.append("\n")
+                        // Add separator line
+                        val sepStart = builder.length
+                        builder.append("─".repeat(50))
+                        builder.setSpan(
+                            ForegroundColorSpan(android.graphics.Color.parseColor("#cccccc")),
+                            sepStart, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.append("\n\n")
+                    }
+                }
+                
+                // Subsection headers (### Header) - Job titles, degrees, project names
                 line.startsWith("### ") -> {
-                    "\n" + line.removePrefix("### ") + "\n"
+                    val subheader = line.removePrefix("### ").trim()
+                    if (subheader.isNotBlank()) {
+                        val start = builder.length
+                        builder.append(subheader)
+                        builder.setSpan(
+                            AbsoluteSizeSpan(FONT_SIZE_H3, true),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.setSpan(
+                            StyleSpan(Typeface.BOLD),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        builder.append("\n")
+                    }
                 }
-
-                // Bold text (**text**)
-                line.contains("**") -> {
-                    line.replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
+                
+                // Bold text lines (**text**) - Company names, etc.
+                line.startsWith("**") && line.endsWith("**") -> {
+                    val boldText = line.removeSurrounding("**")
+                    val start = builder.length
+                    builder.append(boldText)
+                    builder.setSpan(
+                        StyleSpan(Typeface.BOLD),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.setSpan(
+                        AbsoluteSizeSpan(FONT_SIZE_BODY, true),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.append("\n")
                 }
-
-                // Italic text (*text*)
-                line.contains("*") && !line.contains("**") -> {
-                    line.replace(Regex("\\*(.+?)\\*"), "$1")
+                
+                // Italic text lines (*text*) - Dates
+                line.startsWith("*") && line.endsWith("*") && !line.startsWith("**") -> {
+                    val italicText = line.removeSurrounding("*")
+                    val start = builder.length
+                    builder.append(italicText)
+                    builder.setSpan(
+                        StyleSpan(Typeface.ITALIC),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.setSpan(
+                        AbsoluteSizeSpan(FONT_SIZE_SMALL, true),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.setSpan(
+                        ForegroundColorSpan(COLOR_SECONDARY),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.append("\n")
                 }
-
-                // Links [text](url)
-                line.contains("](") -> {
-                    line.replace(Regex("\\[(.+?)\\]\\(.+?\\)"), "$1")
+                
+                // Bullet points (- text)
+                line.startsWith("- ") -> {
+                    val bulletText = parseInlineFormatting(line.removePrefix("- "))
+                    val start = builder.length
+                    builder.append("  • ")
+                    builder.append(bulletText)
+                    builder.setSpan(
+                        AbsoluteSizeSpan(FONT_SIZE_BODY, true),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.append("\n")
                 }
-
-                // Bullet points
-                line.trim().startsWith("- ") -> {
-                    "  • " + line.trim().removePrefix("- ")
+                
+                // Regular text with possible inline formatting
+                line.isNotBlank() -> {
+                    val formattedText = parseInlineFormatting(line)
+                    val start = builder.length
+                    builder.append(formattedText)
+                    builder.setSpan(
+                        AbsoluteSizeSpan(FONT_SIZE_BODY, true),
+                        start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    builder.append("\n")
                 }
-
-                // Empty lines
-                line.isBlank() -> ""
-
-                else -> line
+                
+                // Empty lines - add small spacing
+                line.isBlank() && builder.isNotEmpty() -> {
+                    // Only add spacing if not already multiple newlines
+                    val text = builder.toString()
+                    if (!text.endsWith("\n\n")) {
+                        builder.append("\n")
+                    }
+                }
             }
-        }.replace(Regex("\n{3,}"), "\n\n") // Normalize multiple newlines
+            i++
+        }
+        
+        return builder
+    }
+
+    /**
+     * Parse inline formatting (bold, italic, links) within a line
+     */
+    private fun parseInlineFormatting(text: String): SpannableStringBuilder {
+        val builder = SpannableStringBuilder()
+        var remaining = text
+        
+        // Process the text character by character to handle inline formatting
+        while (remaining.isNotEmpty()) {
+            when {
+                // Bold text **text**
+                remaining.startsWith("**") -> {
+                    val endIndex = remaining.indexOf("**", 2)
+                    if (endIndex > 2) {
+                        val boldText = remaining.substring(2, endIndex)
+                        val start = builder.length
+                        builder.append(boldText)
+                        builder.setSpan(
+                            StyleSpan(Typeface.BOLD),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        remaining = remaining.substring(endIndex + 2)
+                    } else {
+                        builder.append("**")
+                        remaining = remaining.substring(2)
+                    }
+                }
+                
+                // Italic text *text* (but not **)
+                remaining.startsWith("*") && !remaining.startsWith("**") -> {
+                    val endIndex = remaining.indexOf("*", 1)
+                    if (endIndex > 1) {
+                        val italicText = remaining.substring(1, endIndex)
+                        val start = builder.length
+                        builder.append(italicText)
+                        builder.setSpan(
+                            StyleSpan(Typeface.ITALIC),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        remaining = remaining.substring(endIndex + 1)
+                    } else {
+                        builder.append("*")
+                        remaining = remaining.substring(1)
+                    }
+                }
+                
+                // Links [text](url) - show text only
+                remaining.startsWith("[") -> {
+                    val linkTextEnd = remaining.indexOf("]")
+                    val urlStart = remaining.indexOf("(", linkTextEnd)
+                    val urlEnd = remaining.indexOf(")", urlStart)
+                    
+                    if (linkTextEnd > 0 && urlStart == linkTextEnd + 1 && urlEnd > urlStart) {
+                        val linkText = remaining.substring(1, linkTextEnd)
+                        val start = builder.length
+                        builder.append(linkText)
+                        builder.setSpan(
+                            ForegroundColorSpan(COLOR_LINK),
+                            start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        remaining = remaining.substring(urlEnd + 1)
+                    } else {
+                        builder.append("[")
+                        remaining = remaining.substring(1)
+                    }
+                }
+                
+                // Regular character
+                else -> {
+                    builder.append(remaining[0])
+                    remaining = remaining.substring(1)
+                }
+            }
+        }
+        
+        return builder
     }
 }

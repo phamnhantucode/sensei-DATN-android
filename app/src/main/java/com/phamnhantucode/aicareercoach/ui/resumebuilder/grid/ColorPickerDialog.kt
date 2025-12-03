@@ -243,13 +243,26 @@ private fun OptimizedHsvColorWheel(
     val hsv = remember(currentColor) { currentColor.toHsv() }
     var currentHsv by remember { mutableStateOf(hsv) }
 
-    // Update when color changes externally
-    LaunchedEffect(currentColor) {
-        currentHsv = currentColor.toHsv()
-    }
-
     var isDraggingHue by remember { mutableStateOf(false) }
     var isDraggingSV by remember { mutableStateOf(false) }
+    
+    // Track if we're actively dragging to avoid external updates during drag
+    val isDragging = isDraggingHue || isDraggingSV
+
+    // Update when color changes externally, but preserve hue if not dragging
+    // and the color change isn't from our own drag operation
+    LaunchedEffect(currentColor, isDragging) {
+        if (!isDragging) {
+            val newHsv = currentColor.toHsv()
+            // Preserve hue if saturation or value is very low (hue becomes meaningless)
+            val shouldPreserveHue = newHsv.saturation < 0.01f || newHsv.value < 0.01f
+            currentHsv = if (shouldPreserveHue) {
+                newHsv.copy(hue = currentHsv.hue)
+            } else {
+                newHsv
+            }
+        }
+    }
 
     Canvas(
         modifier = modifier

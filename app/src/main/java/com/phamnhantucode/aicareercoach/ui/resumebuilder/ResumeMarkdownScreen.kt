@@ -534,3 +534,216 @@ private fun escapeJsString(str: String): String {
         append('`')
     }
 }
+
+/**
+ * Resume Markdown Content - for embedding in tabs
+ * Shows the markdown preview/editor without the scaffold/app bar
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ResumeMarkdownContentInternal() {
+    val context = LocalContext.current
+    val viewModel: ResumeMarkdownViewModel = viewModel { ResumeMarkdownViewModel(context) }
+    val coroutineScope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
+
+    val uiState by viewModel.uiState.collectAsState()
+    val markdown by viewModel.markdown.collectAsState()
+    val isExporting by viewModel.isExporting.collectAsState()
+
+    var isPreviewMode by remember { mutableStateOf(true) }
+
+    // Handle export events
+    LaunchedEffect(viewModel) {
+        viewModel.exportEvents.collect { event ->
+            when (event) {
+                is ResumeExportResult.Success -> {
+                    val message = "${event.format.displayName} saved to Downloads as ${event.fileName}"
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+                is ResumeExportResult.Error -> {
+                    val error = event.throwable.localizedMessage ?: "Unknown error"
+                    val message = "Failed to export ${event.format.displayName}: $error"
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // Handle sync events
+    LaunchedEffect(viewModel) {
+        viewModel.syncEvents.collect { event ->
+            Toast.makeText(context, event, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Action buttons row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Copy button
+            OutlinedButton(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(markdown))
+                    Toast.makeText(context, "Markdown copied to clipboard", Toast.LENGTH_SHORT).show()
+                },
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Copy")
+            }
+
+            // Export to PDF
+            Button(
+                onClick = {
+                    viewModel.exportPdf()
+                },
+                enabled = !isExporting && uiState is MarkdownUiState.Success,
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.PictureAsPdf,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Export PDF")
+            }
+
+            // Sync button (reloads from form data)
+            OutlinedButton(
+                onClick = { viewModel.retry() },
+                enabled = uiState !is MarkdownUiState.Loading,
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Text("Sync from Form")
+            }
+        }
+
+        // Markdown Content
+        when (val state = uiState) {
+            is MarkdownUiState.Loading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "Loading resume...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            is MarkdownUiState.Error -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Text(
+                            text = "Error",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(onClick = { viewModel.retry() }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+
+            is MarkdownUiState.Success, is MarkdownUiState.Syncing -> {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // WebView preview
+                    MarkdownWebView(
+                        markdown = markdown,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = if (isPreviewMode) 1f else 0f
+                            }
+                    )
+
+                    // Raw text view
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp)
+                            .graphicsLayer {
+                                alpha = if (isPreviewMode) 0f else 1f
+                            }
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = markdown,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 20.sp
+                                ),
+                                modifier = Modifier.padding(16.dp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(80.dp))
+                    }
+
+                    // FAB to toggle view mode
+                    FloatingActionButton(
+                        onClick = { isPreviewMode = !isPreviewMode },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Icon(
+                            imageVector = if (isPreviewMode) Icons.Filled.Code else Icons.Filled.Visibility,
+                            contentDescription = if (isPreviewMode) "Show raw text" else "Show preview"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

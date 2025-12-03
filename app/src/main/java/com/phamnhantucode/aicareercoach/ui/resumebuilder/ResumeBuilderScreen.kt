@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,13 +33,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Person
@@ -60,8 +62,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -91,26 +95,31 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private enum class ResumeBuilderTab(val title: String) {
+    FORM("Form"),
+    DESIGN("Design"),
+    MARKDOWN("Markdown")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResumeBuilderScreen(
-    isEditOnly: Boolean = false,
+    resumeId: String? = null,
     onBack: () -> Unit = {},
-    onNavigateToPreview: ((Resume) -> Unit)? = null,
-    onNavigateToGridEditor: () -> Unit = {},
-    onNavigateToMarkdown: () -> Unit = {}
+    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?, isNewDesign: Boolean, linkedResumeId: String?) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
-    val viewModel: ResumeBuilderViewModel = viewModel { ResumeBuilderViewModel(context) }
+    val viewModel: ResumeBuilderViewModel = viewModel { ResumeBuilderViewModel(context, resumeId) }
     val coroutineScope = rememberCoroutineScope()
 
     val resume by viewModel.resume.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    var expandedSection by remember { mutableStateOf<ResumeSection?>(null) }
-    var exportMenuExpanded by remember { mutableStateOf(false) }
-    var showThemeDialog by remember { mutableStateOf(false) }
     val latestContext by rememberUpdatedState(context)
+    
+    val tabs = ResumeBuilderTab.entries
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
 
     // Handle export events
     LaunchedEffect(viewModel) {
@@ -146,7 +155,6 @@ fun ResumeBuilderScreen(
     // Save data when leaving the screen (lifecycle-aware save)
     DisposableEffect(viewModel) {
         onDispose {
-            // Save immediately when screen is disposed (navigating away or app closing)
             viewModel.saveResume(showToast = false)
         }
     }
@@ -155,27 +163,33 @@ fun ResumeBuilderScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Header with back button and save
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                shadowElevation = 4.dp
             ) {
-                // Header with back button
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 4.dp
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(),
+                            bottom = 0.dp
+                        )
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 12.dp + WindowInsets.systemBars.asPaddingValues().calculateTopPadding(), bottom = 12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // First Row: Back button and Title
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
                                 onClick = onBack,
@@ -200,340 +214,335 @@ fun ResumeBuilderScreen(
                                 )
                             }
                         }
-                        
-                        // Second Row: All Action Buttons
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+
+                        // Save Button
+                        Button(
+                            onClick = { viewModel.saveResume(showToast = true) },
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            ),
+                            enabled = !isSaving
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Grid Editor Button - hidden in edit-only mode
-                                if (!isEditOnly) {
-                                    Button(
-                                        onClick = onNavigateToGridEditor,
-                                        shape = RoundedCornerShape(24.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Dashboard,
-                                            contentDescription = "Resume designer",
-                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Resume designer",
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Save",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isSaving) "Saving..." else "Save")
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Tab Row
+                    ScrollableTabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        edgePadding = 0.dp,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        divider = {}
+                    ) {
+                        tabs.forEachIndexed { index, tab ->
+                            Tab(
+                                selected = pagerState.currentPage == index,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
                                     }
+                                },
+                                text = {
+                                    Text(
+                                        text = tab.title,
+                                        fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
+                                    )
                                 }
-
-                                // Preview Button
-                                if (onNavigateToPreview != null) {
-                                    IconButton(
-                                        onClick = { onNavigateToPreview(resume) },
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.primaryContainer,
-                                                CircleShape
-                                            )
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Visibility,
-                                            contentDescription = "Preview",
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Save Button
-                            Button(
-                                onClick = { viewModel.saveResume(showToast = true) },
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
-                                ),
-                                enabled = !isSaving
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.CheckCircle,
-                                    contentDescription = "Save",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isSaving) "Saving..." else "Save")
-                            }
+                            )
                         }
                     }
                 }
-
-                // Scrollable content
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Helper function to get section visibility
-                    fun getSectionVisibility(type: ResumeSectionType): Boolean {
-                        return resume.sectionConfig.find { it.sectionType == type }?.isVisible ?: true
-                    }
-
-                    // Personal Information Section (Required - no visibility toggle)
-                    ResumeSectionCard(
-                        title = "Personal Information",
-                        icon = Icons.Outlined.Person,
-                        isExpanded = expandedSection == ResumeSection.PERSONAL_INFO,
-                        isComplete = resume.personalInfo.isComplete(),
-                        isVisible = getSectionVisibility(ResumeSectionType.PersonalInfo),
-                        canToggleVisibility = false,
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.PERSONAL_INFO) {
-                                null
-                            } else {
-                                ResumeSection.PERSONAL_INFO
-                            }
-                        }
-                    ) {
-                        PersonalInfoForm(
-                            personalInfo = resume.personalInfo,
-                            onUpdate = viewModel::updatePersonalInfo,
-                            onAutofillFromProfile = {
-                                coroutineScope.launch {
-                                    viewModel.autofillFromUserProfile()
-                                }
-                            }
-                        )
-                    }
-
-                    // Professional Summary
-                    ResumeSectionCard(
-                        title = "Professional Summary",
-                        icon = Icons.Outlined.WorkOutline,
-                        isExpanded = expandedSection == ResumeSection.SUMMARY,
-                        isComplete = resume.professionalSummary.isNotBlank(),
-                        isVisible = getSectionVisibility(ResumeSectionType.Summary),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Summary) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.SUMMARY) {
-                                null
-                            } else {
-                                ResumeSection.SUMMARY
-                            }
-                        }
-                    ) {
-                        ProfessionalSummaryForm(
-                            summary = resume.professionalSummary,
-                            onUpdate = viewModel::updateProfessionalSummary
-                        )
-                    }
-
-                    // Work Experience
-                    ResumeSectionCard(
-                        title = "Work Experience",
-                        icon = Icons.Outlined.Business,
-                        isExpanded = expandedSection == ResumeSection.WORK_EXPERIENCE,
-                        isComplete = resume.workExperiences.isNotEmpty(),
-                        itemCount = resume.workExperiences.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.WorkExperience),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.WorkExperience) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.WORK_EXPERIENCE) {
-                                null
-                            } else {
-                                ResumeSection.WORK_EXPERIENCE
-                            }
-                        }
-                    ) {
-                        WorkExperienceSection(
-                            experiences = resume.workExperiences,
-                            onAdd = { viewModel.addWorkExperience(WorkExperience()) },
-                            onUpdate = viewModel::updateWorkExperience,
-                            onRemove = viewModel::removeWorkExperience
-                        )
-                    }
-
-                    // Education
-                    ResumeSectionCard(
-                        title = "Education",
-                        icon = Icons.Outlined.School,
-                        isExpanded = expandedSection == ResumeSection.EDUCATION,
-                        isComplete = resume.education.isNotEmpty(),
-                        itemCount = resume.education.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.Education),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Education) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.EDUCATION) {
-                                null
-                            } else {
-                                ResumeSection.EDUCATION
-                            }
-                        }
-                    ) {
-                        EducationSection(
-                            education = resume.education,
-                            onAdd = { viewModel.addEducation(Education()) },
-                            onUpdate = viewModel::updateEducation,
-                            onRemove = viewModel::removeEducation
-                        )
-                    }
-
-                    // Skills
-                    ResumeSectionCard(
-                        title = "Skills",
-                        icon = Icons.Outlined.Language,
-                        isExpanded = expandedSection == ResumeSection.SKILLS,
-                        isComplete = resume.skills.isNotEmpty(),
-                        itemCount = resume.skills.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.Skills),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Skills) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.SKILLS) {
-                                null
-                            } else {
-                                ResumeSection.SKILLS
-                            }
-                        }
-                    ) {
-                        SkillsSection(
-                            skills = resume.skills,
-                            onAdd = viewModel::addSkill,
-                            onRemove = viewModel::removeSkill
-                        )
-                    }
-
-                    // Projects
-                    ResumeSectionCard(
-                        title = "Projects",
-                        icon = Icons.Outlined.WorkOutline,
-                        isExpanded = expandedSection == ResumeSection.PROJECTS,
-                        isComplete = resume.projects.isNotEmpty(),
-                        itemCount = resume.projects.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.Projects),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Projects) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.PROJECTS) {
-                                null
-                            } else {
-                                ResumeSection.PROJECTS
-                            }
-                        }
-                    ) {
-                        ProjectsSection(
-                            projects = resume.projects,
-                            onAdd = { viewModel.addProject(Project()) },
-                            onUpdate = viewModel::updateProject,
-                            onRemove = viewModel::removeProject
-                        )
-                    }
-
-                    // Certifications
-                    ResumeSectionCard(
-                        title = "Certifications",
-                        icon = Icons.Outlined.School,
-                        isExpanded = expandedSection == ResumeSection.CERTIFICATIONS,
-                        isComplete = resume.certifications.isNotEmpty(),
-                        itemCount = resume.certifications.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.Certifications),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Certifications) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.CERTIFICATIONS) {
-                                null
-                            } else {
-                                ResumeSection.CERTIFICATIONS
-                            }
-                        }
-                    ) {
-                        CertificationsSection(
-                            certifications = resume.certifications,
-                            onAdd = { viewModel.addCertification(Certification()) },
-                            onUpdate = viewModel::updateCertification,
-                            onRemove = viewModel::removeCertification
-                        )
-                    }
-
-                    // Languages
-                    ResumeSectionCard(
-                        title = "Languages",
-                        icon = Icons.Outlined.Language,
-                        isExpanded = expandedSection == ResumeSection.LANGUAGES,
-                        isComplete = resume.languages.isNotEmpty(),
-                        itemCount = resume.languages.size,
-                        isVisible = getSectionVisibility(ResumeSectionType.Languages),
-                        canToggleVisibility = true,
-                        onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Languages) },
-                        onToggle = {
-                            expandedSection = if (expandedSection == ResumeSection.LANGUAGES) {
-                                null
-                            } else {
-                                ResumeSection.LANGUAGES
-                            }
-                        }
-                    ) {
-                        LanguagesSection(
-                            languages = resume.languages,
-                            onAdd = { viewModel.addLanguage(Language()) },
-                            onUpdate = viewModel::updateLanguage,
-                            onRemove = viewModel::removeLanguage
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(80.dp))
-                }
-                Spacer(
-                    modifier = Modifier
-                        .height(WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
-                )
             }
 
-            // Floating Action Button for Create Markdown - hidden in edit-only mode
-            if (!isEditOnly) {
-                ExtendedFloatingActionButton(
-                    onClick = onNavigateToMarkdown,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp)
-                        .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Description,
-                        contentDescription = "Create Markdown"
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Create Markdown")
+            // Tab Content
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (tabs[page]) {
+                    ResumeBuilderTab.FORM -> {
+                        ResumeFormContent(
+                            viewModel = viewModel,
+                            resume = resume
+                        )
+                    }
+                    ResumeBuilderTab.DESIGN -> {
+                        ResumeDesignContent(
+                            resumeId = resume.id,
+                            onNavigateToGridEditor = onNavigateToGridEditor
+                        )
+                    }
+                    ResumeBuilderTab.MARKDOWN -> {
+                        ResumeMarkdownContent()
+                    }
                 }
             }
         }
     }
+}
 
-    // Theme Customization Dialog
-    if (showThemeDialog) {
-        ThemeCustomizationDialog(
-            currentTheme = resume.theme,
-            onDismiss = { showThemeDialog = false },
-            onApplyTheme = { newTheme ->
-                viewModel.updateTheme(newTheme)
+/**
+ * Form tab content - displays all resume form sections
+ */
+@Composable
+private fun ResumeFormContent(
+    viewModel: ResumeBuilderViewModel,
+    resume: Resume
+) {
+    var expandedSection by remember { mutableStateOf<ResumeSection?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Helper function to get section visibility
+        fun getSectionVisibility(type: ResumeSectionType): Boolean {
+            return resume.sectionConfig.find { it.sectionType == type }?.isVisible ?: true
+        }
+
+        // Personal Information Section (Required - no visibility toggle)
+        ResumeSectionCard(
+            title = "Personal Information",
+            icon = Icons.Outlined.Person,
+            isExpanded = expandedSection == ResumeSection.PERSONAL_INFO,
+            isComplete = resume.personalInfo.isComplete(),
+            isVisible = getSectionVisibility(ResumeSectionType.PersonalInfo),
+            canToggleVisibility = false,
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.PERSONAL_INFO) {
+                    null
+                } else {
+                    ResumeSection.PERSONAL_INFO
+                }
             }
-        )
+        ) {
+            PersonalInfoForm(
+                personalInfo = resume.personalInfo,
+                onUpdate = viewModel::updatePersonalInfo,
+                onAutofillFromProfile = {
+                    coroutineScope.launch {
+                        viewModel.autofillFromUserProfile()
+                    }
+                }
+            )
+        }
+
+        // Professional Summary
+        ResumeSectionCard(
+            title = "Professional Summary",
+            icon = Icons.Outlined.WorkOutline,
+            isExpanded = expandedSection == ResumeSection.SUMMARY,
+            isComplete = resume.professionalSummary.isNotBlank(),
+            isVisible = getSectionVisibility(ResumeSectionType.Summary),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Summary) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.SUMMARY) {
+                    null
+                } else {
+                    ResumeSection.SUMMARY
+                }
+            }
+        ) {
+            ProfessionalSummaryForm(
+                summary = resume.professionalSummary,
+                onUpdate = viewModel::updateProfessionalSummary
+            )
+        }
+
+        // Work Experience
+        ResumeSectionCard(
+            title = "Work Experience",
+            icon = Icons.Outlined.Business,
+            isExpanded = expandedSection == ResumeSection.WORK_EXPERIENCE,
+            isComplete = resume.workExperiences.isNotEmpty(),
+            itemCount = resume.workExperiences.size,
+            isVisible = getSectionVisibility(ResumeSectionType.WorkExperience),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.WorkExperience) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.WORK_EXPERIENCE) {
+                    null
+                } else {
+                    ResumeSection.WORK_EXPERIENCE
+                }
+            }
+        ) {
+            WorkExperienceSection(
+                experiences = resume.workExperiences,
+                onAdd = { viewModel.addWorkExperience(WorkExperience()) },
+                onUpdate = viewModel::updateWorkExperience,
+                onRemove = viewModel::removeWorkExperience
+            )
+        }
+
+        // Education
+        ResumeSectionCard(
+            title = "Education",
+            icon = Icons.Outlined.School,
+            isExpanded = expandedSection == ResumeSection.EDUCATION,
+            isComplete = resume.education.isNotEmpty(),
+            itemCount = resume.education.size,
+            isVisible = getSectionVisibility(ResumeSectionType.Education),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Education) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.EDUCATION) {
+                    null
+                } else {
+                    ResumeSection.EDUCATION
+                }
+            }
+        ) {
+            EducationSection(
+                education = resume.education,
+                onAdd = { viewModel.addEducation(Education()) },
+                onUpdate = viewModel::updateEducation,
+                onRemove = viewModel::removeEducation
+            )
+        }
+
+        // Skills
+        ResumeSectionCard(
+            title = "Skills",
+            icon = Icons.Outlined.Language,
+            isExpanded = expandedSection == ResumeSection.SKILLS,
+            isComplete = resume.skills.isNotEmpty(),
+            itemCount = resume.skills.size,
+            isVisible = getSectionVisibility(ResumeSectionType.Skills),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Skills) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.SKILLS) {
+                    null
+                } else {
+                    ResumeSection.SKILLS
+                }
+            }
+        ) {
+            SkillsSection(
+                skills = resume.skills,
+                onAdd = viewModel::addSkill,
+                onRemove = viewModel::removeSkill
+            )
+        }
+
+        // Projects
+        ResumeSectionCard(
+            title = "Projects",
+            icon = Icons.Outlined.WorkOutline,
+            isExpanded = expandedSection == ResumeSection.PROJECTS,
+            isComplete = resume.projects.isNotEmpty(),
+            itemCount = resume.projects.size,
+            isVisible = getSectionVisibility(ResumeSectionType.Projects),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Projects) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.PROJECTS) {
+                    null
+                } else {
+                    ResumeSection.PROJECTS
+                }
+            }
+        ) {
+            ProjectsSection(
+                projects = resume.projects,
+                onAdd = { viewModel.addProject(Project()) },
+                onUpdate = viewModel::updateProject,
+                onRemove = viewModel::removeProject
+            )
+        }
+
+        // Certifications
+        ResumeSectionCard(
+            title = "Certifications",
+            icon = Icons.Outlined.School,
+            isExpanded = expandedSection == ResumeSection.CERTIFICATIONS,
+            isComplete = resume.certifications.isNotEmpty(),
+            itemCount = resume.certifications.size,
+            isVisible = getSectionVisibility(ResumeSectionType.Certifications),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Certifications) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.CERTIFICATIONS) {
+                    null
+                } else {
+                    ResumeSection.CERTIFICATIONS
+                }
+            }
+        ) {
+            CertificationsSection(
+                certifications = resume.certifications,
+                onAdd = { viewModel.addCertification(Certification()) },
+                onUpdate = viewModel::updateCertification,
+                onRemove = viewModel::removeCertification
+            )
+        }
+
+        // Languages
+        ResumeSectionCard(
+            title = "Languages",
+            icon = Icons.Outlined.Language,
+            isExpanded = expandedSection == ResumeSection.LANGUAGES,
+            isComplete = resume.languages.isNotEmpty(),
+            itemCount = resume.languages.size,
+            isVisible = getSectionVisibility(ResumeSectionType.Languages),
+            canToggleVisibility = true,
+            onToggleVisibility = { viewModel.toggleSectionVisibility(ResumeSectionType.Languages) },
+            onToggle = {
+                expandedSection = if (expandedSection == ResumeSection.LANGUAGES) {
+                    null
+                } else {
+                    ResumeSection.LANGUAGES
+                }
+            }
+        ) {
+            LanguagesSection(
+                languages = resume.languages,
+                onAdd = { viewModel.addLanguage(Language()) },
+                onUpdate = viewModel::updateLanguage,
+                onRemove = viewModel::removeLanguage
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
+}
+
+/**
+ * Design tab content - embeds ResumeDesignScreen content
+ */
+@Composable
+private fun ResumeDesignContent(
+    resumeId: String,
+    onNavigateToGridEditor: (designId: String?, templateAssetPath: String?, isNewDesign: Boolean, linkedResumeId: String?) -> Unit
+) {
+    com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeDesignContent(
+        resumeId = resumeId,
+        onNavigateToGridEditor = onNavigateToGridEditor
+    )
+}
+
+/**
+ * Markdown tab content - embeds ResumeMarkdownScreen content
+ */
+@Composable
+private fun ResumeMarkdownContent() {
+    ResumeMarkdownContentInternal()
 }
 
 @Composable

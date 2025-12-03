@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ResumeBuilderViewModel(context: Context) : ViewModel() {
+class ResumeBuilderViewModel(context: Context, private val resumeId: String? = null) : ViewModel() {
 
     companion object {
         private const val TAG = "ResumeBuilderViewModel"
@@ -47,12 +47,14 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
     private var isInitialLoadComplete = false
 
     init {
-        // Load latest resume or auto-fill from user profile
+        // Load resume based on resumeId or create new
         viewModelScope.launch(Dispatchers.IO) {
-            loadLatestResume()
-
-            // If no resume exists or personal info is blank, auto-fill from user profile
-            if (_resume.value.id.isEmpty() || _resume.value.personalInfo.fullName.isBlank()) {
+            if (resumeId != null) {
+                // Load existing resume
+                loadResumeById(resumeId)
+            } else {
+                // Create new resume, auto-fill from user profile
+                _resume.value = Resume()
                 autofillFromUserProfile()
             }
             
@@ -65,17 +67,23 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
     // ========== Save/Load Functions ==========
 
     /**
-     * Loads the latest resume for the current user
+     * Loads a resume by ID
      */
-    suspend fun loadLatestResume() {
+    private suspend fun loadResumeById(id: String) {
         _isLoading.value = true
         try {
-            val result = repository.getLatestResume()
+            val result = repository.getResume(id)
             result.getOrNull()?.let { loadedResume ->
                 _resume.value = loadedResume
+                Log.d(TAG, "Loaded resume $id")
+            } ?: run {
+                // Resume not found, create new one
+                _resume.value = Resume()
+                Log.w(TAG, "Resume $id not found, creating new")
             }
         } catch (e: Exception) {
-            // Silently fail, keep default empty resume
+            Log.e(TAG, "Error loading resume $id", e)
+            _resume.value = Resume()
         } finally {
             _isLoading.value = false
         }
@@ -132,7 +140,7 @@ class ResumeBuilderViewModel(context: Context) : ViewModel() {
 
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(500) // Wait 500ms after last change - faster saves, minimal data loss
+            delay(1000) // Wait 1000ms after last change - reduce concurrent save conflicts
             saveResume(showToast = false) // Auto-save silently
         }
     }

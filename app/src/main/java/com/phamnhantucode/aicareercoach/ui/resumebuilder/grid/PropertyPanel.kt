@@ -247,7 +247,15 @@ fun PropertyPanel(
                     ImageElementProperties(
                         element = element,
                         onUpdateElement = onUpdateElement,
-                        parentContainer = parentContainer
+                        parentContainer = parentContainer,
+                        resume = resume,
+                        onUpdateResume = { updatedResume ->
+                            scope.launch {
+                                repository.saveResume(updatedResume)
+                                resume = updatedResume
+                                personalInfo = updatedResume.personalInfo
+                            }
+                        }
                     )
                 }
                 is ResumeElement.ShapeElement -> {
@@ -1048,9 +1056,22 @@ private fun TextElementProperties(
 private fun ImageElementProperties(
     element: ResumeElement.ImageElement,
     onUpdateElement: (ResumeElement) -> Unit,
-    parentContainer: ResumeElement.ContainerElement? = null
+    parentContainer: ResumeElement.ContainerElement? = null,
+    resume: Resume? = null,
+    onUpdateResume: ((Resume) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Avatar upload manager (only for avatar elements)
+    val avatarUploadManager = remember {
+        if (element.userInfoTag == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.UserInfoTag.AVATAR) {
+            com.phamnhantucode.aicareercoach.data.imgbb.AvatarUploadManager.getInstance(context)
+        } else null
+    }
+
+    val uploadState by avatarUploadManager?.uploadState?.collectAsState()
+        ?: remember { mutableStateOf(com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Idle) }
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -1067,8 +1088,27 @@ private fun ImageElementProperties(
                 // Permission already granted or not needed
             }
 
-            // Update element with selected image URI
-            onUpdateElement(element.copy(imageUrl = it.toString()))
+            // Upload if avatar, otherwise use local URI
+            if (element.userInfoTag == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.UserInfoTag.AVATAR && avatarUploadManager != null) {
+                coroutineScope.launch {
+                    val result = avatarUploadManager.uploadAvatar(it)
+                    if (result.isSuccess) {
+                        val remoteUrl = result.getOrNull()!!
+                        onUpdateElement(element.copy(imageUrl = remoteUrl))
+                        resume?.let { r ->
+                            onUpdateResume?.invoke(r.copy(
+                                personalInfo = r.personalInfo.copy(avatar = remoteUrl)
+                            ))
+                        }
+                    } else {
+                        // Fallback to local URI on error
+                        onUpdateElement(element.copy(imageUrl = it.toString()))
+                    }
+                }
+            } else {
+                // Non-avatar: use local URI (existing behavior)
+                onUpdateElement(element.copy(imageUrl = it.toString()))
+            }
         }
     }
 
@@ -1103,6 +1143,71 @@ private fun ImageElementProperties(
             }
 
             Spacer(Modifier.height(8.dp))
+        }
+
+        // Show upload state for avatars
+        if (element.userInfoTag == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.UserInfoTag.AVATAR) {
+            when (uploadState) {
+                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Uploading -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Uploading avatar...", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Error -> {
+                    val errorState = uploadState as com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Error
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "Upload failed: ${errorState.message}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val uri = Uri.parse(errorState.localUri)
+                                    avatarUploadManager?.retryUpload(uri)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Retry Upload")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Success -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Avatar uploaded successfully",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                else -> { /* Idle - no special UI */ }
+            }
         }
 
         OutlinedTextField(

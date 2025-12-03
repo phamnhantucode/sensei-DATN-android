@@ -14,6 +14,7 @@ import java.util.UUID
  * @param globalStyles Global styling defaults
  * @param metadata Resume metadata
  * @param linkedElementGroups Cross-page element linking for pagination
+ * @param thumbnail Base64 encoded thumbnail image for preview
  */
 data class GridResume(
     val id: String = UUID.randomUUID().toString(),
@@ -23,7 +24,8 @@ data class GridResume(
     val gridConfig: GridConfig = GridConfig(),
     val globalStyles: GlobalStyles = GlobalStyles(),
     val metadata: ResumeMetadata = ResumeMetadata(),
-    val linkedElementGroups: List<LinkedElementGroup> = emptyList()
+    val linkedElementGroups: List<LinkedElementGroup> = emptyList(),
+    val thumbnail: String = ""
 ) {
     /**
      * Get total page count

@@ -46,7 +46,7 @@ sealed class ResumeElement {
         override val userInfoTag: UserInfoTag? = null,
         override val isVisible: Boolean = true,
         val imageUrl: String = "", // Can be file:// or http://
-        val contentScale: ImageScale = ImageScale.FIT,
+        val contentScale: ImageScale = ImageScale.FILL,
         val cornerRadius: Float = 0f,
         val isCircle: Boolean = false, // If true, crops image to circle
         val description: String = "", // Alt text

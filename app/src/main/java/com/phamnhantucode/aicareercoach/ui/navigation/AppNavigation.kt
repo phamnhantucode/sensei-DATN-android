@@ -25,6 +25,7 @@ import com.phamnhantucode.aicareercoach.ui.login.LoginScreen
 import com.phamnhantucode.aicareercoach.ui.onboarding.IntroPage
 import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeBuilderScreen
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeListScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeMarkdownScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorViewModel
@@ -97,7 +98,7 @@ fun AppNavigation() {
         composable(Screen.IndustryInsights.route) {
             IndustryInsightsScreen(
                 onNavigateToResumeBuilder = {
-                    navController.navigate(Screen.ResumeBuilder.buildRoute(isEditOnly = false))
+                    navController.navigate(Screen.ResumeList.route)
                 },
                 onNavigateToInterviewPrep = {
                     navController.navigate(Screen.InterviewPrep.route)
@@ -125,25 +126,32 @@ fun AppNavigation() {
             )
         }
 
+        composable(Screen.ResumeList.route) {
+            ResumeListScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToResumeBuilder = { resumeId ->
+                    navController.navigate(Screen.ResumeBuilder.buildRoute(resumeId))
+                }
+            )
+        }
+
         composable(
             route = Screen.ResumeBuilder.routeWithArgs,
             arguments = listOf(
-                navArgument(Screen.ResumeBuilder.isEditOnlyKey()) {
-                    type = NavType.BoolType
-                    defaultValue = false
+                navArgument(Screen.ResumeBuilder.resumeIdKey()) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
-            val isEditOnly = backStackEntry.arguments?.getBoolean(Screen.ResumeBuilder.isEditOnlyKey()) ?: false
+            val resumeId = backStackEntry.arguments?.getString(Screen.ResumeBuilder.resumeIdKey())
 
             ResumeBuilderScreen(
-                isEditOnly = isEditOnly,
+                resumeId = resumeId,
                 onBack = { navController.popBackStack() },
-                onNavigateToGridEditor = {
-                    navController.navigate(Screen.ResumeDesignScreen.route)
-                },
-                onNavigateToMarkdown = {
-                    navController.navigate(Screen.ResumeMarkdown.route)
+                onNavigateToGridEditor = { designId, template, isNewDesign, linkedResumeId ->
+                    navController.navigate(Screen.GridEditor.buildRoute(designId, template, isNewDesign, linkedResumeId))
                 }
             )
         }
@@ -157,8 +165,8 @@ fun AppNavigation() {
         composable(Screen.ResumeDesignScreen.route) {
             ResumeDesignScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToGridEditor = { designId, template, isNewDesign ->
-                    navController.navigate(Screen.GridEditor.buildRoute(designId, template, isNewDesign))
+                onNavigateToGridEditor = { designId, template, isNewDesign, linkedResumeId ->
+                    navController.navigate(Screen.GridEditor.buildRoute(designId, template, isNewDesign, linkedResumeId))
                 }
             )
         }
@@ -179,18 +187,24 @@ fun AppNavigation() {
                 navArgument(Screen.GridEditor.isNewDesignKey()) {
                     type = NavType.BoolType
                     defaultValue = false
+                },
+                navArgument(Screen.GridEditor.linkedResumeIdKey()) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val designId = backStackEntry.arguments?.getString(Screen.GridEditor.designIdKey())
             val template = backStackEntry.arguments?.getString(Screen.GridEditor.templateKey())
             val isNewDesign = backStackEntry.arguments?.getBoolean(Screen.GridEditor.isNewDesignKey()) ?: false
+            val linkedResumeId = backStackEntry.arguments?.getString(Screen.GridEditor.linkedResumeIdKey())
 
             val viewModel: GridEditorViewModel = viewModel(
                 factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return GridEditorViewModel(context, designId, template, isNewDesign) as T
+                        return GridEditorViewModel(context, designId, template, isNewDesign, linkedResumeId) as T
                     }
                 }
             )
@@ -198,7 +212,8 @@ fun AppNavigation() {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPreview = { /* TODO: Navigate to preview if needed */ },
                 onSwitchToFormEditor = {
-                    navController.navigate(Screen.ResumeBuilder.buildRoute(isEditOnly = true))
+                    // Navigate back to resume builder with the current resume
+                    navController.popBackStack()
                 },
                 viewModel = viewModel
             )

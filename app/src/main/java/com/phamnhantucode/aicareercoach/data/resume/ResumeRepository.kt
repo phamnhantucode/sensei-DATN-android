@@ -9,22 +9,22 @@ import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
 import com.phamnhantucode.aicareercoach.data.neon.NeonResumeService
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.GridResume
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
 /**
  * Repository responsible for managing resume data.
- * Coordinates between Room (local cache) and Neon (remote database).
+ * Now operates in Neon-only mode (local caching disabled to fix sync corruption issues).
  */
 class ResumeRepository private constructor(context: Context) {
 
+    // Keep DAO reference for potential future use, but don't use it for now
     private val resumeDao = AppDatabase.getDatabase(context).resumeDao()
 
     companion object {
         private const val TAG = "ResumeRepository"
-        private const val CACHE_VALIDITY_MS = 5 * 60 * 1000L // 5 minutes
 
         @Volatile
         private var INSTANCE: ResumeRepository? = null
@@ -42,185 +42,159 @@ class ResumeRepository private constructor(context: Context) {
      * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
      * If the user doesn't exist in Neon yet, creates them first.
      */
-    private suspend fun getCurrentUserId(): String {
-        val clerkUser = Clerk.user
-            ?: throw IllegalStateException("User not logged in")
+    /**
+     * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
+     * If the user doesn't exist in Neon yet, creates them first.
+     */
+    suspend fun getCurrentUserId(): String? {
+        return try {
+            val clerkUser = Clerk.user ?: return null
 
-        val authToken = NeonAuth.fetchNeonAuthToken()
-        
-        // Get Neon user's internal ID (not the Clerk ID) for foreign key references
-        var neonUser = NeonUserService.getUser(clerkUser.id, authToken)
-        
-        // If user doesn't exist in Neon, create them
-        if (neonUser == null) {
-            Log.d(TAG, "User not found in Neon, creating...")
-            NeonUserService.upsertUser(clerkUser, authToken)
-            neonUser = NeonUserService.getUser(clerkUser.id, authToken)
+            val authToken = NeonAuth.fetchNeonAuthToken()
+            
+            // Get Neon user's internal ID (not the Clerk ID) for foreign key references
+            var neonUser = NeonUserService.getUser(clerkUser.id, authToken)
+            
+            // If user doesn't exist in Neon, create them
+            if (neonUser == null) {
+                Log.d(TAG, "[ResumeRepository] User not found in Neon, creating...")
+                NeonUserService.upsertUser(clerkUser, authToken)
+                neonUser = NeonUserService.getUser(clerkUser.id, authToken)
+            }
+            
+            neonUser?.id
+        } catch (e: CancellationException) {
+            // Rethrow cancellation to properly propagate coroutine cancellation
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "[ResumeRepository] Error getting current user ID", e)
+            null
         }
-        
-        return neonUser?.id ?: throw IllegalStateException("Failed to create user in Neon database")
+    }
+    
+    /**
+     * Gets current user ID, throws if not available
+     */
+    private suspend fun requireCurrentUserId(): String {
+        return getCurrentUserId() ?: throw IllegalStateException("User not logged in or failed to get user ID")
     }
 
     /**
-     * Saves a resume locally and syncs to remote
+     * Saves a resume directly to Neon (local caching disabled)
+     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @deprecated Use GridResumeRepository.saveDesign() instead. Form-based resumes are deprecated in favor of GridResume.
      */
-    suspend fun saveResume(resume: Resume, syncToRemote: Boolean = true): Result<Unit> =
+    @Deprecated(
+        message = "Use GridResumeRepository.saveDesign() instead",
+        replaceWith = ReplaceWith(
+            expression = "GridResumeRepository.getInstance(context).saveDesign(gridResume, thumbnail, syncToRemote)",
+            imports = ["com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository"]
+        )
+    )
+    suspend fun saveResume(resume: Resume, syncToRemote: Boolean = true, gridResume: GridResume? = null): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val userId = getCurrentUserId()
-                val now = System.currentTimeMillis()
-
-                // Save to local database
-                val entity = ResumeEntity(
-                    id = resume.id,
-                    userId = userId,
-                    resumeData = resume,
-                    createdAt = now,
-                    updatedAt = now
-                )
-                resumeDao.insertResume(entity)
-                Log.d(TAG, "Saved resume ${resume.id} locally")
-
-                // Sync to remote if requested
-                if (syncToRemote) {
-                    val authToken = NeonAuth.fetchNeonAuthToken()
-                    val remoteResult = NeonResumeService.saveResume(resume, userId, authToken)
-                    if (remoteResult.isFailure) {
-                        Log.w(TAG, "Failed to sync resume to remote", remoteResult.exceptionOrNull())
-                        // Don't fail the whole operation if remote sync fails
-                    } else {
-                        Log.d(TAG, "Synced resume ${resume.id} to remote")
-                    }
+                val userId = requireCurrentUserId()
+                
+                // Save directly to Neon (skip local)
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val remoteResult = NeonResumeService.saveResume(resume, userId, authToken, gridResume)
+                if (remoteResult.isFailure) {
+                    Log.e(TAG, "[ResumeRepository] Failed to save resume to Neon", remoteResult.exceptionOrNull())
+                    return@withContext Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to save resume"))
                 }
-
+                
+                Log.d(TAG, "[ResumeRepository] Saved resume ${resume.id} to Neon")
                 Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error saving resume", e)
+                Log.e(TAG, "[ResumeRepository] Error saving resume", e)
                 Result.failure(e)
             }
         }
 
     /**
-     * Updates an existing resume locally and syncs to remote
+     * Updates an existing resume directly in Neon (local caching disabled)
+     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @deprecated Use GridResumeRepository.updateDesign() instead. Form-based resumes are deprecated in favor of GridResume.
      */
-    suspend fun updateResume(resume: Resume, syncToRemote: Boolean = true): Result<Unit> =
+    @Deprecated(
+        message = "Use GridResumeRepository.updateDesign() instead",
+        replaceWith = ReplaceWith(
+            expression = "GridResumeRepository.getInstance(context).updateDesign(gridResume, thumbnail, syncToRemote)",
+            imports = ["com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository"]
+        )
+    )
+    suspend fun updateResume(resume: Resume, syncToRemote: Boolean = true, gridResume: GridResume? = null): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val userId = getCurrentUserId()
-                val now = System.currentTimeMillis()
-
-                // Get existing entity to preserve createdAt
-                val existing = resumeDao.getResumeById(resume.id)
-                val createdAt = existing?.createdAt ?: now
-
-                // Update local database
-                val entity = ResumeEntity(
-                    id = resume.id,
-                    userId = userId,
-                    resumeData = resume,
-                    createdAt = createdAt,
-                    updatedAt = now
-                )
-                resumeDao.updateResume(entity)
-                Log.d(TAG, "Updated resume ${resume.id} locally")
-
-                // Sync to remote if requested
-                if (syncToRemote) {
-                    val authToken = NeonAuth.fetchNeonAuthToken()
-                    val remoteResult = NeonResumeService.updateResume(resume, authToken)
-                    if (remoteResult.isFailure) {
-                        Log.w(TAG, "Failed to sync update to remote", remoteResult.exceptionOrNull())
-                    } else {
-                        Log.d(TAG, "Synced resume update ${resume.id} to remote")
-                    }
+                // Update directly in Neon (skip local)
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val remoteResult = NeonResumeService.updateResume(resume, authToken, gridResume)
+                if (remoteResult.isFailure) {
+                    Log.e(TAG, "[ResumeRepository] Failed to update resume in Neon", remoteResult.exceptionOrNull())
+                    return@withContext Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to update resume"))
                 }
-
+                
+                Log.d(TAG, "[ResumeRepository] Updated resume ${resume.id} in Neon")
                 Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error updating resume", e)
+                Log.e(TAG, "[ResumeRepository] Error updating resume", e)
                 Result.failure(e)
             }
         }
 
     /**
-     * Gets a resume by ID, preferring local cache
+     * Gets a resume by ID directly from Neon (local caching disabled)
      */
     suspend fun getResume(resumeId: String, forceRemote: Boolean = false): Result<Resume?> =
         withContext(Dispatchers.IO) {
             try {
-                // Try local first unless force remote is requested
-                if (!forceRemote) {
-                    val local = resumeDao.getResumeById(resumeId)
-                    if (local != null) {
-                        Log.d(TAG, "Retrieved resume $resumeId from local cache")
-                        return@withContext Result.success(local.resumeData)
-                    }
-                }
-
-                // Fetch from remote
+                // Fetch directly from Neon (skip local)
                 val authToken = NeonAuth.fetchNeonAuthToken()
                 val remoteResult = NeonResumeService.getResume(resumeId, authToken)
                 if (remoteResult.isSuccess) {
                     val resume = remoteResult.getOrNull()
-                    if (resume != null) {
-                        // Cache locally
-                        saveResume(resume, syncToRemote = false)
-                        Log.d(TAG, "Retrieved and cached resume $resumeId from remote")
-                        return@withContext Result.success(resume)
-                    }
+                    Log.d(TAG, "[ResumeRepository] Retrieved resume $resumeId from Neon")
+                    return@withContext Result.success(resume)
                 }
-
+                
+                Log.w(TAG, "[ResumeRepository] Failed to get resume from Neon", remoteResult.exceptionOrNull())
                 Result.success(null)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error getting resume", e)
+                Log.e(TAG, "[ResumeRepository] Error getting resume", e)
                 Result.failure(e)
             }
         }
 
     /**
-     * Gets all resumes for the current user
+     * Gets all resumes for the current user directly from Neon (local caching disabled)
      */
     suspend fun getAllResumes(forceRemote: Boolean = false): Result<List<Resume>> =
         withContext(Dispatchers.IO) {
             try {
-                val userId = getCurrentUserId()
+                val userId = requireCurrentUserId()
 
-                // Try local first unless force remote is requested
-                if (!forceRemote) {
-                    val localResumes = resumeDao.getAllResumesByUser(userId)
-                    if (localResumes.isNotEmpty()) {
-                        // Check if cache is still valid
-                        val newestUpdate = localResumes.maxOfOrNull { it.updatedAt } ?: 0L
-                        val cacheAge = System.currentTimeMillis() - newestUpdate
-
-                        if (cacheAge < CACHE_VALIDITY_MS) {
-                            Log.d(TAG, "Retrieved ${localResumes.size} resumes from local cache")
-                            return@withContext Result.success(localResumes.map { it.resumeData })
-                        }
-                    }
-                }
-
-                // Fetch from remote
+                // Fetch directly from Neon (skip local)
                 val authToken = NeonAuth.fetchNeonAuthToken()
                 val remoteResult = NeonResumeService.getAllResumesForUser(userId, authToken)
                 if (remoteResult.isSuccess) {
                     val resumes = remoteResult.getOrNull() ?: emptyList()
-
-                    // Cache all locally
-                    resumes.forEach { resume ->
-                        saveResume(resume, syncToRemote = false)
-                    }
-
-                    Log.d(TAG, "Retrieved and cached ${resumes.size} resumes from remote")
+                    Log.d(TAG, "[ResumeRepository] Retrieved ${resumes.size} resumes from Neon")
                     return@withContext Result.success(resumes)
                 }
 
-                // Return local cache even if remote fails
-                val localResumes = resumeDao.getAllResumesByUser(userId)
-                Log.d(TAG, "Remote fetch failed, returning ${localResumes.size} cached resumes")
-                Result.success(localResumes.map { it.resumeData })
+                Log.e(TAG, "[ResumeRepository] Failed to get resumes from Neon", remoteResult.exceptionOrNull())
+                Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to get resumes"))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error getting all resumes", e)
+                Log.e(TAG, "[ResumeRepository] Error getting all resumes", e)
                 Result.failure(e)
             }
         }
@@ -230,102 +204,69 @@ class ResumeRepository private constructor(context: Context) {
      */
     suspend fun getLatestResume(): Result<Resume?> = withContext(Dispatchers.IO) {
         try {
-            val userId = getCurrentUserId()
-            val latest = resumeDao.getLatestResume(userId)
-
-            if (latest != null) {
-                Log.d(TAG, "Retrieved latest resume ${latest.id}")
-                Result.success(latest.resumeData)
-            } else {
-                // Try remote
-                val allRemote = getAllResumes(forceRemote = true)
-                val resumes = allRemote.getOrNull() ?: emptyList()
-                Result.success(resumes.firstOrNull())
-            }
+            val allResumes = getAllResumes(forceRemote = true)
+            val resumes = allResumes.getOrNull() ?: emptyList()
+            Result.success(resumes.firstOrNull())
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting latest resume", e)
+            Log.e(TAG, "[ResumeRepository] Error getting latest resume", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Deletes a resume locally and from remote
+     * Deletes a resume from Neon (local caching disabled)
      */
     suspend fun deleteResume(resumeId: String, syncToRemote: Boolean = true): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                // Delete from local
-                resumeDao.deleteResumeById(resumeId)
-                Log.d(TAG, "Deleted resume $resumeId locally")
-
-                // Sync to remote if requested
-                if (syncToRemote) {
-                    val authToken = NeonAuth.fetchNeonAuthToken()
-                    val remoteResult = NeonResumeService.deleteResume(resumeId, authToken)
-                    if (remoteResult.isFailure) {
-                        Log.w(TAG, "Failed to delete from remote", remoteResult.exceptionOrNull())
-                    } else {
-                        Log.d(TAG, "Deleted resume $resumeId from remote")
-                    }
+                // Delete from Neon directly (skip local)
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val remoteResult = NeonResumeService.deleteResume(resumeId, authToken)
+                if (remoteResult.isFailure) {
+                    Log.e(TAG, "[ResumeRepository] Failed to delete from Neon", remoteResult.exceptionOrNull())
+                    return@withContext Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to delete resume"))
                 }
-
+                
+                Log.d(TAG, "[ResumeRepository] Deleted resume $resumeId from Neon")
                 Result.success(Unit)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error deleting resume", e)
+                Log.e(TAG, "[ResumeRepository] Error deleting resume", e)
                 Result.failure(e)
             }
         }
 
     /**
-     * Gets the count of resumes for the current user
+     * Gets the count of resumes for the current user (from Neon)
      */
     suspend fun getResumeCount(): Int = withContext(Dispatchers.IO) {
         try {
-            val userId = getCurrentUserId()
-            resumeDao.getResumeCount(userId)
+            val allResumes = getAllResumes(forceRemote = true)
+            allResumes.getOrNull()?.size ?: 0
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting resume count", e)
+            Log.e(TAG, "[ResumeRepository] Error getting resume count", e)
             0
         }
     }
 
     /**
-     * Clears all local resume cache
+     * Clears all local resume cache (no-op in Neon-only mode)
      */
     suspend fun clearLocalCache(): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val userId = getCurrentUserId()
-            resumeDao.deleteAllResumesForUser(userId)
-            Log.d(TAG, "Cleared local resume cache for user $userId")
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error clearing local cache", e)
-            Result.failure(e)
-        }
+        // No-op in Neon-only mode
+        Log.d(TAG, "[ResumeRepository] clearLocalCache called but local caching is disabled")
+        Result.success(Unit)
     }
 
     /**
-     * Syncs all local resumes to remote
+     * Syncs all local resumes to remote (no-op in Neon-only mode)
      */
     suspend fun syncAllToRemote(): Result<Int> = withContext(Dispatchers.IO) {
-        try {
-            val userId = getCurrentUserId()
-            val localResumes = resumeDao.getAllResumesByUser(userId)
-
-            val authToken = NeonAuth.fetchNeonAuthToken()
-            var syncedCount = 0
-            localResumes.forEach { entity ->
-                val result = NeonResumeService.saveResume(entity.resumeData, userId, authToken)
-                if (result.isSuccess) {
-                    syncedCount++
-                }
-            }
-
-            Log.d(TAG, "Synced $syncedCount of ${localResumes.size} resumes to remote")
-            Result.success(syncedCount)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing to remote", e)
-            Result.failure(e)
-        }
+        // No-op in Neon-only mode - data is already in Neon
+        Log.d(TAG, "[ResumeRepository] syncAllToRemote called but local caching is disabled")
+        Result.success(0)
     }
 }

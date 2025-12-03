@@ -36,11 +36,12 @@ class GridEditorViewModel(
     private val context: Context,
     private val designId: String? = null,
     private val templateName: String? = null,
-    private val isNewDesign: Boolean = false
+    private val isNewDesign: Boolean = false,
+    private val initialLinkedResumeId: String? = null
 ) : ViewModel() {
 
-    private val repository = ResumeRepository.getInstance(context)
     private val gridResumeRepository = GridResumeRepository.getInstance(context)
+    private val resumeRepository = ResumeRepository.getInstance(context)
     private val pdfExporter = AndroidPdfGenerator(context)
     private val imageExporter = AndroidImageExporter(context)
     private val thumbnailGenerator = ThumbnailGenerator(context)
@@ -129,9 +130,6 @@ class GridEditorViewModel(
     private var autoSaveJob: Job? = null
     private var isAutoSaveEnabled = true
 
-    // Resume ID tracking - links GridResume to database Resume record
-    private var linkedResumeId: String? = null
-
     // Events
     private val _events = MutableSharedFlow<GridEditorEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<GridEditorEvent> = _events.asSharedFlow()
@@ -179,7 +177,6 @@ class GridEditorViewModel(
                     // Case 0: Create new blank design (takes priority over all other cases)
                     isNewDesign -> {
                         _gridResume.value = createDefaultResume()
-                        linkedResumeId = null
                         android.util.Log.d("GridEditorViewModel", "Created new blank design")
                     }
 
@@ -190,13 +187,11 @@ class GridEditorViewModel(
                         if (gridResume != null) {
                             val freeModeResume = migrateToFreeLayoutMode(gridResume)
                             _gridResume.value = migrateToHighRes(freeModeResume)
-                            linkedResumeId = null // Grid designs are separate from form resumes
                             android.util.Log.d("GridEditorViewModel", "Loaded design: $designId")
                         } else {
                             // Design not found, create blank
                             android.util.Log.w("GridEditorViewModel", "Design $designId not found, creating blank")
                             _gridResume.value = createDefaultResume()
-                            linkedResumeId = null
                         }
                     }
 
@@ -214,7 +209,13 @@ class GridEditorViewModel(
                                 val newResume = templateLoader.getTemplateGridResume(template)
                                 if (newResume != null) {
                                     val freeModeResume = migrateToFreeLayoutMode(newResume)
-                                    _gridResume.value = migrateToHighRes(freeModeResume)
+                                    // If we have a linked resume ID, use it to prevent creating a duplicate
+                                    val resumeWithId = if (initialLinkedResumeId != null) {
+                                        freeModeResume.copy(id = initialLinkedResumeId)
+                                    } else {
+                                        freeModeResume
+                                    }
+                                    _gridResume.value = migrateToHighRes(resumeWithId)
                                     android.util.Log.d("GridEditorViewModel", "Loaded template from assets: $templateName")
                                 } else {
                                     _gridResume.value = createDefaultResume()
@@ -232,27 +233,24 @@ class GridEditorViewModel(
                             }
 
                             // Create resume with template
-                            _gridResume.value = migrateToHighRes(createResumeWithTemplate(templateType))
+                            val templateResume = createResumeWithTemplate(templateType)
+                            // If we have a linked resume ID, use it to prevent creating a duplicate
+                            val resumeWithId = if (initialLinkedResumeId != null) {
+                                templateResume.copy(id = initialLinkedResumeId)
+                            } else {
+                                templateResume
+                            }
+                            _gridResume.value = migrateToHighRes(resumeWithId)
                         }
 
-                        // Get user data from form resume to populate template
-                        val formResumeResult = repository.getLatestResume()
-                        val formResume = formResumeResult.getOrNull()
-
-                        if (formResume != null) {
-                            // Apply user data to template (modifies _gridResume.value)
-                            applyUserDataToTemplate(formResume, saveToUndo = false)
-                        }
-
-                        linkedResumeId = null
+                        // Note: Template loading complete, user data syncing handled by syncUserDataOnLoad()
                         android.util.Log.d("GridEditorViewModel", "Applied template: $templateName")
                     }
 
-                    // Case 3: Default - load latest from SharedPreferences or create new
+                    // Case 3: Default - load latest from SharedPreferences or GridResumeRepository
                     else -> {
                         // Try to load the GridResume from SharedPreferences
                         val savedGridResumeJson = sharedPreferences.getString("latest_grid_resume", null)
-                        val savedResumeId = sharedPreferences.getString("linked_resume_id", null)
 
                         if (savedGridResumeJson != null) {
                             // Load from SharedPreferences
@@ -262,43 +260,36 @@ class GridEditorViewModel(
                                 val freeModeResume = migrateToFreeLayoutMode(savedGridResume)
                                 // Migrate to high-res grid if needed
                                 _gridResume.value = migrateToHighRes(freeModeResume)
-                                // Restore the linked resume ID
-                                linkedResumeId = savedResumeId
+                                android.util.Log.d("GridEditorViewModel", "Loaded from SharedPreferences")
                             } catch (e: Exception) {
-                                // If parsing fails, try loading from repository database before falling back to empty resume
+                                // If parsing fails, try loading from GridResumeRepository
                                 android.util.Log.e("GridEditorViewModel", "Failed to deserialize GridResume from SharedPreferences", e)
 
-                                val result = repository.getLatestResume()
-                                val formResume = result.getOrNull()
+                                val result = gridResumeRepository.getLatestDesign()
+                                val gridResume = result.getOrNull()
 
-                                if (formResume != null) {
-                                    // Convert form resume to grid resume - this preserves user data
-                                    android.util.Log.d("GridEditorViewModel", "Recovered resume from database after SharedPreferences parse failure")
-                                    val gridResume = migrateToFreeLayoutMode(formResume.toGridResume())
-                                    _gridResume.value = migrateToHighRes(gridResume)
-                                    linkedResumeId = formResume.id
+                                if (gridResume != null) {
+                                    android.util.Log.d("GridEditorViewModel", "Recovered from GridResumeRepository")
+                                    val freeModeResume = migrateToFreeLayoutMode(gridResume)
+                                    _gridResume.value = migrateToHighRes(freeModeResume)
                                 } else {
-                                    // Only fall back to empty resume if repository also has no data
-                                    android.util.Log.w("GridEditorViewModel", "No resume found in database, creating default empty resume")
+                                    android.util.Log.w("GridEditorViewModel", "No resume found, creating default")
                                     _gridResume.value = createDefaultResume()
-                                    linkedResumeId = null
                                 }
                             }
                         } else {
-                            // No saved GridResume, try to load from form resume
-                            val result = repository.getLatestResume()
-                            val formResume = result.getOrNull()
+                            // No saved GridResume, try to load latest from GridResumeRepository
+                            val result = gridResumeRepository.getLatestDesign()
+                            val gridResume = result.getOrNull()
 
-                            if (formResume != null) {
-                                // Convert form resume to grid resume
-                                val gridResume = migrateToFreeLayoutMode(formResume.toGridResume())
-                                _gridResume.value = migrateToHighRes(gridResume)
-                                // Store the resume ID so we update this record instead of creating new ones
-                                linkedResumeId = formResume.id
+                            if (gridResume != null) {
+                                val freeModeResume = migrateToFreeLayoutMode(gridResume)
+                                _gridResume.value = migrateToHighRes(freeModeResume)
+                                android.util.Log.d("GridEditorViewModel", "Loaded latest design from repository")
                             } else {
                                 // Create new resume with default template
                                 _gridResume.value = createDefaultResume()
-                                linkedResumeId = null
+                                android.util.Log.d("GridEditorViewModel", "No saved designs, created default")
                             }
                         }
                     }
@@ -375,14 +366,12 @@ class GridEditorViewModel(
     }
 
     /**
-     * Loads a specific resume by converting from form format
+     * Loads a specific resume by converting from form format (backward compatibility)
      */
     fun loadResume(formResume: Resume) {
         viewModelScope.launch(Dispatchers.IO) {
             saveToUndoStack()
             _gridResume.value = formResume.toGridResume()
-            // Link to this resume's ID for future updates
-            linkedResumeId = formResume.id
             syncUserDataOnLoad()
             _events.tryEmit(GridEditorEvent.ResumeLoaded)
         }
@@ -401,9 +390,8 @@ class GridEditorViewModel(
     }
 
     /**
-     * Saves the current resume
-     * If designId was provided, saves to GridResumeRepository
-     * Otherwise, saves to SharedPreferences + form Resume repository
+     * Saves the current resume directly as GridResume to local and remote storage
+     * Also updates the linked Resume table's json field with GridResume data
      */
     fun save() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -414,58 +402,59 @@ class GridEditorViewModel(
                     thumbnailGenerator.generateThumbnail(_gridResume.value)
                 } catch (e: Exception) {
                     android.util.Log.e("GridEditorViewModel", "Failed to generate thumbnail", e)
-                    "" // Empty string if thumbnail generation fails
+                    ""
                 }
 
-                if (designId != null) {
-                    // Save as grid design to GridResumeRepository
-                    val result = if (_gridResume.value.id == designId) {
-                        // Update existing design
-                        gridResumeRepository.updateDesign(_gridResume.value, thumbnail)
-                    } else {
-                        // Save as new design (shouldn't happen, but handle it)
-                        gridResumeRepository.saveDesign(_gridResume.value, thumbnail)
-                    }
+                // Save GridResume to SharedPreferences for quick restore
+                val gridResumeJson = gson.toJson(_gridResume.value)
+                sharedPreferences.edit()
+                    .putString("latest_grid_resume", gridResumeJson)
+                    .commit()
 
-                    if (result.isSuccess) {
-                        _events.emit(GridEditorEvent.SaveSuccess("Design saved successfully"))
-                    } else {
-                        _events.emit(GridEditorEvent.SaveError("Failed to save design"))
-                    }
+                // Check if design already exists
+                val existing = gridResumeRepository.getDesign(_gridResume.value.id).getOrNull()
+
+                // Direct GridResume sync (no form conversion)
+                val result = if (existing != null) {
+                    gridResumeRepository.updateDesign(
+                        gridResume = _gridResume.value,
+                        thumbnail = thumbnail,
+                        syncToRemote = true
+                    )
                 } else {
-                    // Save GridResume directly to SharedPreferences as JSON
-                    val gridResumeJson = gson.toJson(_gridResume.value)
-                    sharedPreferences.edit()
-                        .putString("latest_grid_resume", gridResumeJson)
-                        .putString("linked_resume_id", linkedResumeId) // Save the linked resume ID
-                        .commit() // Using commit() for reliable synchronous save
+                    gridResumeRepository.saveDesign(
+                        gridResume = _gridResume.value,
+                        thumbnail = thumbnail,
+                        syncToRemote = true
+                    )
+                }
 
-                    // Also save as grid design to repository with thumbnail
-                    gridResumeRepository.saveDesign(_gridResume.value, thumbnail)
-
-                    // Also convert to form resume for compatibility with other parts of the app
-                    val formResume = _gridResume.value.toFormResume(linkedResumeId)
-
-                    // Use UPDATE if we have a linked resume ID, otherwise INSERT (new resume)
-                    val result = if (linkedResumeId != null) {
-                        repository.updateResume(formResume, syncToRemote = true)
-                    } else {
-                        repository.saveResume(formResume, syncToRemote = true)
-                    }
-
-                    if (result.isSuccess) {
-                        // If this was a new resume (no linked ID), store the ID for future updates
-                        if (linkedResumeId == null) {
-                            linkedResumeId = formResume.id
-                            // Save the linked ID immediately
-                            sharedPreferences.edit()
-                                .putString("linked_resume_id", linkedResumeId)
-                                .apply()
+                // Also update the linked Resume table's json field with GridResume data
+                if (result.isSuccess && initialLinkedResumeId != null) {
+                    try {
+                        // Get the linked resume
+                        val linkedResumeResult = resumeRepository.getResume(initialLinkedResumeId)
+                        val linkedResume = linkedResumeResult.getOrNull()
+                        if (linkedResume != null) {
+                            // Update the Resume with GridResume JSON in the 'json' field
+                            @Suppress("DEPRECATION")
+                            resumeRepository.updateResume(
+                                resume = linkedResume,
+                                syncToRemote = true,
+                                gridResume = _gridResume.value
+                            )
+                            android.util.Log.d("GridEditorViewModel", "Updated linked Resume ${initialLinkedResumeId} with GridResume JSON")
                         }
-                        _events.emit(GridEditorEvent.SaveSuccess("Resume saved successfully"))
-                    } else {
-                        _events.emit(GridEditorEvent.SaveError("Failed to save resume"))
+                    } catch (e: Exception) {
+                        android.util.Log.e("GridEditorViewModel", "Failed to update linked Resume", e)
+                        // Don't fail the whole save if this fails
                     }
+                }
+
+                if (result.isSuccess) {
+                    _events.emit(GridEditorEvent.SaveSuccess("Resume saved successfully"))
+                } else {
+                    _events.emit(GridEditorEvent.SaveError("Failed to save resume"))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1401,18 +1390,12 @@ class GridEditorViewModel(
     /**
      * Automatically syncs user data from Resume Builder on load
      * Called after resume is loaded to ensure tagged elements have latest data
+     * @deprecated Form-based Resume sync is deprecated. This method is no longer used.
      */
+    @Deprecated("Form-based Resume sync is deprecated")
     private suspend fun syncUserDataOnLoad() {
-        try {
-            val result = repository.getLatestResume()
-            result.getOrNull()?.let { formResume ->
-                // Update all tagged elements with fresh user data
-                applyUserDataToTemplate(formResume, saveToUndo = false)
-            }
-        } catch (e: Exception) {
-            // Silently fail - not critical, user can manually refresh
-            e.printStackTrace()
-        }
+        // No-op: Form-based Resume sync is deprecated
+        // User data should be directly embedded in GridResume elements
     }
 
     /**

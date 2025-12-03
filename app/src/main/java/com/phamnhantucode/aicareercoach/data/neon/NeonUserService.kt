@@ -44,6 +44,14 @@ object NeonUserService {
      * @param industry The industry name (required for new users)
      * @param authToken Optional authentication token
      */
+    /**
+     * Creates or updates a user with the industry field.
+     * This should be used during onboarding after ensuring the IndustryInsight exists.
+     *
+     * @param user The Clerk user to sync
+     * @param industry The industry name (required for new users)
+     * @param authToken Optional authentication token
+     */
     suspend fun upsertUserWithIndustry(
         user: User,
         industry: String,
@@ -51,14 +59,14 @@ object NeonUserService {
     ) = withContext(Dispatchers.IO) {
         val authorizationHeader = resolveAuthorizationHeader(authToken)
             ?: run {
-                Log.w(TAG, "No Neon auth credentials available; skipping Neon sync.")
+                Log.w(TAG, "[NeonUserService] No Neon auth credentials available; skipping Neon sync.")
                 return@withContext
             }
 
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
         val email = resolvePrimaryEmail(user)
             ?: run {
-                Log.w(TAG, "Clerk user ${user.id} missing email; skipping Neon sync.")
+                Log.w(TAG, "[NeonUserService] Clerk user ${user.id} missing email; skipping Neon sync.")
                 return@withContext
             }
 
@@ -67,7 +75,7 @@ object NeonUserService {
 
         if (existingUser != null) {
             // User exists, just update the industry
-            Log.d(TAG, "User ${user.id} already exists in Neon, updating industry to $industry")
+            Log.d(TAG, "[NeonUserService] User ${user.id} already exists in Neon, updating industry to $industry")
             val updatePayload = JSONObject().apply {
                 put("industry", industry)
             }
@@ -89,7 +97,7 @@ object NeonUserService {
                 put("skills", JSONArray())
             }
 
-            Log.d(TAG, "Creating new Neon user with industry: $payload")
+            Log.d(TAG, "[NeonUserService] Creating new Neon user with industry: $payload")
 
             val request = Request.Builder()
                 .url("$apiUrl/User?on_conflict=clerkUserId")
@@ -105,7 +113,7 @@ object NeonUserService {
                 if (!response.isSuccessful) {
                     val errorMessage = bodyString ?: "Empty response body"
                     if (response.code == 409 && bodyString?.contains("duplicate key value") == true) {
-                        Log.i(TAG, "Neon record exists for ${user.id}; attempting to update instead.")
+                        Log.i(TAG, "[NeonUserService] Neon record exists for ${user.id}; attempting to update instead.")
                         val updatePayload = JSONObject().apply {
                             put("industry", industry)
                         }
@@ -114,7 +122,7 @@ object NeonUserService {
                     }
                     throw IOException("Neon query failed (${response.code}): $errorMessage")
                 }
-                Log.d(TAG, "Created Neon user ${user.id} with industry $industry.")
+                Log.d(TAG, "[NeonUserService] Created Neon user ${user.id} with industry $industry.")
             }
         }
     }
@@ -127,14 +135,14 @@ object NeonUserService {
     suspend fun upsertUser(user: User, authToken: String? = null) = withContext(Dispatchers.IO) {
         val authorizationHeader = resolveAuthorizationHeader(authToken)
             ?: run {
-                Log.w(TAG, "No Neon auth credentials available; skipping Neon sync.")
+                Log.w(TAG, "[NeonUserService] No Neon auth credentials available; skipping Neon sync.")
                 return@withContext
             }
 
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
         val email = resolvePrimaryEmail(user)
             ?: run {
-                Log.w(TAG, "Clerk user ${user.id} missing email; skipping Neon sync.")
+                Log.w(TAG, "[NeonUserService] Clerk user ${user.id} missing email; skipping Neon sync.")
                 return@withContext
             }
 
@@ -153,7 +161,7 @@ object NeonUserService {
             put("skills", JSONArray())
         }
 
-        Log.d(TAG, "Neon sync payload: $payload")
+        Log.d(TAG, "[NeonUserService] Neon sync payload: $payload")
 
         val request = Request.Builder()
             .url("$apiUrl/User?on_conflict=clerkUserId")
@@ -169,13 +177,13 @@ object NeonUserService {
             if (!response.isSuccessful) {
                 val errorMessage = bodyString ?: "Empty response body"
                 if (response.code == 409 && bodyString?.contains("duplicate key value") == true) {
-                    Log.i(TAG, "Neon record exists for ${user.id}; attempting to update instead.")
+                    Log.i(TAG, "[NeonUserService] Neon record exists for ${user.id}; attempting to update instead.")
                     patchUser(apiUrl, authorizationHeader, user.id, payload)
                     return@withContext
                 }
                 throw IOException("Neon query failed (${response.code}): $errorMessage")
             }
-            Log.d(TAG, "Synced Clerk user ${user.id} with Neon.")
+            Log.d(TAG, "[NeonUserService] Synced Clerk user ${user.id} with Neon.")
         }
     }
 
@@ -186,7 +194,7 @@ object NeonUserService {
     ) = withContext(Dispatchers.IO) {
         val authorizationHeader = resolveAuthorizationHeader(authToken)
             ?: run {
-                Log.w(TAG, "No Neon auth credentials available; skipping user profile update.")
+                Log.w(TAG, "[NeonUserService] No Neon auth credentials available; skipping user profile update.")
                 return@withContext
             }
 
@@ -210,9 +218,9 @@ object NeonUserService {
             }
         }
 
-        Log.d(TAG, "Updating Neon user $clerkUserId with onboarding profile: $payload")
+        Log.d(TAG, "[NeonUserService] Updating Neon user $clerkUserId with onboarding profile: $payload")
         patchUser(apiUrl, authorizationHeader, clerkUserId, payload)
-        Log.d(TAG, "Updated onboarding profile for Neon user $clerkUserId.")
+        Log.d(TAG, "[NeonUserService] Updated onboarding profile for Neon user $clerkUserId.")
     }
 
     suspend fun getUser(
@@ -315,7 +323,7 @@ object NeonUserService {
                     "Neon update failed (${patchResponse.code}) for $clerkUserId: $errorMessage"
                 )
             }
-            Log.d(TAG, "Patched Neon user $clerkUserId.")
+            Log.d(TAG, "[NeonUserService] Patched Neon user $clerkUserId.")
         }
     }
 

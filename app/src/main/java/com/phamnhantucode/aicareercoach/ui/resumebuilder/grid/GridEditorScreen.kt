@@ -594,18 +594,11 @@ private fun GridEditorTopBar(
 ) {
     TopAppBar(
         title = {
-            Column {
-                Text(
-                    text = resumeName,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Grid Editor",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = resumeName,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         },
         navigationIcon = {
             IconButton(onClick = onNavigateBack) {
@@ -730,6 +723,7 @@ private fun GridEditorBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
