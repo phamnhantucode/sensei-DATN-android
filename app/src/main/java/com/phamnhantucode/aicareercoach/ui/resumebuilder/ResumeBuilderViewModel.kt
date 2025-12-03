@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
+import com.phamnhantucode.aicareercoach.data.resume.ResumeSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ResumeBuilderViewModel(context: Context, private val resumeId: String? = null) : ViewModel() {
+class ResumeBuilderViewModel(private val context: Context, private val resumeId: String? = null) : ViewModel() {
 
     companion object {
         private const val TAG = "ResumeBuilderViewModel"
@@ -45,10 +46,14 @@ class ResumeBuilderViewModel(context: Context, private val resumeId: String? = n
     private var autoSaveJob: Job? = null
     private var isAutoSaveEnabled = false
     private var isInitialLoadComplete = false
+    private var cachedUserId: String? = null
 
     init {
         // Load resume based on resumeId or create new
         viewModelScope.launch(Dispatchers.IO) {
+            // Cache user ID for WorkManager sync
+            cachedUserId = repository.getCurrentUserId()
+            
             if (resumeId != null) {
                 // Load existing resume
                 loadResumeById(resumeId)
@@ -133,7 +138,8 @@ class ResumeBuilderViewModel(context: Context, private val resumeId: String? = n
     }
 
     /**
-     * Triggers auto-save with debounce (saves 500ms after last change)
+     * Triggers auto-save with debounce (enqueues WorkManager sync 1000ms after last change)
+     * Uses WorkManager for reliable background sync that survives process death.
      */
     private fun triggerAutoSave() {
         if (!isAutoSaveEnabled || !isInitialLoadComplete) return
@@ -141,7 +147,23 @@ class ResumeBuilderViewModel(context: Context, private val resumeId: String? = n
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             delay(1000) // Wait 1000ms after last change - reduce concurrent save conflicts
-            saveResume(showToast = false) // Auto-save silently
+            
+            val userId = cachedUserId
+            if (userId == null) {
+                Log.w(TAG, "Cannot auto-save: user ID not available")
+                return@launch
+            }
+            
+            val currentResume = _resume.value
+            val isUpdate = resumeId != null
+            
+            // Enqueue reliable background sync via WorkManager
+            ResumeSyncWorker.enqueue(
+                context = context,
+                resume = currentResume,
+                userId = userId,
+                isUpdate = isUpdate
+            )
         }
     }
 

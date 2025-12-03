@@ -33,8 +33,9 @@ object NeonResumeMapper {
     /**
      * Convert app Resume to Neon Resume table payload
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, omit 'json' field entirely to preserve existing DB value
      */
-    fun toNeonResumePayload(resume: Resume, userId: String, gridResume: GridResume? = null): JSONObject {
+    fun toNeonResumePayload(resume: Resume, userId: String, gridResume: GridResume? = null, preserveExistingJson: Boolean = false): JSONObject {
         return JSONObject().apply {
             put("id", resume.id)
             put("userId", userId)
@@ -44,17 +45,24 @@ object NeonResumeMapper {
             put("template", resume.theme.templateId)
             put("accentColor", getAccentColorName(resume.theme.colorScheme.accentColor))
             put("skills", toPostgresTextArray(resume.skills))
-            // Store GridResume design JSON if provided, otherwise store NULL
-            // IMPORTANT: Do NOT store form data JSON here, as it causes the app to think a design exists
-            put("json", gridResume?.let { toGridResumeJson(it) } ?: JSONObject.NULL)
+            // Store GridResume design JSON if provided
+            // If preserveExistingJson is true and no gridResume provided, omit the field entirely
+            // This prevents form-only saves from wiping out existing GridResume designs
+            if (gridResume != null) {
+                put("json", toGridResumeJson(gridResume))
+            } else if (!preserveExistingJson) {
+                put("json", JSONObject.NULL)
+            }
+            // When preserveExistingJson=true and gridResume=null, omit 'json' field to keep existing value
         }
     }
 
     /**
      * Convert app Resume to Neon Resume table update payload (without id/userId)
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, omit 'json' field entirely to preserve existing DB value
      */
-    fun toNeonResumeUpdatePayload(resume: Resume, gridResume: GridResume? = null): JSONObject {
+    fun toNeonResumeUpdatePayload(resume: Resume, gridResume: GridResume? = null, preserveExistingJson: Boolean = false): JSONObject {
         return JSONObject().apply {
             put("content", ResumeFormatter.toMarkdown(resume))
             put("title", resume.personalInfo.fullName.ifEmpty { "Untitled Resume" })
@@ -62,9 +70,15 @@ object NeonResumeMapper {
             put("template", resume.theme.templateId)
             put("accentColor", getAccentColorName(resume.theme.colorScheme.accentColor))
             put("skills", toPostgresTextArray(resume.skills))
-            // Store GridResume design JSON if provided, otherwise store NULL
-            // IMPORTANT: Do NOT store form data JSON here, as it causes the app to think a design exists
-            put("json", gridResume?.let { toGridResumeJson(it) } ?: JSONObject.NULL)
+            // Store GridResume design JSON if provided
+            // If preserveExistingJson is true and no gridResume provided, omit the field entirely
+            // This prevents form-only saves from wiping out existing GridResume designs
+            if (gridResume != null) {
+                put("json", toGridResumeJson(gridResume))
+            } else if (!preserveExistingJson) {
+                put("json", JSONObject.NULL)
+            }
+            // When preserveExistingJson=true and gridResume=null, omit 'json' field to keep existing value
         }
     }
 

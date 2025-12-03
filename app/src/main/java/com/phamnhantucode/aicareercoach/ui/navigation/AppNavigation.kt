@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import com.phamnhantucode.aicareercoach.data.preferences.PreferencesRepository
 import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import com.phamnhantucode.aicareercoach.ui.accountsettings.AccountSettingsScreen
+import com.phamnhantucode.aicareercoach.ui.components.NetworkAwareContent
 import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.editor.CoverLetterEditorScreen
 import com.phamnhantucode.aicareercoach.ui.industryinsights.IndustryInsightsScreen
@@ -48,7 +49,8 @@ fun AppNavigation() {
     val navController = rememberNavController()
 
     AppTheme(darkTheme = darkTheme) {
-        NavHost(
+        NetworkAwareContent {
+            NavHost(
             navController = navController,
             startDestination = Screen.Login.route
         ) {
@@ -290,6 +292,7 @@ fun AppNavigation() {
             LiveInterviewScreen(
                 onBack = { navController.popBackStack() }
             )
+        }
         }
         }
     }

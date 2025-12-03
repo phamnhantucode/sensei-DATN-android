@@ -82,6 +82,7 @@ class ResumeRepository private constructor(context: Context) {
     /**
      * Saves a resume directly to Neon (local caching disabled)
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, preserve existing 'json' field when gridResume is null (default: true)
      * @deprecated Use GridResumeRepository.saveDesign() instead. Form-based resumes are deprecated in favor of GridResume.
      */
     @Deprecated(
@@ -91,14 +92,19 @@ class ResumeRepository private constructor(context: Context) {
             imports = ["com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository"]
         )
     )
-    suspend fun saveResume(resume: Resume, syncToRemote: Boolean = true, gridResume: GridResume? = null): Result<Unit> =
+    suspend fun saveResume(
+        resume: Resume,
+        syncToRemote: Boolean = true,
+        gridResume: GridResume? = null,
+        preserveExistingJson: Boolean = true
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 val userId = requireCurrentUserId()
                 
                 // Save directly to Neon (skip local)
                 val authToken = NeonAuth.fetchNeonAuthToken()
-                val remoteResult = NeonResumeService.saveResume(resume, userId, authToken, gridResume)
+                val remoteResult = NeonResumeService.saveResume(resume, userId, authToken, gridResume, preserveExistingJson)
                 if (remoteResult.isFailure) {
                     Log.e(TAG, "[ResumeRepository] Failed to save resume to Neon", remoteResult.exceptionOrNull())
                     return@withContext Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to save resume"))
@@ -117,6 +123,7 @@ class ResumeRepository private constructor(context: Context) {
     /**
      * Updates an existing resume directly in Neon (local caching disabled)
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, preserve existing 'json' field when gridResume is null (default: true)
      * @deprecated Use GridResumeRepository.updateDesign() instead. Form-based resumes are deprecated in favor of GridResume.
      */
     @Deprecated(
@@ -126,12 +133,17 @@ class ResumeRepository private constructor(context: Context) {
             imports = ["com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository"]
         )
     )
-    suspend fun updateResume(resume: Resume, syncToRemote: Boolean = true, gridResume: GridResume? = null): Result<Unit> =
+    suspend fun updateResume(
+        resume: Resume,
+        syncToRemote: Boolean = true,
+        gridResume: GridResume? = null,
+        preserveExistingJson: Boolean = true
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 // Update directly in Neon (skip local)
                 val authToken = NeonAuth.fetchNeonAuthToken()
-                val remoteResult = NeonResumeService.updateResume(resume, authToken, gridResume)
+                val remoteResult = NeonResumeService.updateResume(resume, authToken, gridResume, preserveExistingJson)
                 if (remoteResult.isFailure) {
                     Log.e(TAG, "[ResumeRepository] Failed to update resume in Neon", remoteResult.exceptionOrNull())
                     return@withContext Result.failure(remoteResult.exceptionOrNull() ?: Exception("Failed to update resume"))

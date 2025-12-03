@@ -34,12 +34,14 @@ object NeonResumeService {
     /**
      * Creates or updates a resume in Neon database (all tables)
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, preserve existing 'json' field value when gridResume is null
      */
     suspend fun saveResume(
         resume: Resume,
         userId: String,
         authToken: String? = null,
-        gridResume: GridResume? = null
+        gridResume: GridResume? = null,
+        preserveExistingJson: Boolean = true
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val operationId = "saveResume-${resume.id.take(8)}"
         Log.d(TAG, "[NeonSync] [$operationId] Starting save for user $userId")
@@ -55,14 +57,15 @@ object NeonResumeService {
             if (existingResume.isSuccess && existingResume.getOrNull() != null) {
                 // Resume exists, update it
                 Log.d(TAG, "[NeonSync] [$operationId] Resume already exists, updating...")
-                return@withContext updateResume(resume, authToken, gridResume)
+                return@withContext updateResume(resume, authToken, gridResume, preserveExistingJson)
             } else {
                 // Resume doesn't exist, create new one
                 Log.d(TAG, "[NeonSync] [$operationId] Creating new resume")
                 val now = java.time.Instant.now().toString()
 
                 // 1. Save to Resume table
-                val payload = NeonResumeMapper.toNeonResumePayload(resume, userId, gridResume).apply {
+                // For new resumes, don't preserve existing json (there is none)
+                val payload = NeonResumeMapper.toNeonResumePayload(resume, userId, gridResume, preserveExistingJson = false).apply {
                     put("atsScore", JSONObject.NULL)
                     put("feedback", JSONObject.NULL)
                     put("createdAt", now)
@@ -83,7 +86,7 @@ object NeonResumeService {
                         // Check for 409 Conflict (Duplicate Key)
                         if (response.code == 409) {
                             Log.w(TAG, "[NeonSync] [$operationId] Conflict detected (409), resume already exists. Retrying as update.")
-                            return@withContext updateResume(resume, authToken, gridResume)
+                            return@withContext updateResume(resume, authToken, gridResume, preserveExistingJson)
                         }
 
                         val errorMessage = bodyString ?: "Empty response body"
@@ -298,11 +301,13 @@ object NeonResumeService {
     /**
      * Updates an existing resume in Neon database
      * @param gridResume Optional GridResume to store in the 'json' field instead of form data
+     * @param preserveExistingJson If true, preserve existing 'json' field value when gridResume is null
      */
     suspend fun updateResume(
         resume: Resume,
         authToken: String? = null,
-        gridResume: GridResume? = null
+        gridResume: GridResume? = null,
+        preserveExistingJson: Boolean = true
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val operationId = "updateResume-${resume.id.take(8)}"
         Log.d(TAG, "[NeonSync] [$operationId] Starting update")
@@ -314,7 +319,7 @@ object NeonResumeService {
             val now = java.time.Instant.now().toString()
 
             // 1. Update Resume table
-            val payload = NeonResumeMapper.toNeonResumeUpdatePayload(resume, gridResume).apply {
+            val payload = NeonResumeMapper.toNeonResumeUpdatePayload(resume, gridResume, preserveExistingJson).apply {
                 put("updatedAt", now)
             }
 
