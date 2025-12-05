@@ -46,13 +46,15 @@ class ThumbnailGenerator(private val context: Context) {
      */
     suspend fun generateThumbnail(gridResume: GridResume): String = withContext(Dispatchers.Default) {
         try {
+            android.util.Log.d("ThumbnailGenerator", "Starting thumbnail generation for resume: ${gridResume.id}")
             val thumbnail = createThumbnailBitmap(gridResume)
             if (thumbnail == null) {
-                android.util.Log.e("ThumbnailGenerator", "Failed to create thumbnail bitmap")
+                android.util.Log.e("ThumbnailGenerator", "Failed to create thumbnail bitmap - bitmap is null")
                 return@withContext ""
             }
 
             val base64String = bitmapToBase64(thumbnail)
+            android.util.Log.d("ThumbnailGenerator", "Generated thumbnail: ${base64String.length} chars (${base64String.take(50)}...)")
             thumbnail.recycle()
             base64String
         } catch (e: Exception) {

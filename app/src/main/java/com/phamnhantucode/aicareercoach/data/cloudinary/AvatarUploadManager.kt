@@ -1,4 +1,4 @@
-package com.phamnhantucode.aicareercoach.data.imgbb
+package com.phamnhantucode.aicareercoach.data.cloudinary
 
 import android.content.Context
 import android.net.Uri
@@ -39,7 +39,7 @@ class AvatarUploadManager private constructor(private val context: Context) {
     val uploadState: StateFlow<ImageUploadState> = _uploadState.asStateFlow()
 
     /**
-     * Uploads avatar image to imgbb
+     * Uploads avatar image to Cloudinary
      * First checks cache, then uploads if not cached
      *
      * @param localUri Content URI from photo picker
@@ -57,15 +57,15 @@ class AvatarUploadManager private constructor(private val context: Context) {
                 return@withContext Result.success(cachedUrl)
             }
 
-            // Not cached - upload to imgbb
-            Log.d(TAG, "Uploading avatar to imgbb: $uriString")
+            // Not cached - upload to Cloudinary
+            Log.d(TAG, "Uploading avatar to Cloudinary: $uriString")
             _uploadState.value = ImageUploadState.Uploading
 
-            val uploadResult = ImgbbUploadService.uploadImage(context, localUri)
+            val uploadResult = CloudinaryUploadService.uploadImage(context, localUri)
 
             if (uploadResult.isSuccess) {
                 val response = uploadResult.getOrNull()!!
-                val remoteUrl = response.data.displayUrl
+                val remoteUrl = response.data.secureUrl
 
                 // Cache the mapping
                 cache.cacheUrl(uriString, remoteUrl)

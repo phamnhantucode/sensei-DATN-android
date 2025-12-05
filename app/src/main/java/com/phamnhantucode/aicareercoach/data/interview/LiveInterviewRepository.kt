@@ -3,11 +3,11 @@ package com.phamnhantucode.aicareercoach.data.interview
 import android.content.Context
 import android.util.Log
 import com.clerk.api.Clerk
-import com.clerk.api.network.serialization.ClerkResult
-import com.clerk.api.session.fetchToken
 import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.data.audio.GeminiAudioService
+import com.phamnhantucode.aicareercoach.data.audio.VoskSpeechRecognizer
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Repository for managing live mock interviews with speech-to-text functionality.
- * Coordinates audio recording, transcription, AI feedback, and persistence.
+ * Coordinates audio recording, transcription (via Vosk), AI feedback (via Gemini), and persistence.
  */
 class LiveInterviewRepository(
     private val context: Context,
@@ -35,6 +35,7 @@ class LiveInterviewRepository(
 ) {
     private val database = AppDatabase.getDatabase(context)
     private val geminiAudioService = GeminiAudioService()
+    private val voskRecognizer = VoskSpeechRecognizer(context)
     private val userProfileCacheDao = database.userProfileCacheDao()
 
     companion object {
@@ -47,33 +48,84 @@ class LiveInterviewRepository(
     suspend fun startLiveInterview(request: StartLiveInterviewRequest): Result<StartInterviewResult> =
         withContext(Dispatchers.IO) {
             try {
-                val user = Clerk.user
-                    ?: return@withContext Result.failure(Exception("User session unavailable"))
+                Log.d(TAG, "startLiveInterview() called with request: $request")
 
-                if (BuildConfig.NEON_API_URL.isBlank()) {
+                val user = Clerk.user
+                Log.d(TAG, "Clerk.user: ${if (user != null) "ID=${user.id}" else "NULL"}")
+                if (user == null) {
+                    Log.e(TAG, "User session unavailable")
+                    return@withContext Result.failure(Exception("User session unavailable"))
+                }
+
+                val apiUrl = BuildConfig.NEON_API_URL
+                Log.d(TAG, "NEON_API_URL configured: ${apiUrl.isNotBlank()}, value=${if (apiUrl.isNotBlank()) apiUrl else "BLANK"}")
+                if (apiUrl.isBlank()) {
+                    Log.e(TAG, "Neon API URL not configured")
                     return@withContext Result.failure(Exception("Neon API URL not configured"))
                 }
 
-                val authHeader = resolveAuthorizationHeader()
-                    ?: return@withContext Result.failure(Exception("Authentication failed"))
+                Log.d(TAG, "Fetching authentication token...")
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                Log.d(TAG, "Auth token fetched: ${authToken != null}")
+
+                val authHeader = buildAuthorizationHeader(authToken)
+                if (authHeader == null) {
+                    Log.e(TAG, "Failed to build authorization header")
+                    return@withContext Result.failure(Exception("Authentication failed"))
+                }
+                Log.d(TAG, "Authorization header built successfully")
 
                 // Fetch Neon user profile to get the UUID
+                Log.d(TAG, "Fetching Neon user profile for Clerk user: ${user.id}")
                 val neonUser = fetchNeonUserProfile(user.id, authHeader)
-                    ?: return@withContext Result.failure(Exception("Failed to fetch user profile"))
+                Log.d(TAG, "Neon user profile fetched: ${if (neonUser != null) "SUCCESS (id=${neonUser.id})" else "NULL (FAILED)"}")
+                if (neonUser == null) {
+                    Log.e(TAG, "Failed to fetch user profile from Neon database for Clerk user: ${user.id}")
+                    return@withContext Result.failure(Exception("Failed to fetch user profile"))
+                }
 
                 // Create new interview session in database
-                val sessionId = createInterviewSession(neonUser.id, authHeader)
-                    ?: return@withContext Result.failure(Exception("Failed to create interview session"))
+                Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")
+                val sessionId = createInterviewSession(
+                    userId = neonUser.id,
+                    authHeader = authHeader,
+                    role = request.interviewType.name,
+                    description = "Mock interview for ${request.interviewType.name}",
+                    yoes = request.experienceLevel ?: 0
+                )
+                Log.d(TAG, "Interview session created: ${if (sessionId != null) "SUCCESS (id=$sessionId)" else "NULL (FAILED)"}")
+                if (sessionId == null) {
+                    Log.e(TAG, "Failed to create interview session in database")
+                    return@withContext Result.failure(Exception("Failed to create interview session"))
+                }
 
                 // Generate first question
+                Log.d(TAG, "Generating first question for category=${request.interviewType.name}")
                 val firstQuestionResult = geminiAudioService.generateNextQuestion(
                     category = request.interviewType.name,
                     previousQuestions = emptyList(),
                     userProfile = buildUserProfileContext(request)
                 )
+                Log.d(TAG, "First question generation result: ${if (firstQuestionResult.isSuccess) "SUCCESS" else "FAILED"}")
 
                 if (firstQuestionResult.isFailure) {
-                    return@withContext Result.failure(firstQuestionResult.exceptionOrNull() ?: Exception("Failed to generate question"))
+                    val error = firstQuestionResult.exceptionOrNull() ?: Exception("Failed to generate question")
+                    Log.e(TAG, "Failed to generate first question", error)
+
+                    // Provide specific error message based on exception
+                    val userMessage = when {
+                        error.message?.contains("API key not configured") == true ->
+                            "Gemini API key is not configured. Please add GEMINI_API_KEY to local.properties"
+                        error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
+                            "Gemini API authentication failed. Please check your API key in local.properties"
+                        error.message?.contains("HTTP 429") == true ->
+                            "Gemini API rate limit exceeded. Please try again later"
+                        error.message?.contains("HTTP 5") == true ->
+                            "Gemini API server error. Please try again later"
+                        else -> "Failed to generate interview question: ${error.message}"
+                    }
+
+                    return@withContext Result.failure(Exception(userMessage))
                 }
 
                 val questionData = firstQuestionResult.getOrNull()!!
@@ -84,18 +136,18 @@ class LiveInterviewRepository(
                     correctAnswer = questionData.idealAnswer
                 )
 
-                Log.d(TAG, "Live interview started: sessionId=$sessionId")
+                Log.d(TAG, "Live interview started successfully: sessionId=$sessionId, questionText=${questionData.question.take(50)}...")
 
                 Result.success(StartInterviewResult(sessionId = sessionId, firstQuestion = firstQuestion))
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting live interview", e)
+                Log.e(TAG, "Exception in startLiveInterview()", e)
                 Result.failure(e)
             }
         }
 
     /**
-     * Processes a recorded audio answer: transcribes it and gets AI feedback.
+     * Processes a recorded audio answer: transcribes it using Vosk and gets AI feedback from Gemini.
      */
     suspend fun processAnswer(
         audioFile: File,
@@ -105,16 +157,48 @@ class LiveInterviewRepository(
         previousQuestions: List<String>
     ): Result<AnswerResult> = withContext(Dispatchers.IO) {
         try {
-            // Step 1: Transcribe audio
-            val transcriptionResult = geminiAudioService.transcribeAudio(audioFile)
+            // Pre-validate audio file
+            if (!audioFile.exists() || audioFile.length() <= 44) {
+                Log.e(TAG, "Audio file validation failed: exists=${audioFile.exists()}, size=${audioFile.length()}")
+                audioFile.delete()
+                return@withContext Result.failure(
+                    Exception("Audio recording failed. Please try again.")
+                )
+            }
+
+            Log.d(TAG, "Processing audio file: ${audioFile.absolutePath}, size=${audioFile.length()} bytes")
+
+            // Step 1: Transcribe audio using Vosk (offline, accurate speech-to-text)
+            Log.d(TAG, "Transcribing audio with Vosk...")
+            val transcriptionResult = voskRecognizer.transcribeAudio(audioFile)
+
             if (transcriptionResult.isFailure) {
-                return@withContext Result.failure(transcriptionResult.exceptionOrNull() ?: Exception("Transcription failed"))
+                val error = transcriptionResult.exceptionOrNull()
+                val userMessage = when {
+                    error?.message?.contains("corrupted") == true || error?.message?.contains("invalid") == true ->
+                        "Audio file was corrupted. Please try recording again."
+                    error?.message?.contains("No speech detected") == true ->
+                        "No speech detected. Please speak clearly into the microphone."
+                    error?.message?.contains("model not available") == true ->
+                        "Speech recognition is initializing. Please wait and try again."
+                    error?.message?.contains("empty") == true ->
+                        "Recording too short. Please speak for at least 2 seconds."
+                    else ->
+                        "Transcription failed: ${error?.message ?: "Unknown error"}"
+                }
+
+                Log.e(TAG, "Transcription failed: ${error?.message}", error)
+
+                // Clean up audio file
+                audioFile.delete()
+
+                return@withContext Result.failure(Exception(userMessage))
             }
 
             val transcription = transcriptionResult.getOrNull()!!
-            Log.d(TAG, "Audio transcribed: $transcription")
+            Log.d(TAG, "Audio transcribed with Vosk: $transcription")
 
-            // Step 2: Get AI feedback
+            // Step 2: Get AI feedback from Gemini (uses text, not audio)
             val feedbackResult = geminiAudioService.generateFeedback(
                 question = question.questionText,
                 userAnswer = transcription,
@@ -135,7 +219,8 @@ class LiveInterviewRepository(
                 rating = feedback.rating
             )
 
-            val authHeader = resolveAuthorizationHeader()
+            val authToken = NeonAuth.fetchNeonAuthToken()
+            val authHeader = buildAuthorizationHeader(authToken)
                 ?: return@withContext Result.failure(Exception("Authentication failed"))
 
             saveQuestionToDatabase(savedQuestion, authHeader)
@@ -177,7 +262,9 @@ class LiveInterviewRepository(
 
         } catch (e: Exception) {
             Log.e(TAG, "Error processing answer", e)
-            Result.failure(e)
+            // Clean up audio file on error
+            audioFile.delete()
+            Result.failure(Exception("Failed to process answer: ${e.message}"))
         }
     }
 
@@ -260,7 +347,8 @@ class LiveInterviewRepository(
     suspend fun getInterviewHistory(userId: String): Result<List<LiveMockInterviewSession>> =
         withContext(Dispatchers.IO) {
             try {
-                val authHeader = resolveAuthorizationHeader()
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val authHeader = buildAuthorizationHeader(authToken)
                     ?: return@withContext Result.failure(Exception("Authentication failed"))
 
                 val encodedUserId = URLEncoder.encode(userId, "UTF-8")
@@ -294,9 +382,12 @@ class LiveInterviewRepository(
 
     private suspend fun fetchNeonUserProfile(clerkUserId: String, authHeader: String): NeonUserProfile? {
         return try {
+            Log.d(TAG, "fetchNeonUserProfile() called for clerkUserId=$clerkUserId")
+
             val encodedClerkId = java.net.URLEncoder.encode(clerkUserId, "UTF-8")
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val url = "$apiUrl/User?select=id,industry,skills,bio,experience&clerkUserId=eq.$encodedClerkId&limit=1"
+            Log.d(TAG, "Fetching from URL: $url")
 
             val request = Request.Builder()
                 .url(url)
@@ -305,15 +396,21 @@ class LiveInterviewRepository(
                 .get()
                 .build()
 
+            Log.d(TAG, "Executing HTTP request...")
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string()
+            Log.d(TAG, "HTTP Response: code=${response.code}, hasBody=${responseBody != null}, bodyLength=${responseBody?.length ?: 0}")
 
             if (!response.isSuccessful || responseBody == null) {
-                Log.e(TAG, "Failed to fetch user profile: ${response.code}")
+                Log.e(TAG, "Failed to fetch user profile: HTTP ${response.code}, body=${responseBody?.take(200)}")
                 return null
             }
 
+            Log.d(TAG, "Response body (first 200 chars): ${responseBody.take(200)}")
+
             val jsonArray = JSONArray(responseBody)
+            Log.d(TAG, "JSON array length: ${jsonArray.length()}")
+
             if (jsonArray.length() > 0) {
                 val json = jsonArray.getJSONObject(0)
                 val skillsJson = json.optJSONArray("skills")
@@ -323,24 +420,35 @@ class LiveInterviewRepository(
                     emptyList()
                 }
 
-                NeonUserProfile(
+                val profile = NeonUserProfile(
                     id = json.optString("id"),
                     industry = json.optString("industry").takeIf { it.isNotBlank() },
                     experienceYears = json.optInt("experience").takeUnless { json.isNull("experience") },
                     skills = skills,
                     bio = json.optString("bio").takeIf { it.isNotBlank() }
                 )
+                Log.d(TAG, "User profile parsed successfully: id=${profile.id}, industry=${profile.industry}, skills=${profile.skills.size}")
+                profile
             } else {
+                Log.e(TAG, "No user found in Neon database for Clerk user: $clerkUserId")
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching user profile", e)
+            Log.e(TAG, "Exception in fetchNeonUserProfile()", e)
             null
         }
     }
 
-    private suspend fun createInterviewSession(userId: String, authHeader: String): String? {
+    private suspend fun createInterviewSession(
+        userId: String,
+        authHeader: String,
+        role: String,
+        description: String,
+        yoes: Int
+    ): String? {
         return try {
+            Log.d(TAG, "createInterviewSession() called with userId=$userId, role=$role, yoes=$yoes")
+
             val randomBytes = ByteArray(12)
             java.security.SecureRandom().nextBytes(randomBytes)
             val hexId = randomBytes.joinToString("") { "%02x".format(it) }
@@ -349,37 +457,55 @@ class LiveInterviewRepository(
             val payload = JSONObject().apply {
                 put("id", hexId)
                 put("userId", userId)
+                put("role", role)
+                put("description", description)
+                put("yoes", yoes)
                 put("createdAt", now)
                 put("updatedAt", now)
             }
+            Log.d(TAG, "Generated session ID: $hexId")
+            Log.d(TAG, "Request payload: $payload")
+
+            val apiUrl = "${BuildConfig.NEON_API_URL}/LiveMockInterview"
+            Log.d(TAG, "POST to: $apiUrl")
 
             val request = Request.Builder()
-                .url("${BuildConfig.NEON_API_URL}/LiveMockInterview")
+                .url(apiUrl)
                 .addHeader("Authorization", authHeader)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Prefer", "return=representation")
                 .post(payload.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
+            Log.d(TAG, "Executing HTTP POST request...")
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string()
+            Log.d(TAG, "HTTP Response: code=${response.code}, hasBody=${responseBody != null}, bodyLength=${responseBody?.length ?: 0}")
 
             if (!response.isSuccessful) {
-                Log.e(TAG, "Failed to create interview session: ${response.code}")
+                Log.e(TAG, "Failed to create interview session: HTTP ${response.code}")
+                Log.e(TAG, "Response body: ${responseBody ?: "null"}")
                 return null
             }
 
+            Log.d(TAG, "Response body: ${responseBody}")
+
             // Parse response to get the created session ID
             val jsonArray = JSONArray(responseBody)
+            Log.d(TAG, "Response JSON array length: ${jsonArray.length()}")
+
             if (jsonArray.length() > 0) {
                 val session = jsonArray.getJSONObject(0)
-                session.optString("id")
+                val returnedId = session.optString("id")
+                Log.d(TAG, "Session created successfully with ID: $returnedId")
+                returnedId
             } else {
+                Log.e(TAG, "Response array is empty - no session returned")
                 null
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating interview session", e)
+            Log.e(TAG, "Exception in createInterviewSession()", e)
             null
         }
     }
@@ -434,36 +560,41 @@ class LiveInterviewRepository(
         return parts.joinToString(" | ")
     }
 
-    private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
-        val session = Clerk.session ?: return null
-
-        // Try to get JWT token
-        if (forceRefresh) {
-            val result = session.fetchToken()
-            if (result is ClerkResult.Success) {
-                return "Bearer ${result.value.jwt}"
+    /**
+     * Builds an HTTP Authorization header from an auth token.
+     * Returns null if no valid authentication is available.
+     *
+     * TODO: Consider moving to shared utility in NeonAuth.
+     * This pattern is duplicated in NeonGridResumeService and NeonUserService.
+     */
+    private fun buildAuthorizationHeader(authToken: String?): String? {
+        return when {
+            authToken.isNullOrBlank() -> {
+                Log.e(TAG, "No authentication token provided")
+                null
+            }
+            authToken == "" -> {
+                // Empty string signals to use Basic auth fallback
+                val role = BuildConfig.NEON_DB_ROLE
+                val password = BuildConfig.NEON_DB_PASSWORD
+                if (role.isNotBlank() && password.isNotBlank()) {
+                    val credentials = "$role:$password"
+                    val encoded = android.util.Base64.encodeToString(
+                        credentials.toByteArray(),
+                        android.util.Base64.NO_WRAP
+                    )
+                    Log.d(TAG, "Using Basic authentication fallback")
+                    "Basic $encoded"
+                } else {
+                    Log.e(TAG, "Basic auth credentials not configured")
+                    null
+                }
+            }
+            else -> {
+                Log.d(TAG, "Using Bearer token authentication")
+                "Bearer $authToken"
             }
         }
-
-        // Use last active token
-        session.lastActiveToken?.jwt?.let { jwt ->
-            return "Bearer $jwt"
-        }
-
-        // Fallback to basic auth
-        val role = BuildConfig.NEON_DB_ROLE
-        val password = BuildConfig.NEON_DB_PASSWORD
-
-        if (role.isNotBlank() && password.isNotBlank()) {
-            val credentials = "$role:$password"
-            val encoded = android.util.Base64.encodeToString(
-                credentials.toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
-            return "Basic $encoded"
-        }
-
-        return null
     }
 
     /**

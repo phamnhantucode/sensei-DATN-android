@@ -11,7 +11,12 @@
       "Bash(findstr:*)",
       "Bash(git -C \"D:\\Workspace\\Android\\AICareerCoach\" diff app/src/main/java/com/phamnhantucode/aicareercoach/ui/resumebuilder/grid/elements/WorkExperienceElementRenderer.kt)",
       "Bash(dir:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(while read f)",
+      "Bash(do if grep -q \"ColorPicker\\|ColorHistory\\|HSV\\|toHsv\" \"$f\")",
+      "Bash(then echo \"$f\")",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

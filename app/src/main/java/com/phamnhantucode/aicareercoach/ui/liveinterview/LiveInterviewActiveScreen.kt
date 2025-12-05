@@ -258,7 +258,7 @@ private fun QuestionView(
                 isRecording = recordingState == RecordingState.RECORDING,
                 onStartRecording = onStartRecording,
                 onStopRecording = onStopRecording,
-                enabled = recordingState != RecordingState.STOPPED
+                enabled = recordingState == RecordingState.IDLE || recordingState == RecordingState.RECORDING
             )
         }
 

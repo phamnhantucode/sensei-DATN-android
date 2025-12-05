@@ -1,4 +1,4 @@
-package com.phamnhantucode.aicareercoach.data.imgbb
+package com.phamnhantucode.aicareercoach.data.cloudinary
 
 import android.content.Context
 import android.util.Log
@@ -44,7 +44,7 @@ class ImageUrlCache private constructor(private val context: Context) {
     /**
      * Gets cached URL for a local URI
      * @param localUri The local content:// URI
-     * @return Remote imgbb URL if cached, null otherwise
+     * @return Remote Cloudinary URL if cached, null otherwise
      */
     suspend fun getCachedUrl(localUri: String): String? = withContext(Dispatchers.IO) {
         try {
@@ -59,7 +59,7 @@ class ImageUrlCache private constructor(private val context: Context) {
     /**
      * Caches a URI-to-URL mapping
      * @param localUri The local content:// URI
-     * @param remoteUrl The remote imgbb URL
+     * @param remoteUrl The remote Cloudinary URL
      */
     suspend fun cacheUrl(localUri: String, remoteUrl: String) = withContext(Dispatchers.IO) {
         try {

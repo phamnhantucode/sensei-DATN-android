@@ -50,9 +50,11 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     private var timerJob: Job? = null
     private var currentAudioFile: File? = null
     private val answeredQuestions = mutableListOf<LiveQuestion>()
+    private var recordingStartTime = 0L
 
     companion object {
         private const val TAG = "LiveInterviewViewModel"
+        private const val MIN_RECORDING_DURATION_MS = 1500L // 1.5 seconds minimum
     }
 
     override fun onCleared() {
@@ -65,8 +67,10 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
      * Starts a new live interview with the specified configuration.
      */
     fun startInterview(config: InterviewConfig) {
+        Log.d(TAG, "startInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
         viewModelScope.launch {
             try {
+                Log.d(TAG, "Setting UI state to Starting")
                 _uiState.value = LiveInterviewUiState.Starting
 
                 val request = StartLiveInterviewRequest(
@@ -77,11 +81,16 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     experienceLevel = config.experienceLevel,
                     skills = config.skills
                 )
+                Log.d(TAG, "Created StartLiveInterviewRequest: $request")
 
+                Log.d(TAG, "Calling repository.startLiveInterview()")
                 val result = repository.startLiveInterview(request)
+                Log.d(TAG, "Repository call completed. Success: ${result.isSuccess}")
 
                 if (result.isSuccess) {
                     val startResult = result.getOrNull()!!
+                    Log.d(TAG, "Start result received: sessionId=${startResult.sessionId}, hasFirstQuestion=${startResult.firstQuestion != null}")
+
                     val session = LiveMockInterviewSession(
                         id = startResult.sessionId,
                         userId = config.userId,
@@ -96,18 +105,23 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     _currentQuestion.value = startResult.firstQuestion
                     _currentFeedback.value = null
                     _questionStartTime.value = System.currentTimeMillis()
+                    Log.d(TAG, "Setting UI state to ActiveQuestion")
                     _uiState.value = LiveInterviewUiState.ActiveQuestion
                     startTimer()
 
-                    Log.d(TAG, "Interview started: ${startResult.sessionId}")
+                    Log.d(TAG, "Interview started successfully: ${startResult.sessionId}")
                 } else {
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Failed to start interview"
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Failed to start interview"
+                    Log.e(TAG, "Failed to start interview: $errorMsg", result.exceptionOrNull())
+                    _errorMessage.value = errorMsg
+                    Log.d(TAG, "Setting UI state back to Setup due to failure")
                     _uiState.value = LiveInterviewUiState.Setup
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting interview", e)
+                Log.e(TAG, "Exception in startInterview()", e)
                 _errorMessage.value = e.message ?: "An error occurred"
+                Log.d(TAG, "Setting UI state back to Setup due to exception")
                 _uiState.value = LiveInterviewUiState.Setup
             }
         }
@@ -117,6 +131,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
      * Starts recording audio (push-to-talk pressed).
      */
     fun startRecording() {
+        recordingStartTime = System.currentTimeMillis()
         currentAudioFile = audioRecorder.startRecording()
         if (currentAudioFile == null) {
             _errorMessage.value = "Failed to start recording. Please check microphone permissions."
@@ -127,23 +142,32 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
      * Stops recording and processes the answer (push-to-talk released).
      */
     fun stopRecordingAndProcess() {
-        val audioFile = audioRecorder.stopRecording()
-        if (audioFile == null) {
-            _errorMessage.value = "Failed to stop recording"
-            return
-        }
-
-        val question = _currentQuestion.value
-        val session = _interviewSession.value
-
-        if (question == null || session == null) {
-            _errorMessage.value = "No active question"
-            audioFile.delete()
-            return
-        }
-
         viewModelScope.launch {
+            // Check minimum recording duration
+            val recordingDuration = System.currentTimeMillis() - recordingStartTime
+            if (recordingDuration < MIN_RECORDING_DURATION_MS) {
+                _errorMessage.value = "Recording too short. Please hold the button and speak for at least 2 seconds."
+                audioRecorder.cancelRecording()
+                return@launch
+            }
+
+            val question = _currentQuestion.value
+            val session = _interviewSession.value
+
+            if (question == null || session == null) {
+                _errorMessage.value = "No active question"
+                audioRecorder.cancelRecording()
+                return@launch
+            }
+
             try {
+                // Stop recording (suspend function)
+                val audioFile = audioRecorder.stopRecording()
+                if (audioFile == null) {
+                    _errorMessage.value = "Failed to stop recording"
+                    return@launch
+                }
+
                 _uiState.value = LiveInterviewUiState.Processing
 
                 val questionDuration = System.currentTimeMillis() - _questionStartTime.value
@@ -220,6 +244,10 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                         _currentQuestion.value = nextQuestion
                         _currentFeedback.value = null
                         _questionStartTime.value = System.currentTimeMillis()
+                        
+                        // Reset audio recorder state for next question
+                        audioRecorder.reset()
+                        
                         _uiState.value = LiveInterviewUiState.ActiveQuestion
                     } else {
                         _errorMessage.value = "Failed to load next question"
@@ -304,7 +332,9 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
      */
     fun abandonInterview() {
         stopTimer()
-        audioRecorder.cancelRecording()
+        viewModelScope.launch {
+            audioRecorder.cancelRecording()
+        }
         _uiState.value = LiveInterviewUiState.Setup
         _interviewSession.value = null
         _currentQuestion.value = null

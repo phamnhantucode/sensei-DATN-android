@@ -1066,12 +1066,12 @@ private fun ImageElementProperties(
     // Avatar upload manager (only for avatar elements)
     val avatarUploadManager = remember {
         if (element.userInfoTag == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.UserInfoTag.AVATAR) {
-            com.phamnhantucode.aicareercoach.data.imgbb.AvatarUploadManager.getInstance(context)
+            com.phamnhantucode.aicareercoach.data.cloudinary.AvatarUploadManager.getInstance(context)
         } else null
     }
 
     val uploadState by avatarUploadManager?.uploadState?.collectAsState()
-        ?: remember { mutableStateOf(com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Idle) }
+        ?: remember { mutableStateOf(com.phamnhantucode.aicareercoach.data.cloudinary.ImageUploadState.Idle) }
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -1148,7 +1148,7 @@ private fun ImageElementProperties(
         // Show upload state for avatars
         if (element.userInfoTag == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.UserInfoTag.AVATAR) {
             when (uploadState) {
-                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Uploading -> {
+                is com.phamnhantucode.aicareercoach.data.cloudinary.ImageUploadState.Uploading -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
@@ -1160,8 +1160,8 @@ private fun ImageElementProperties(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Error -> {
-                    val errorState = uploadState as com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Error
+                is com.phamnhantucode.aicareercoach.data.cloudinary.ImageUploadState.Error -> {
+                    val errorState = uploadState as com.phamnhantucode.aicareercoach.data.cloudinary.ImageUploadState.Error
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             "Upload failed: ${errorState.message}",
@@ -1185,7 +1185,7 @@ private fun ImageElementProperties(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                is com.phamnhantucode.aicareercoach.data.imgbb.ImageUploadState.Success -> {
+                is com.phamnhantucode.aicareercoach.data.cloudinary.ImageUploadState.Success -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,

@@ -27,10 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumePage
 
 /**
@@ -115,6 +118,7 @@ private fun PageThumbnail(
     onDuplicate: (() -> Unit)?
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     val borderColor by animateColorAsState(
         targetValue = if (isSelected) 
@@ -150,19 +154,36 @@ private fun PageThumbnail(
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 // Display thumbnail or loading state
                 if (thumbnailBase64 != null && thumbnailBase64.isNotEmpty()) {
-                    val thumbnailBitmap = remember(thumbnailBase64) {
-                        decodeBase64Thumbnail(thumbnailBase64)
-                    }
-
-                    if (thumbnailBitmap != null) {
-                        Image(
-                            bitmap = thumbnailBitmap.asImageBitmap(),
+                    // Check if thumbnail is a URL or Base64
+                    val isUrl = thumbnailBase64.startsWith("http://") || thumbnailBase64.startsWith("https://")
+                    
+                    if (isUrl) {
+                        // Load image from URL using Coil
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(thumbnailBase64)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = "Page $pageNumber preview",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit
                         )
                     } else {
-                        PageNumberFallback(pageNumber, isSelected, compactMode)
+                        // Decode Base64 thumbnail (legacy format)
+                        val thumbnailBitmap = remember(thumbnailBase64) {
+                            decodeBase64Thumbnail(thumbnailBase64)
+                        }
+
+                        if (thumbnailBitmap != null) {
+                            Image(
+                                bitmap = thumbnailBitmap.asImageBitmap(),
+                                contentDescription = "Page $pageNumber preview",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            PageNumberFallback(pageNumber, isSelected, compactMode)
+                        }
                     }
                 } else {
                     ThumbnailLoadingPlaceholder(page, pageNumber, isSelected, compactMode)

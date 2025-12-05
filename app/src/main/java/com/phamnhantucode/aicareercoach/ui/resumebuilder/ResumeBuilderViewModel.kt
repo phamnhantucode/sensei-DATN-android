@@ -116,12 +116,25 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
 
     /**
      * Manually saves the current resume
+     * Skips saving if the resume is essentially empty (no meaningful content)
      */
     fun saveResume(showToast: Boolean = true) {
         viewModelScope.launch(Dispatchers.IO) {
+            val currentResume = _resume.value
+            
+            // Skip saving empty resumes to avoid creating blank entries
+            // when navigating away from form without filling in data
+            if (currentResume.personalInfo.fullName.isBlank() &&
+                currentResume.professionalSummary.isBlank() &&
+                currentResume.workExperiences.isEmpty() &&
+                currentResume.education.isEmpty() &&
+                currentResume.skills.isEmpty()) {
+                Log.d(TAG, "Skipping save - resume is empty")
+                return@launch
+            }
+            
             _isSaving.value = true
             try {
-                val currentResume = _resume.value
                 val result = repository.saveResume(currentResume, syncToRemote = true)
 
                 if (result.isSuccess && showToast) {
@@ -134,6 +147,21 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
             } finally {
                 _isSaving.value = false
             }
+        }
+    }
+
+    /**
+     * Ensures the resume is saved to the database before navigating to Design tab.
+     * This prevents duplicate entries when GridEditor tries to create a linked design.
+     * Unlike saveResume(), this always saves regardless of content to ensure ID exists in DB.
+     */
+    suspend fun ensureResumeSaved() {
+        val currentResume = _resume.value
+        Log.d(TAG, "Ensuring resume ${currentResume.id} exists in database before Design tab")
+        try {
+            repository.saveResume(currentResume, syncToRemote = true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to ensure resume saved", e)
         }
     }
 

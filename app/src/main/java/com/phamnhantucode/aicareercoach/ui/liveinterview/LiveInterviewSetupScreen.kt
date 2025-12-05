@@ -2,6 +2,7 @@ package com.phamnhantucode.aicareercoach.ui.liveinterview
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.interview.InterviewType
+
+private const val TAG = "LiveInterviewSetupScreen"
 
 /**
  * Setup screen for configuring live interview parameters.
@@ -180,18 +183,27 @@ fun LiveInterviewSetupScreen(
             // Start button
             Button(
                 onClick = {
+                    Log.d(TAG, "Start Interview button clicked")
+                    Log.d(TAG, "hasAudioPermission=$hasAudioPermission")
+
                     if (hasAudioPermission) {
                         val user = Clerk.user
+                        Log.d(TAG, "Clerk.user=${if (user != null) "ID:${user.id}" else "NULL"}")
+
                         if (user != null) {
-                            onStartInterview(
-                                InterviewConfig(
-                                    userId = user.id,
-                                    interviewType = selectedType,
-                                    questionCount = questionCount
-                                )
+                            val config = InterviewConfig(
+                                userId = user.id,
+                                interviewType = selectedType,
+                                questionCount = questionCount
                             )
+                            Log.d(TAG, "Calling onStartInterview with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
+                            onStartInterview(config)
+                            Log.d(TAG, "onStartInterview callback invoked")
+                        } else {
+                            Log.e(TAG, "Clerk.user is null - cannot start interview")
                         }
                     } else {
+                        Log.d(TAG, "Audio permission not granted, showing permission dialog")
                         showPermissionDialog = true
                     }
                 },

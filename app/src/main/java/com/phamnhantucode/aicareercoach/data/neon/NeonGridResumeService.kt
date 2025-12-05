@@ -156,13 +156,22 @@ object NeonGridResumeService {
             val encodedId = URLEncoder.encode(gridResume.id, UTF_8.name())
             val now = java.time.Instant.now().toString()
 
-            // Serialize GridResume to JSON string (include thumbnail if provided)
-            val gridResumeWithThumbnail = if (thumbnail != null) {
-                gridResume.copy(thumbnail = thumbnail)
-            } else {
-                gridResume
+            // Serialize GridResume to JSON string (include thumbnail if provided, or preserve existing)
+            val finalThumbnail = when {
+                // New thumbnail provided - use it
+                thumbnail != null -> thumbnail
+                // gridResume already has a thumbnail - keep it
+                gridResume.thumbnail.isNotBlank() -> gridResume.thumbnail
+                // No thumbnail - try to fetch existing from database to preserve it
+                else -> {
+                    val existing = getGridResume(gridResume.id, authToken).getOrNull()
+                    existing?.thumbnail ?: ""
+                }
             }
+            val gridResumeWithThumbnail = gridResume.copy(thumbnail = finalThumbnail)
             val gridResumeJsonString = gson.toJson(gridResumeWithThumbnail)
+            
+            Log.d(TAG, "[NeonSync] [$operationId] Serializing GridResume with thumbnail: ${gridResumeWithThumbnail.thumbnail.take(50)}...")
 
             // Build update payload for Resume table
             val payload = JSONObject().apply {
@@ -241,11 +250,30 @@ object NeonGridResumeService {
                     Log.w(TAG, "[NeonSync] [$operationId] GridResume has no json data")
                     return@withContext Result.success(null)
                 }
+                
+                // Log first 200 chars of json for debugging
+                Log.d(TAG, "[NeonSync] [$operationId] JSON field preview: ${jsonField.take(200)}...")
+                
+                // Quick check if this looks like a GridResume (has 'pages' field)
+                try {
+                    val jsonObj = JSONObject(jsonField)
+                    if (!jsonObj.has("pages")) {
+                        Log.w(TAG, "[NeonSync] [$operationId] JSON is not GridResume format (no 'pages' field)")
+                        return@withContext Result.success(null)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "[NeonSync] [$operationId] Failed to parse JSON structure: ${e.message}")
+                    return@withContext Result.success(null)
+                }
 
                 // Try to deserialize as GridResume
                 try {
                     val gridResume = gson.fromJson(jsonField, GridResume::class.java)
-                    Log.d(TAG, "[NeonSync] [$operationId] Successfully retrieved GridResume")
+                    if (gridResume == null || gridResume.pages.isEmpty()) {
+                        Log.w(TAG, "[NeonSync] [$operationId] GridResume deserialized to null or empty pages")
+                        return@withContext Result.success(null)
+                    }
+                    Log.d(TAG, "[NeonSync] [$operationId] Successfully retrieved GridResume: id=${gridResume.id}")
                     return@withContext Result.success(gridResume)
                 } catch (e: Exception) {
                     // json field might contain old Resume format, not GridResume
@@ -297,15 +325,37 @@ object NeonGridResumeService {
                     try {
                         val row = results.getJSONObject(i)
                         val jsonField = row.optString("json")
+                        val rowId = row.optString("id")
 
                         if (jsonField.isNotBlank()) {
+                            // Quick check if this looks like a GridResume (has 'pages' field)
+                            // vs old form-based Resume JSON (has 'personalInfo' field)
+                            try {
+                                val jsonObj = JSONObject(jsonField)
+                                if (!jsonObj.has("pages")) {
+                                    // This is likely old Resume format, not GridResume
+                                    Log.d(TAG, "[NeonSync] [$operationId] Skipping row at index $i (id=$rowId): JSON is not GridResume format (no 'pages' field)")
+                                    continue
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "[NeonSync] [$operationId] Failed to parse JSON structure at index $i (id=$rowId): ${e.message}")
+                                continue
+                            }
+                            
                             try {
                                 val gridResume = gson.fromJson(jsonField, GridResume::class.java)
-                                gridResumes.add(gridResume)
+                                if (gridResume != null && gridResume.pages.isNotEmpty()) {
+                                    Log.d(TAG, "[NeonSync] [$operationId] Parsed GridResume at index $i: id=${gridResume.id}, thumbnail=${gridResume.thumbnail.take(50).ifEmpty { "(empty)" }}...")
+                                    gridResumes.add(gridResume)
+                                } else {
+                                    Log.w(TAG, "[NeonSync] [$operationId] GridResume at index $i (id=$rowId) deserialized to null or empty pages. JSON preview: ${jsonField.take(100)}...")
+                                }
                             } catch (e: Exception) {
                                 // Skip entries that aren't valid GridResume format
-                                Log.w(TAG, "[NeonSync] [$operationId] Failed to parse GridResume at index $i: ${e.message}")
+                                Log.w(TAG, "[NeonSync] [$operationId] Failed to parse GridResume at index $i (id=$rowId): ${e.message}")
                             }
+                        } else {
+                            Log.d(TAG, "[NeonSync] [$operationId] Skipping row at index $i (id=$rowId): json field is blank")
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "[NeonSync] [$operationId] Failed to process row at index $i", e)

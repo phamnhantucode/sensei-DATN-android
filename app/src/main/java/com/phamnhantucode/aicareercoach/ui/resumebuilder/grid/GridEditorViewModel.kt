@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.GsonBuilder
+import com.phamnhantucode.aicareercoach.data.cloudinary.ThumbnailUploadManager
 import com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
@@ -45,6 +46,7 @@ class GridEditorViewModel(
     private val pdfExporter = AndroidPdfGenerator(context)
     private val imageExporter = AndroidImageExporter(context)
     private val thumbnailGenerator = ThumbnailGenerator(context)
+    private val thumbnailUploadManager = ThumbnailUploadManager.getInstance(context)
     private val sharedPreferences = context.getSharedPreferences("grid_resume_prefs", Context.MODE_PRIVATE)
 
     // Configure Gson with custom type adapter for sealed classes
@@ -398,10 +400,26 @@ class GridEditorViewModel(
             _isSaving.value = true
             try {
                 // Generate thumbnail for the design
-                val thumbnail = try {
+                val base64Thumbnail = try {
                     thumbnailGenerator.generateThumbnail(_gridResume.value)
                 } catch (e: Exception) {
                     android.util.Log.e("GridEditorViewModel", "Failed to generate thumbnail", e)
+                    ""
+                }
+
+                // Upload thumbnail to Cloudinary for faster loading in resume list
+                val thumbnail = if (base64Thumbnail.isNotEmpty()) {
+                    try {
+                        val uploadResult = thumbnailUploadManager.uploadThumbnail(
+                            base64Thumbnail = base64Thumbnail,
+                            resumeId = _gridResume.value.id
+                        )
+                        uploadResult.getOrElse { base64Thumbnail }
+                    } catch (e: Exception) {
+                        android.util.Log.e("GridEditorViewModel", "Failed to upload thumbnail", e)
+                        base64Thumbnail // Fallback to Base64 if upload fails
+                    }
+                } else {
                     ""
                 }
 
@@ -413,15 +431,19 @@ class GridEditorViewModel(
 
                 // Check if design already exists
                 val existing = gridResumeRepository.getDesign(_gridResume.value.id).getOrNull()
+                
+                android.util.Log.d("GridEditorViewModel", "Saving design: id=${_gridResume.value.id}, thumbnail=${thumbnail.take(50)}..., existing=${existing != null}")
 
                 // Direct GridResume sync (no form conversion)
                 val result = if (existing != null) {
+                    android.util.Log.d("GridEditorViewModel", "Updating existing design")
                     gridResumeRepository.updateDesign(
                         gridResume = _gridResume.value,
                         thumbnail = thumbnail,
                         syncToRemote = true
                     )
                 } else {
+                    android.util.Log.d("GridEditorViewModel", "Creating new design")
                     gridResumeRepository.saveDesign(
                         gridResume = _gridResume.value,
                         thumbnail = thumbnail,
@@ -437,13 +459,15 @@ class GridEditorViewModel(
                         val linkedResume = linkedResumeResult.getOrNull()
                         if (linkedResume != null) {
                             // Update the Resume with GridResume JSON in the 'json' field
+                            // Include the thumbnail that was uploaded
+                            val gridResumeWithThumbnail = _gridResume.value.copy(thumbnail = thumbnail)
                             @Suppress("DEPRECATION")
                             resumeRepository.updateResume(
                                 resume = linkedResume,
                                 syncToRemote = true,
-                                gridResume = _gridResume.value
+                                gridResume = gridResumeWithThumbnail
                             )
-                            android.util.Log.d("GridEditorViewModel", "Updated linked Resume ${initialLinkedResumeId} with GridResume JSON")
+                            android.util.Log.d("GridEditorViewModel", "Updated linked Resume ${initialLinkedResumeId} with GridResume JSON (thumbnail: ${thumbnail.take(50)}...)")
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("GridEditorViewModel", "Failed to update linked Resume", e)
@@ -1738,6 +1762,8 @@ class GridEditorViewModel(
 
     private fun createDefaultResume(): GridResume {
         return GridResume(
+            // Use linkedResumeId if provided to ensure design ID matches Resume ID
+            id = initialLinkedResumeId ?: UUID.randomUUID().toString(),
             name = "My Resume",
             pages = listOf(ResumePage())
         )
@@ -1748,6 +1774,8 @@ class GridEditorViewModel(
         // For now, we'll just return a basic resume with the template type
         // In a real app, this would populate elements based on the template
         return GridResume(
+            // Use linkedResumeId if provided to ensure design ID matches Resume ID
+            id = initialLinkedResumeId ?: UUID.randomUUID().toString(),
             name = "My Resume (${templateType.name})",
             pages = listOf(ResumePage())
         )

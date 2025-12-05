@@ -23,7 +23,10 @@ val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
 val neonDbRole = localProperties.getProperty("NEON_DB_ROLE", "")
 val neonDbPassword = localProperties.getProperty("NEON_DB_PASSWORD", "")
 val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY", "")
-val imgbbApiKey = localProperties.getProperty("IMGBB_API_KEY", "")
+val cldnrApiKey = localProperties.getProperty("CLDNR_API_KEY", "")
+val cldnrApiSecret = localProperties.getProperty("CLDNR_API_SECRET", "")
+val cldnrCloudName = localProperties.getProperty("CLDNR_CLOUD_NAME", "")
+val cldnrUploadPreset = localProperties.getProperty("CLDNR_UPLOAD_PRESET", "")
 
 android {
     namespace = "com.phamnhantucode.aicareercoach"
@@ -52,7 +55,10 @@ android {
         buildConfigField("String", "NEON_DB_ROLE", "\"$neonDbRole\"")
         buildConfigField("String", "NEON_DB_PASSWORD", "\"$neonDbPassword\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
-        buildConfigField("String", "IMGBB_API_KEY", "\"$imgbbApiKey\"")
+        buildConfigField("String", "CLDNR_API_KEY", "\"$cldnrApiKey\"")
+        buildConfigField("String", "CLDNR_API_SECRET", "\"$cldnrApiSecret\"")
+        buildConfigField("String", "CLDNR_CLOUD_NAME", "\"$cldnrCloudName\"")
+        buildConfigField("String", "CLDNR_UPLOAD_PRESET", "\"$cldnrUploadPreset\"")
     }
 
     buildTypes {
@@ -123,4 +129,7 @@ dependencies {
 
     // Reorderable LazyColumn for drag-drop reordering (local module)
     implementation(project(":reorderable"))
+
+    // Vosk offline speech recognition
+    implementation("com.alphacephei:vosk-android:0.3.47")
 }

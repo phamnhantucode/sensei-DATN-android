@@ -138,7 +138,7 @@ class GridResumeRepository private constructor(context: Context) {
             // Update directly in Neon
             val remoteResult = NeonGridResumeService.updateGridResume(
                 gridResume = gridResume.copy(name = name, userId = neonUserId),
-                thumbnail = thumbnail ?: "",
+                thumbnail = thumbnail?.takeIf { it.isNotBlank() },  // Pass null if blank to preserve existing
                 authToken = authToken
             )
             

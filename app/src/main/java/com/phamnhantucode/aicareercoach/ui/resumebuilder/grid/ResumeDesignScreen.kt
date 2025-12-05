@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
 import java.text.SimpleDateFormat
@@ -258,20 +260,37 @@ private fun ResumeCardThumbnail(variant: ResumeCardVariant) {
         contentAlignment = Alignment.Center
     ) {
         if (thumbnail.isNotEmpty()) {
-            val thumbnailBitmap = remember(thumbnail) {
-                decodeBase64Thumbnail(thumbnail)
-            }
-
-            if (thumbnailBitmap != null) {
-                Image(
-                    bitmap = thumbnailBitmap.asImageBitmap(),
+            // Check if thumbnail is a URL or Base64
+            val isUrl = thumbnail.startsWith("http://") || thumbnail.startsWith("https://")
+            
+            if (isUrl) {
+                // Load image from URL using Coil
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(thumbnail)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = contentDescription,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             } else {
-                // Fallback if decode fails
-                ThumbnailPlaceholder()
+                // Decode Base64 thumbnail (legacy format)
+                val thumbnailBitmap = remember(thumbnail) {
+                    decodeBase64Thumbnail(thumbnail)
+                }
+
+                if (thumbnailBitmap != null) {
+                    Image(
+                        bitmap = thumbnailBitmap.asImageBitmap(),
+                        contentDescription = contentDescription,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    // Fallback if decode fails
+                    ThumbnailPlaceholder()
+                }
             }
         } else {
             // Empty state fallback
@@ -709,20 +728,36 @@ private fun CurrentDesignSection(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Thumbnail
+                    // Thumbnail - handle both URL and Base64 formats
                     if (design.thumbnail.isNotEmpty()) {
-                        val thumbnailBitmap = remember(design.thumbnail) {
-                            decodeBase64Thumbnail(design.thumbnail)
-                        }
-                        if (thumbnailBitmap != null) {
-                            Image(
-                                bitmap = thumbnailBitmap.asImageBitmap(),
+                        val isUrl = design.thumbnail.startsWith("http://") || design.thumbnail.startsWith("https://")
+                        
+                        if (isUrl) {
+                            // Load image from URL using Coil
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(design.thumbnail)
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = "Current design preview",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
                         } else {
-                            DesignPlaceholder()
+                            // Decode Base64 thumbnail (legacy format)
+                            val thumbnailBitmap = remember(design.thumbnail) {
+                                decodeBase64Thumbnail(design.thumbnail)
+                            }
+                            if (thumbnailBitmap != null) {
+                                Image(
+                                    bitmap = thumbnailBitmap.asImageBitmap(),
+                                    contentDescription = "Current design preview",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                DesignPlaceholder()
+                            }
                         }
                     } else {
                         DesignPlaceholder()

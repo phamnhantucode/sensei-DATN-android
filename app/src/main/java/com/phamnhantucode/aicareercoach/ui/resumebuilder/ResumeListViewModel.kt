@@ -75,7 +75,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                     Log.d(TAG, "=== THUMBNAIL DEBUG ===")
                     Log.d(TAG, "Resume IDs: ${resumeList.map { it.id }}")
                     Log.d(TAG, "Grid Design IDs: ${gridDesigns.map { it.id }}")
-                    Log.d(TAG, "Grid Designs with thumbnails: ${gridDesigns.filter { it.thumbnail.isNotBlank() }.map { "${it.id} -> has thumbnail" }}")
+                    Log.d(TAG, "Grid Designs with thumbnails: ${gridDesigns.filter { it.thumbnail.isNotBlank() }.map { "${it.id} -> thumbnail: ${it.thumbnail.take(50)}..." }}")
                     
                     val thumbnailMap = gridDesigns
                         .filter { it.thumbnail.isNotBlank() }
@@ -84,7 +84,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                     // Combine resumes with their thumbnails
                     _resumes.value = resumeList.map { resume ->
                         val thumbnail = thumbnailMap[resume.id]
-                        Log.d(TAG, "Resume ${resume.id}: thumbnail match = ${thumbnail != null}")
+                        Log.d(TAG, "Resume ${resume.id}: thumbnail match = ${thumbnail != null}, thumbnail = ${thumbnail?.take(50) ?: "null"}")
                         ResumeWithThumbnail(
                             resume = resume,
                             thumbnail = thumbnail

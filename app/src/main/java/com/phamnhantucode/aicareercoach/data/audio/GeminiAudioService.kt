@@ -28,7 +28,7 @@ class GeminiAudioService {
 
     companion object {
         private const val TAG = "GeminiAudioService"
-        private const val GEMINI_MODEL = "gemini-2.0-flash-exp"
+        private const val GEMINI_MODEL = "gemini-2.5-flash"
         private const val GEMINI_HOST = "generativelanguage.googleapis.com"
     }
 
@@ -43,7 +43,20 @@ class GeminiAudioService {
                 return@withContext Result.failure(Exception("Audio file is empty or doesn't exist"))
             }
 
-            Log.d(TAG, "Transcribing audio file: ${audioFile.absolutePath}, size: ${audioFile.length()} bytes")
+            // Minimum file size check (very short recordings may not have enough data)
+            val minFileSizeBytes = 5000L // ~5KB minimum for meaningful audio
+            if (audioFile.length() < minFileSizeBytes) {
+                Log.w(
+                    TAG,
+                    "Audio file too small: ${audioFile.length()} bytes (minimum: $minFileSizeBytes)"
+                )
+                return@withContext Result.failure(Exception("Recording too short. Please speak longer and try again."))
+            }
+
+            Log.d(
+                TAG,
+                "Transcribing audio file: ${audioFile.absolutePath}, size: ${audioFile.length()} bytes"
+            )
 
             // Read and encode audio file to base64
             val audioBytes = audioFile.readBytes()
@@ -58,7 +71,7 @@ class GeminiAudioService {
                 else -> "audio/mp4" // Default to mp4
             }
 
-            // Build request payload
+            // Build request payload with improved transcription prompt
             val payload = JSONObject().apply {
                 put("contents", JSONArray().apply {
                     put(JSONObject().apply {
@@ -70,15 +83,24 @@ class GeminiAudioService {
                                     put("data", base64Audio)
                                 })
                             })
-                            // Add prompt for transcription
+                            // Add improved prompt for transcription
                             put(JSONObject().apply {
-                                put("text", "Please transcribe this audio accurately. Only provide the transcribed text without any additional commentary.")
+                                put(
+                                    "text",
+                                    """Transcribe the speech in this audio recording exactly as spoken.
+IMPORTANT RULES:
+- Output ONLY the exact words spoken in the audio, nothing else
+- If the audio contains no speech or is unclear, respond with exactly: [NO_SPEECH_DETECTED]
+- Do NOT make up or hallucinate any text
+- Do NOT add any commentary, explanations, or assumptions
+- Preserve the original language and wording exactly as spoken"""
+                                )
                             })
                         })
                     })
                 })
                 put("generationConfig", JSONObject().apply {
-                    put("temperature", 0.1)
+                    put("temperature", 0.0) // Use 0 temperature for deterministic transcription
                     put("maxOutputTokens", 1024)
                 })
             }
@@ -116,8 +138,20 @@ class GeminiAudioService {
                 return@withContext Result.failure(Exception("No transcription found in response"))
             }
 
-            Log.d(TAG, "Transcription successful: $transcribedText")
-            Result.success(transcribedText.trim())
+            // Check for no speech detected marker
+            val trimmedText = transcribedText.trim()
+            if (trimmedText.equals("[NO_SPEECH_DETECTED]", ignoreCase = true) ||
+                trimmedText.contains("no speech", ignoreCase = true) ||
+                trimmedText.contains("no audio", ignoreCase = true) ||
+                trimmedText.contains("cannot hear", ignoreCase = true) ||
+                trimmedText.contains("unable to transcribe", ignoreCase = true)
+            ) {
+                Log.w(TAG, "No speech detected in audio")
+                return@withContext Result.failure(Exception("No speech detected. Please speak clearly into the microphone and try again."))
+            }
+
+            Log.d(TAG, "Transcription successful: $trimmedText")
+            Result.success(trimmedText)
 
         } catch (e: Exception) {
             Log.e(TAG, "Error transcribing audio", e)
@@ -135,9 +169,15 @@ class GeminiAudioService {
     suspend fun generateFeedback(
         question: String,
         userAnswer: String,
-        category: String
+        category: String,
     ): Result<FeedbackResult> = withContext(Dispatchers.IO) {
         try {
+            // Validate API key is configured
+            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+                Log.e(TAG, "GEMINI_API_KEY is not configured in local.properties")
+                return@withContext Result.failure(Exception("Gemini API key not configured"))
+            }
+
             val prompt = buildFeedbackPrompt(question, userAnswer, category)
 
             val payload = JSONObject().apply {
@@ -173,8 +213,17 @@ class GeminiAudioService {
             val responseBody = response.body?.string()
 
             if (!response.isSuccessful || responseBody == null) {
-                Log.e(TAG, "Feedback generation failed: ${response.code}")
-                return@withContext Result.failure(Exception("Failed to generate feedback"))
+                val errorDetails = buildString {
+                    append("Gemini API feedback request failed: ")
+                    append("HTTP ${response.code} ${response.message}")
+                    if (responseBody != null) {
+                        append(", Response: ${responseBody.take(500)}")
+                    } else {
+                        append(", Response body is null")
+                    }
+                }
+                Log.e(TAG, errorDetails)
+                return@withContext Result.failure(Exception("Failed to generate feedback: HTTP ${response.code}"))
             }
 
             val jsonResponse = JSONObject(responseBody)
@@ -186,7 +235,10 @@ class GeminiAudioService {
 
             // Parse feedback to extract rating and comments
             val feedbackResult = parseFeedbackResponse(feedbackText)
-            Log.d(TAG, "Feedback generated: rating=${feedbackResult.rating}, feedback=${feedbackResult.feedback}")
+            Log.d(
+                TAG,
+                "Feedback generated: rating=${feedbackResult.rating}, feedback=${feedbackResult.feedback}"
+            )
 
             Result.success(feedbackResult)
 
@@ -206,9 +258,15 @@ class GeminiAudioService {
     suspend fun generateNextQuestion(
         category: String,
         previousQuestions: List<String>,
-        userProfile: String? = null
+        userProfile: String? = null,
     ): Result<QuestionResult> = withContext(Dispatchers.IO) {
         try {
+            // Validate API key is configured
+            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
+                Log.e(TAG, "GEMINI_API_KEY is not configured in local.properties")
+                return@withContext Result.failure(Exception("Gemini API key not configured"))
+            }
+
             val prompt = buildQuestionPrompt(category, previousQuestions, userProfile)
 
             val payload = JSONObject().apply {
@@ -244,7 +302,17 @@ class GeminiAudioService {
             val responseBody = response.body?.string()
 
             if (!response.isSuccessful || responseBody == null) {
-                return@withContext Result.failure(Exception("Failed to generate question"))
+                val errorDetails = buildString {
+                    append("Gemini API request failed: ")
+                    append("HTTP ${response.code} ${response.message}")
+                    if (responseBody != null) {
+                        append(", Response: ${responseBody.take(500)}")
+                    } else {
+                        append(", Response body is null")
+                    }
+                }
+                Log.e(TAG, errorDetails)
+                return@withContext Result.failure(Exception("Failed to generate question: HTTP ${response.code}"))
             }
 
             val jsonResponse = JSONObject(responseBody)
@@ -279,7 +347,11 @@ class GeminiAudioService {
         }
     }
 
-    private fun buildFeedbackPrompt(question: String, userAnswer: String, category: String): String {
+    private fun buildFeedbackPrompt(
+        question: String,
+        userAnswer: String,
+        category: String,
+    ): String {
         return """
             You are an expert interview coach. Evaluate this candidate's interview answer and provide constructive feedback.
 
@@ -290,35 +362,50 @@ class GeminiAudioService {
             Please provide:
             1. A rating from 1-10 (where 10 is excellent)
             2. Specific, actionable feedback on the answer
-            3. Highlight strengths
+            3. Highlight strengths using **bold** for key points
             4. Suggest improvements
 
             Format your response as:
             RATING: [number]
-            FEEDBACK: [your detailed feedback]
+            FEEDBACK: [your detailed feedback - use **bold** for important points and key terms]
         """.trimIndent()
     }
 
     private fun buildQuestionPrompt(
         category: String,
         previousQuestions: List<String>,
-        userProfile: String?
+        userProfile: String?,
     ): String {
         val profileContext = userProfile?.let { "\n\nCandidate Profile: $it" } ?: ""
         val previousContext = if (previousQuestions.isNotEmpty()) {
-            "\n\nPreviously asked questions (avoid duplicates):\n${previousQuestions.joinToString("\n- ", "- ")}"
+            "\n\nPreviously asked questions (avoid duplicates):\n${
+                previousQuestions.joinToString(
+                    "\n- ",
+                    "- "
+                )
+            }"
         } else {
             ""
         }
 
         return """
-            You are an expert interviewer. Generate a single $category interview question.
+            You are an expert interviewer conducting a live mock interview via voice.
+            Generate a single $category interview question that can be answered in 30-60 seconds.
             $profileContext
             $previousContext
 
+            IMPORTANT REQUIREMENTS:
+            - The question must be concise and focused on ONE specific point
+            - Avoid multi-part questions or questions with multiple sub-questions
+            - The expected answer should be brief (2-4 key sentences)
+            - Questions should be answerable without lengthy explanations
+            - For TECHNICAL questions: ask about a single concept, not multiple
+            - For BEHAVIORAL questions: focus on one specific situation/example
+            - For SITUATIONAL questions: present one clear scenario
+
             Format your response as:
-            QUESTION: [the interview question]
-            IDEAL_ANSWER: [key points that should be in a good answer]
+            QUESTION: [the interview question - keep it short and focused]
+            IDEAL_ANSWER: [2-4 key bullet points for a good answer]
         """.trimIndent()
     }
 
@@ -354,6 +441,7 @@ class GeminiAudioService {
                 line.startsWith("QUESTION:", ignoreCase = true) -> {
                     question = line.substringAfter(":").trim()
                 }
+
                 line.startsWith("IDEAL_ANSWER:", ignoreCase = true) -> {
                     idealAnswer = line.substringAfter(":").trim()
                 }
@@ -374,7 +462,7 @@ class GeminiAudioService {
  */
 data class FeedbackResult(
     val rating: Int,      // 1-10 rating
-    val feedback: String  // Detailed feedback text
+    val feedback: String,  // Detailed feedback text
 )
 
 /**
@@ -382,5 +470,5 @@ data class FeedbackResult(
  */
 data class QuestionResult(
     val question: String,      // The interview question
-    val idealAnswer: String    // Key points for an ideal answer
+    val idealAnswer: String,    // Key points for an ideal answer
 )

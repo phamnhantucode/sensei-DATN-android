@@ -249,6 +249,10 @@ fun ResumeBuilderScreen(
                                 selected = pagerState.currentPage == index,
                                 onClick = {
                                     coroutineScope.launch {
+                                        // Auto-save when switching to Design tab to ensure Resume exists in DB
+                                        if (tab == ResumeBuilderTab.DESIGN && pagerState.currentPage != index) {
+                                            viewModel.ensureResumeSaved()
+                                        }
                                         pagerState.animateScrollToPage(index)
                                     }
                                 },
@@ -261,6 +265,13 @@ fun ResumeBuilderScreen(
                             )
                         }
                     }
+                }
+            }
+
+            // Auto-save when switching to Design tab (handles swipe navigation)
+            LaunchedEffect(pagerState.currentPage) {
+                if (tabs[pagerState.currentPage] == ResumeBuilderTab.DESIGN) {
+                    viewModel.ensureResumeSaved()
                 }
             }
 

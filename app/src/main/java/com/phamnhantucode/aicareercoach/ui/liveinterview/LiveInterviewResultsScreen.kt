@@ -338,7 +338,7 @@ private fun QuestionReviewCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Text(
+                        MarkdownText(
                             text = feedback,
                             style = MaterialTheme.typography.bodySmall
                         )

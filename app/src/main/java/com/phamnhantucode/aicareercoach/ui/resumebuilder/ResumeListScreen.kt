@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -342,6 +344,8 @@ private fun ResumeListItem(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -357,20 +361,16 @@ private fun ResumeListItem(
         ) {
             // Thumbnail or fallback avatar
             if (thumbnail != null && thumbnail.isNotBlank()) {
-                // Display resume thumbnail
-                val imageBitmap = remember(thumbnail) {
-                    try {
-                        val bytes = android.util.Base64.decode(thumbnail, android.util.Base64.DEFAULT)
-                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            ?.asImageBitmap()
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
+                // Check if thumbnail is a URL (from Cloudinary) or Base64
+                val isUrl = thumbnail.startsWith("http://") || thumbnail.startsWith("https://")
                 
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
+                if (isUrl) {
+                    // Load image from URL using Coil
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(thumbnail)
+                            .crossfade(true)
+                            .build(),
                         contentDescription = "Resume preview",
                         modifier = Modifier
                             .size(width = 48.dp, height = 68.dp)
@@ -379,8 +379,31 @@ private fun ResumeListItem(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Fallback if thumbnail decode fails
-                    FallbackAvatar(resume)
+                    // Decode Base64 thumbnail (legacy format)
+                    val imageBitmap = remember(thumbnail) {
+                        try {
+                            val bytes = android.util.Base64.decode(thumbnail, android.util.Base64.DEFAULT)
+                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                ?.asImageBitmap()
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    
+                    if (imageBitmap != null) {
+                        Image(
+                            bitmap = imageBitmap,
+                            contentDescription = "Resume preview",
+                            modifier = Modifier
+                                .size(width = 48.dp, height = 68.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Fallback if thumbnail decode fails
+                        FallbackAvatar(resume)
+                    }
                 }
             } else {
                 // No thumbnail available, show initials avatar

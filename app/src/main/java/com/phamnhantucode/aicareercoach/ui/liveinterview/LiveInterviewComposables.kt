@@ -17,8 +17,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.phamnhantucode.aicareercoach.data.interview.InterviewSummary
 import com.phamnhantucode.aicareercoach.data.interview.LiveQuestion
@@ -222,13 +226,79 @@ fun FeedbackCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
+            MarkdownText(
                 text = feedback,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+/**
+ * Renders text with basic markdown support (bold, italic).
+ */
+@Composable
+fun MarkdownText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified
+) {
+    val annotatedString = remember(text) {
+        buildAnnotatedString {
+            var currentIndex = 0
+            val boldPattern = Regex("\\*\\*(.+?)\\*\\*")
+            val italicPattern = Regex("(?<!\\*)\\*(?!\\*)(.+?)(?<!\\*)\\*(?!\\*)")
+            
+            // Find all bold matches first
+            val boldMatches = boldPattern.findAll(text).toList()
+            val italicMatches = italicPattern.findAll(text).filter { italicMatch ->
+                // Exclude italic matches that overlap with bold matches
+                boldMatches.none { boldMatch ->
+                    italicMatch.range.first >= boldMatch.range.first && 
+                    italicMatch.range.last <= boldMatch.range.last
+                }
+            }.toList()
+            
+            // Combine and sort all matches
+            data class MatchInfo(val range: IntRange, val content: String, val isBold: Boolean)
+            val allMatches = (boldMatches.map { MatchInfo(it.range, it.groupValues[1], true) } +
+                    italicMatches.map { MatchInfo(it.range, it.groupValues[1], false) })
+                .sortedBy { it.range.first }
+            
+            for (match in allMatches) {
+                // Append text before this match
+                if (currentIndex < match.range.first) {
+                    append(text.substring(currentIndex, match.range.first))
+                }
+                
+                // Append styled text
+                withStyle(
+                    SpanStyle(
+                        fontWeight = if (match.isBold) FontWeight.Bold else FontWeight.Normal,
+                        fontStyle = if (!match.isBold) FontStyle.Italic else FontStyle.Normal
+                    )
+                ) {
+                    append(match.content)
+                }
+                
+                currentIndex = match.range.last + 1
+            }
+            
+            // Append remaining text
+            if (currentIndex < text.length) {
+                append(text.substring(currentIndex))
+            }
+        }
+    }
+    
+    Text(
+        text = annotatedString,
+        modifier = modifier,
+        style = style,
+        color = color
+    )
 }
 
 /**
