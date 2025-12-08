@@ -187,17 +187,13 @@ private fun StandardEducationLayout(
             )
         }
 
-        // Institution and Date Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        // Institution and Date
+        if (element.isDateOnNewLine) {
+            // New line layout: Institution then Date
             if (item.institution.isNotEmpty()) {
                 Text(
                     text = item.institution,
-                    style = element.institutionStyle.toComposeTextStyle(zoomLevel),
-                    modifier = Modifier.weight(1f, fill = false)
+                    style = element.institutionStyle.toComposeTextStyle(zoomLevel)
                 )
             }
 
@@ -206,6 +202,28 @@ private fun StandardEducationLayout(
                     text = formatDateRange(item, element),
                     style = element.dateStyle.toComposeTextStyle(zoomLevel)
                 )
+            }
+        } else {
+            // Standard layout: Institution and Date on same line
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.institution.isNotEmpty()) {
+                    Text(
+                        text = item.institution,
+                        style = element.institutionStyle.toComposeTextStyle(zoomLevel),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+
+                if (element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())) {
+                    Text(
+                        text = formatDateRange(item, element),
+                        style = element.dateStyle.toComposeTextStyle(zoomLevel)
+                    )
+                }
             }
         }
 

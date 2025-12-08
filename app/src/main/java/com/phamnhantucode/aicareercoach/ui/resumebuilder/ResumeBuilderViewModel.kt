@@ -135,6 +135,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
             
             _isSaving.value = true
             try {
+                Log.d(TAG, "Saving Resume: ${currentResume.id}, Projects: ${currentResume.projects.map { "${it.title}: ${it.technologies}" }}")
                 val result = repository.saveResume(currentResume, syncToRemote = true)
 
                 if (result.isSuccess && showToast) {
@@ -159,6 +160,14 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         val currentResume = _resume.value
         Log.d(TAG, "Ensuring resume ${currentResume.id} exists in database before Design tab")
         try {
+            // Check if resume already exists to avoid unnecessary (and potentially destructive) updates
+            val existing = repository.getResume(currentResume.id, forceRemote = true)
+            if (existing.isSuccess && existing.getOrNull() != null) {
+                Log.d(TAG, "Resume ${currentResume.id} already exists, skipping ensureResumeSaved")
+                return
+            }
+
+            // Only save if it doesn't exist (newly created)
             repository.saveResume(currentResume, syncToRemote = true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to ensure resume saved", e)

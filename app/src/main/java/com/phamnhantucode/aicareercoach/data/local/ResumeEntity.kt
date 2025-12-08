@@ -69,6 +69,7 @@ class ResumeConverters {
     private fun personalInfoToJson(info: PersonalInfo): JSONObject {
         return JSONObject().apply {
             put("fullName", info.fullName)
+            put("profession", info.profession)
             put("email", info.email)
             put("phone", info.phone)
             put("location", info.location)
@@ -82,6 +83,7 @@ class ResumeConverters {
     private fun jsonToPersonalInfo(json: JSONObject): PersonalInfo {
         return PersonalInfo(
             fullName = json.getString("fullName"),
+            profession = json.optString("profession", ""),
             email = json.getString("email"),
             phone = json.getString("phone"),
             location = json.getString("location"),

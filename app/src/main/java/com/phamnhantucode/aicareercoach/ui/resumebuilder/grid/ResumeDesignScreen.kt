@@ -36,6 +36,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.components.ShimmerBox
+import androidx.compose.animation.core.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -398,14 +400,7 @@ private fun TemplatesSection(
 
         when {
             isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                ResumeListShimmer()
             }
             templates.isEmpty() -> {
                 Card(
@@ -473,14 +468,7 @@ private fun MyDesignsSection(
 
         when {
             isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                ResumeListShimmer()
             }
             designs.isEmpty() -> {
                 EmptyDesignsPlaceholder()
@@ -709,14 +697,24 @@ private fun CurrentDesignSection(
         )
 
         if (isLoading) {
-            Box(
+            val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+            val shimmerProgress by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1200, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "shimmer"
+            )
+            
+            ShimmerBox(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+                    .aspectRatio(0.707f)
+                    .clip(RoundedCornerShape(12.dp)),
+                shimmerProgress = shimmerProgress
+            )
         } else {
             // Large clickable card for current design
             Card(
@@ -857,14 +855,7 @@ private fun TemplateSelectorSection(
 
         when {
             isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                ResumeListShimmer()
             }
             templates.isEmpty() -> {
                 Card(
@@ -900,6 +891,51 @@ private fun TemplateSelectorSection(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+@Composable
+private fun ResumeListShimmer() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(3) {
+            Column {
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .aspectRatio(0.707f)
+                        .clip(RoundedCornerShape(12.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    shimmerProgress = shimmerProgress
+                )
             }
         }
     }

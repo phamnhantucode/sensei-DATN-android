@@ -16,7 +16,9 @@
       "Bash(do if grep -q \"ColorPicker\\|ColorHistory\\|HSV\\|toHsv\" \"$f\")",
       "Bash(then echo \"$f\")",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(./gradlew:*)",
+      "Bash(del \"D:\\Workspace\\Android\\AICareerCoach\\app\\src\\main\\java\\com\\phamnhantucode\\aicareercoach\\ui\\resumebuilder\\grid\\ColorPickerDialog.kt\")"
     ],
     "deny": [],
     "ask": []

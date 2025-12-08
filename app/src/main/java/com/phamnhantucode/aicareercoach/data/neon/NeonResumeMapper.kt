@@ -93,34 +93,108 @@ object NeonResumeMapper {
      * Parse Neon Resume row to app Resume
      */
     fun fromNeonResumeRow(json: JSONObject): Resume {
-        // Try to parse from 'json' field first (contains full resume data)
+        // 1. Try to parse from 'json' field first (GridResume or legacy full JSON)
+        // If 'json' exists and is not null, it might be a GridResume or a legacy save
         val jsonField = json.optString("json", "")
-        if (jsonField.isNotEmpty()) {
+        if (jsonField.isNotEmpty() && jsonField != "null") {
             try {
                 return fromResumeJson(JSONObject(jsonField)).copy(id = json.getString("id"))
             } catch (e: Exception) {
-                // Fall through to markdown parsing
+                // Fall through if parsing fails
             }
         }
 
-        // Fallback: parse from markdown content
+        // 2. Parse from separate tables (PostgREST embedded resources)
+        // This is the primary path for the Form Resume Builder now
+        val personalInfoArr = json.optJSONArray("ResumePersonalInfo")
+        val educationArr = json.optJSONArray("ResumeEducation")
+        val experienceArr = json.optJSONArray("ResumeExperience")
+        val projectArr = json.optJSONArray("ResumeProject")
+        // Note: Skills, Certifications, Languages currently stored as simple arrays or might be added as tables later
+        // Current schema uses 'skills' text[] column in Resume table
+        
+        // If we have embedded data, use it to build the Resume object
+        if (personalInfoArr != null || educationArr != null || experienceArr != null || projectArr != null) {
+            val id = json.optString("id")
+            val title = optStringSafe(json, "title", "Untitled Resume")
+            val summary = optStringSafe(json, "professional_summary", "")
+            val theme = ResumeTheme(
+                templateId = optStringSafe(json, "template", "classic"),
+                colorScheme = ColorScheme(
+                    accentColor = getAccentColorValue(optStringSafe(json, "accentColor", "neutral"))
+                )
+            )
+            val skills = parseSkills(json)
+            
+            // Map Personal Info
+            val personalInfo = if (personalInfoArr != null && personalInfoArr.length() > 0) {
+                fromNeonPersonalInfoRow(personalInfoArr.getJSONObject(0))
+            } else {
+                PersonalInfo(fullName = title)
+            }
+            
+            // Map Education
+            val education = mutableListOf<Education>()
+            if (educationArr != null) {
+                for (i in 0 until educationArr.length()) {
+                    education.add(fromNeonEducationRow(educationArr.getJSONObject(i)))
+                }
+            }
+            
+            // Map Experience
+            val workExperiences = mutableListOf<WorkExperience>()
+            if (experienceArr != null) {
+                for (i in 0 until experienceArr.length()) {
+                    workExperiences.add(fromNeonExperienceRow(experienceArr.getJSONObject(i)))
+                }
+            }
+            
+            // Map Projects
+            val projects = mutableListOf<Project>()
+            if (projectArr != null) {
+                for (i in 0 until projectArr.length()) {
+                    projects.add(fromNeonProjectRow(projectArr.getJSONObject(i)))
+                }
+            }
+            
+            return Resume(
+                id = id,
+                personalInfo = personalInfo,
+                professionalSummary = summary,
+                workExperiences = workExperiences,
+                education = education,
+                skills = skills,
+                projects = projects,
+                // Certifications and Languages might not have tables yet or strictly rely on JSON? 
+                // Based on schema comments: "Resume: ... skills". No ResumeCertifications table in comments, but used in 'save'?
+                // UPDATE: saveRelatedTables ONLY saves PersonalInfo, Education, Experience, Project.
+                // So Certifications and Languages are currently NOT saved to separate tables in NeonResumeService.
+                // They will be lost if not in 'json'. 
+                // TODO later: Add tables for Certifications/Languages if needed.
+                certifications = emptyList(), 
+                languages = emptyList(),
+                theme = theme
+            )
+        }
+
+        // 3. Fallback: parse from markdown content (rare)
         val content = json.optString("content", "")
         if (content.isNotEmpty()) {
             try {
                 return ResumeFormatter.fromMarkdown(content).copy(id = json.getString("id"))
             } catch (e: Exception) {
-                // Fall through to basic parsing
+                // Fall through
             }
         }
 
-        // Last fallback: construct from individual fields
+        // 4. Last fallback: construct from individual main table fields only
         return Resume(
             id = json.getString("id"),
             personalInfo = PersonalInfo(
                 fullName = optStringSafe(json, "title", "Untitled Resume")
             ),
             professionalSummary = optStringSafe(json, "professional_summary", ""),
-            skills = fromPostgresTextArray(json.optString("skills", "")),
+            skills = parseSkills(json),
             theme = ResumeTheme(
                 templateId = optStringSafe(json, "template", "classic"),
                 colorScheme = ColorScheme(
@@ -129,6 +203,21 @@ object NeonResumeMapper {
             )
         )
     }
+
+    /**
+     * Helper to parse skills from JSON, handling both JSONArray (PostgREST default) and Postgres text array format.
+     */
+    private fun parseSkills(json: JSONObject): List<String> {
+        // 1. Try to parse as standard JSON Array (PostgREST behavior for text[])
+        val jsonArray = json.optJSONArray("skills")
+        if (jsonArray != null) {
+            return parseStringList(jsonArray)
+        }
+        
+        // 2. Fallback: parse as Postgres text array string "{a,b}" (if returned as string)
+        return fromPostgresTextArray(json.optString("skills", ""))
+    }
+
 
     // ==================== ResumePersonalInfo Table ====================
 
@@ -146,7 +235,7 @@ object NeonResumeMapper {
             put("linkedin", info.linkedIn)
             put("website", info.portfolio) // Map portfolio -> website
             put("image", info.avatar) // Map avatar -> image
-            put("profession", "") // App doesn't have this field
+            put("profession", info.profession)
         }
     }
 
@@ -162,7 +251,8 @@ object NeonResumeMapper {
             linkedIn = optStringSafe(json, "linkedin", ""),
             portfolio = optStringSafe(json, "website", ""), // Map website -> portfolio
             github = "", // DB doesn't have this
-            avatar = optStringSafe(json, "image", "") // Map image -> avatar
+            avatar = optStringSafe(json, "image", ""), // Map image -> avatar
+            profession = optStringSafe(json, "profession", "")
         )
     }
 
@@ -246,12 +336,14 @@ object NeonResumeMapper {
      * Convert app Project to Neon ResumeProject table payload
      */
     fun toNeonProjectPayload(resumeId: String, project: Project): JSONObject {
+        val typeStr = project.technologies.joinToString(",")
+        android.util.Log.d("NeonMapper", "Mapping Project: ${project.title}, Techs: ${project.technologies}, ResultType: $typeStr")
         return JSONObject().apply {
             put("id", project.id)
             put("resumeId", resumeId)
             put("name", project.title) // Map title -> name
             put("description", project.description)
-            put("type", project.technologies.firstOrNull() ?: "Other") // Use first technology as type
+            put("type", typeStr) // Map technologies -> type (CSV)
         }
     }
 
@@ -264,7 +356,7 @@ object NeonResumeMapper {
             id = json.getString("id"),
             title = optStringSafe(json, "name", ""), // Map name -> title
             description = optStringSafe(json, "description", ""),
-            technologies = if (projectType.isNotEmpty()) listOf(projectType) else emptyList(),
+            technologies = if (projectType.isNotEmpty()) projectType.split(",").map { it.trim() } else emptyList(),
             link = "", // DB doesn't have this
             startDate = null, // DB doesn't have this
             endDate = null // DB doesn't have this

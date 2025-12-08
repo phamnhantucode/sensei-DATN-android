@@ -19,6 +19,7 @@ data class Resume(
 
 data class PersonalInfo(
     val fullName: String = "",
+    val profession: String = "", // Added profession field
     val email: String = "",
     val phone: String = "",
     val location: String = "",

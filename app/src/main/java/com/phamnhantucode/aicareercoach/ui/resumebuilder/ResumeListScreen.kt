@@ -1,14 +1,20 @@
 package com.phamnhantucode.aicareercoach.ui.resumebuilder
 
 import androidx.compose.animation.*
+import com.phamnhantucode.aicareercoach.ui.components.ShimmerBox
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -153,12 +161,7 @@ fun ResumeListScreen(
         ) {
             when {
                 isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    ResumeListLoading()
                 }
 
                 error != null -> {
@@ -189,9 +192,11 @@ fun ResumeListScreen(
                 }
 
                 else -> {
-                    LazyColumn(
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(
@@ -208,10 +213,6 @@ fun ResumeListScreen(
                                     showDeleteConfirmation = resumeWithThumbnail.resume.id
                                 }
                             )
-                        }
-                        // Add bottom padding for FAB
-                        item {
-                            Spacer(modifier = Modifier.height(80.dp))
                         }
                     }
                 }
@@ -309,7 +310,7 @@ private fun SwipeableResumeListItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(color)
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd
@@ -349,72 +350,126 @@ private fun ResumeListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+            .clickable(
+                onClick = onClick,
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Thumbnail or fallback avatar
-            if (thumbnail != null && thumbnail.isNotBlank()) {
-                // Check if thumbnail is a URL (from Cloudinary) or Base64
-                val isUrl = thumbnail.startsWith("http://") || thumbnail.startsWith("https://")
-                
-                if (isUrl) {
-                    // Load image from URL using Coil
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(thumbnail)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Resume preview",
-                        modifier = Modifier
-                            .size(width = 48.dp, height = 68.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // Decode Base64 thumbnail (legacy format)
-                    val imageBitmap = remember(thumbnail) {
-                        try {
-                            val bytes = android.util.Base64.decode(thumbnail, android.util.Base64.DEFAULT)
-                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                ?.asImageBitmap()
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }
-                    
-                    if (imageBitmap != null) {
-                        Image(
-                            bitmap = imageBitmap,
+            // Thumbnail section with delete button overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.4f)
+            ) {
+                // Thumbnail or fallback avatar
+                if (thumbnail != null && thumbnail.isNotBlank()) {
+                    // Check if thumbnail is a URL (from Cloudinary) or Base64
+                    val isUrl = thumbnail.startsWith("http://") || thumbnail.startsWith("https://")
+
+                    if (isUrl) {
+                        // Load image from URL using Coil
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(thumbnail)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = "Resume preview",
                             modifier = Modifier
-                                .size(width = 48.dp, height = 68.dp)
-                                .clip(RoundedCornerShape(4.dp))
+                                .fillMaxSize()
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Fallback if thumbnail decode fails
-                        FallbackAvatar(resume)
+                        // Decode Base64 thumbnail (legacy format)
+                        val imageBitmap = remember(thumbnail) {
+                            try {
+                                val bytes = android.util.Base64.decode(thumbnail, android.util.Base64.DEFAULT)
+                                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    ?.asImageBitmap()
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+
+                        if (imageBitmap != null) {
+                            Image(
+                                bitmap = imageBitmap,
+                                contentDescription = "Resume preview",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            // Fallback if thumbnail decode fails
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                FallbackAvatarContent(resume)
+                            }
+                        }
+                    }
+                } else {
+                    // No thumbnail available, show initials avatar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FallbackAvatarContent(resume)
                     }
                 }
-            } else {
-                // No thumbnail available, show initials avatar
-                FallbackAvatar(resume)
+
+                // Delete button overlay in top-right corner
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(32.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            shape = CircleShape
+                        ),
+                    enabled = !isDeleting
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.error,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete resume",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Resume info
+            // Resume info section
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = resume.personalInfo.fullName.ifBlank { "Untitled Resume" },
@@ -423,8 +478,6 @@ private fun ResumeListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 // Show email if available
                 if (resume.personalInfo.email.isNotBlank()) {
@@ -436,8 +489,6 @@ private fun ResumeListItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 // Resume stats
                 val statsText = buildList {
@@ -460,27 +511,91 @@ private fun ResumeListItem(
                     )
                 }
             }
+        }
+    }
+}
 
-            // Delete button
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(40.dp),
-                enabled = !isDeleting
+@Composable
+private fun ResumeListLoading() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(4) {
+            ResumeLoadingCard(shimmerProgress = shimmerProgress)
+        }
+    }
+}
+
+@Composable
+private fun ResumeLoadingCard(shimmerProgress: Float) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Thumbnail placeholder
+            ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.4f),
+                shimmerProgress = shimmerProgress
+            )
+
+            // Resume info section placeholders
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete resume",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                // Title placeholder
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+
+                // Email placeholder
+                ShimmerBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    shimmerProgress = shimmerProgress
+                )
+
+                // Stats placeholder
+                ShimmerBox(
+                    modifier = Modifier
+                        .width(120.dp)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    shimmerProgress = shimmerProgress
+                )
             }
         }
     }
@@ -540,34 +655,26 @@ private fun EmptyResumesPlaceholder(
 }
 
 @Composable
-private fun FallbackAvatar(resume: Resume) {
-    Box(
-        modifier = Modifier
-            .size(width = 48.dp, height = 68.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center
-    ) {
-        val initials = resume.personalInfo.fullName
-            .split(" ")
-            .take(2)
-            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-            .joinToString("")
+private fun FallbackAvatarContent(resume: Resume) {
+    val initials = resume.personalInfo.fullName
+        .split(" ")
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
 
-        if (initials.isNotEmpty()) {
-            Text(
-                text = initials,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Default.Description,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+    if (initials.isNotEmpty()) {
+        Text(
+            text = initials,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Default.Description,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(48.dp)
+        )
     }
 }

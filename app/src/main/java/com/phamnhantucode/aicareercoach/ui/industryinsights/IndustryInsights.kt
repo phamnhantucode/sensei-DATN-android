@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -303,23 +304,26 @@ private fun HeaderSection(
                 }
 
                 Box {
-                    Button(
+                    Surface(
                         onClick = { growthToolsExpanded = true },
                         modifier = Modifier.onGloballyPositioned { coordinates ->
                             growthToolsButtonWidth = coordinates.size.width
                         },
                         shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.onBackground
-                        )
+                        color = MaterialTheme.colorScheme.onBackground
                     ) {
-                        Text(text = "Growth Tools", color = MaterialTheme.colorScheme.background)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.Filled.ExpandMore,
-                            tint = MaterialTheme.colorScheme.background,
-                            contentDescription = "Toggle growth tools"
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "Growth Tools", color = MaterialTheme.colorScheme.background)
+                            Icon(
+                                imageVector = Icons.Filled.ExpandMore,
+                                tint = MaterialTheme.colorScheme.background,
+                                contentDescription = "Toggle growth tools"
+                            )
+                        }
                     }
                     DropdownMenu(
                         expanded = growthToolsExpanded,
@@ -810,9 +814,10 @@ private fun QuickStatsSummary(
     
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
         ),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -921,7 +926,8 @@ private fun MarketOutlookCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Box(
             modifier = Modifier
@@ -1028,12 +1034,13 @@ private fun GrowthCard(
             animationSpec = tween(1000, easing = FastOutSlowInEasing)
         )
     }
-    
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1146,7 +1153,8 @@ private fun DemandLevelCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1250,7 +1258,8 @@ private fun HighlightSkillsCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1268,11 +1277,11 @@ private fun HighlightSkillsCard(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+//                Icon(
+//                    imageVector = Icons.Filled.ChevronRight,
+//                    contentDescription = null,
+//                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+//                )
             }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1296,7 +1305,8 @@ private fun SalaryRangesCard(
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1613,7 +1623,8 @@ private fun KeyTrendsCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1674,7 +1685,8 @@ private fun RecommendedSkillsCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -1728,22 +1740,22 @@ private fun RecommendedSkillsCard(
                 }
             }
             
-            Button(
-                onClick = { },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Add to learning plan")
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+//            Button(
+//                onClick = { },
+//                shape = RoundedCornerShape(12.dp),
+//                colors = ButtonDefaults.buttonColors(
+//                    containerColor = MaterialTheme.colorScheme.primary
+//                ),
+//                modifier = Modifier.fillMaxWidth()
+//            ) {
+//                Text("Add to learning plan")
+//                Spacer(modifier = Modifier.width(8.dp))
+//                Icon(
+//                    imageVector = Icons.Default.ChevronRight,
+//                    contentDescription = null,
+//                    modifier = Modifier.size(18.dp)
+//                )
+//            }
         }
     }
 }

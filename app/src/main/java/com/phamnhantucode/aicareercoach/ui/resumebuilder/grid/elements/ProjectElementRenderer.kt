@@ -107,6 +107,15 @@ private fun drawProjectItem(
     var currentY = yOffset
     val itemSpacing = element.itemSpacing * density
     
+    val renderTechnologiesBlock = {
+        if (element.showTechnologies && item.technologies.isNotEmpty()) {
+            val techHeight = drawTechnologyTags(
+                canvas, item.technologies, element, context, width, currentY, density
+            )
+            currentY += techHeight + itemSpacing
+        }
+    }
+
     when (element.displayStyle) {
         ProjectDisplayStyle.STANDARD -> {
             // Project Name and Date Row
@@ -115,6 +124,11 @@ private fun drawProjectItem(
                     canvas, item, element, context, width, currentY, density
                 )
                 currentY += nameHeight + itemSpacing
+            }
+            
+            // Technologies (if placement is BELOW_TITLE)
+            if (element.technologiesPlacement == TechnologiesPlacement.BELOW_TITLE || element.technologiesPlacement == null) {
+                renderTechnologiesBlock()
             }
             
             // Description
@@ -126,12 +140,9 @@ private fun drawProjectItem(
                 currentY += descHeight + itemSpacing
             }
             
-            // Technologies
-            if (element.showTechnologies && item.technologies.isNotEmpty()) {
-                val techHeight = drawTechnologyTags(
-                    canvas, item.technologies, element, context, width, currentY, density
-                )
-                currentY += techHeight + itemSpacing
+            // Technologies (if placement is BELOW_DESCRIPTION)
+            if (element.technologiesPlacement == TechnologiesPlacement.BELOW_DESCRIPTION) {
+                renderTechnologiesBlock()
             }
             
             // Highlights
@@ -160,7 +171,7 @@ private fun drawProjectItem(
                 currentY += nameHeight + (itemSpacing / 2)
             }
             
-            // Technologies (inline)
+            // Technologies (inline) - Compact style always keeps technologies here
             if (element.showTechnologies && item.technologies.isNotEmpty()) {
                 val techHeight = drawText(
                     canvas, item.technologies, element.technologyStyle,
@@ -215,12 +226,10 @@ private fun drawProjectItem(
                 currentY += linkHeight + itemSpacing
             }
             
-            // Technologies
-            if (element.showTechnologies && item.technologies.isNotEmpty()) {
-                val techHeight = drawTechnologyTags(
-                    canvas, item.technologies, element, context, width, currentY, density
-                )
-                currentY += techHeight + itemSpacing
+            // Technologies (if placement is BELOW_TITLE)
+            // Note: In detailed layout, "Below Title" implies before Description/Highlights but after header info
+            if (element.technologiesPlacement == TechnologiesPlacement.BELOW_TITLE || element.technologiesPlacement == null) {
+                renderTechnologiesBlock()
             }
             
             // Description
@@ -230,6 +239,11 @@ private fun drawProjectItem(
                     context, width, currentY, TextAlignment.LEFT
                 )
                 currentY += descHeight + itemSpacing
+            }
+            
+            // Technologies (if placement is BELOW_DESCRIPTION)
+            if (element.technologiesPlacement == TechnologiesPlacement.BELOW_DESCRIPTION) {
+                renderTechnologiesBlock()
             }
             
             // Highlights

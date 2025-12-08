@@ -89,6 +89,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import kotlinx.coroutines.launch
+import com.phamnhantucode.aicareercoach.ui.components.MonthYearPickerDialog
+import java.time.YearMonth
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -712,6 +714,19 @@ private fun PersonalInfoForm(
         )
 
         OutlinedTextField(
+            value = editedInfo.profession,
+            onValueChange = {
+                editedInfo = editedInfo.copy(profession = it)
+                onUpdate(editedInfo)
+            },
+            label = { Text("Profession / Job Title") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+
+
+        OutlinedTextField(
             value = editedInfo.email,
             onValueChange = {
                 editedInfo = editedInfo.copy(email = it)
@@ -761,18 +776,7 @@ private fun PersonalInfoForm(
                 editedInfo = editedInfo.copy(portfolio = it)
                 onUpdate(editedInfo)
             },
-            label = { Text("Portfolio URL (Optional)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        OutlinedTextField(
-            value = editedInfo.github,
-            onValueChange = {
-                editedInfo = editedInfo.copy(github = it)
-                onUpdate(editedInfo)
-            },
-            label = { Text("GitHub URL (Optional)") },
+            label = { Text("Website URL (Optional)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -1122,7 +1126,9 @@ private fun EducationItem(
     onRemove: () -> Unit
 ) {
     var editedEducation by remember(education) { mutableStateOf(education) }
-    var showDatePicker by remember { mutableStateOf<DatePickerType?>(null) }
+    // Date formatter for yyyy-MM
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM", Locale.getDefault()) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1180,49 +1186,30 @@ private fun EducationItem(
                 singleLine = true
             )
 
-            OutlinedTextField(
-                value = editedEducation.location,
-                onValueChange = {
-                    editedEducation = editedEducation.copy(location = it)
-                    onUpdate(editedEducation)
-                },
-                label = { Text("Location") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            // Location field removed as per request
+            // Start Date field removed as per request
 
-            // Date fields
-            val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = editedEducation.startDate?.format(dateFormatter) ?: "",
-                    onValueChange = { },
-                    label = { Text("Start Date") },
-                    modifier = Modifier.weight(1f),
-                    readOnly = true,
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = DatePickerType.START }) {
-                            Icon(Icons.Filled.Edit, "Select date")
-                        }
-                    },
-                    placeholder = { Text("Click to select") }
-                )
-
+            // Graduated Date (yyyy-MM)
+            Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = editedEducation.endDate?.format(dateFormatter) ?: "",
                     onValueChange = { },
-                    label = { Text("End Date") },
-                    modifier = Modifier.weight(1f),
+                    label = { Text("Graduated Date (yyyy-MM)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Click to select") },
                     readOnly = true,
                     trailingIcon = {
-                        IconButton(onClick = { showDatePicker = DatePickerType.END }) {
+                        IconButton(onClick = { showDatePicker = true }) {
                             Icon(Icons.Filled.Edit, "Select date")
                         }
-                    },
-                    placeholder = { Text("Click to select") }
+                    }
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .padding(end = 48.dp) // Exclude trailing icon area
+                        .clickable { showDatePicker = true }
                 )
             }
 
@@ -1239,48 +1226,22 @@ private fun EducationItem(
         }
     }
 
-    // Date Picker Dialog
-    if (showDatePicker != null) {
-        val initialDate = when (showDatePicker) {
-            DatePickerType.START -> editedEducation.startDate
-            DatePickerType.END -> editedEducation.endDate
-            else -> null
+    if (showDatePicker) {
+        val initialDate = if (editedEducation.endDate != null) {
+            YearMonth.from(editedEducation.endDate)
+        } else {
+            YearMonth.now()
         }
 
-        val initialMillis = initialDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = null },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            val selectedDate = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-
-                            editedEducation = when (showDatePicker) {
-                                DatePickerType.START -> editedEducation.copy(startDate = selectedDate)
-                                DatePickerType.END -> editedEducation.copy(endDate = selectedDate)
-                                else -> editedEducation
-                            }
-                            onUpdate(editedEducation)
-                        }
-                        showDatePicker = null
-                    }
-                ) {
-                    Text("OK")
-                }
+        MonthYearPickerDialog(
+            initialDate = initialDate,
+            onDateSelected = { selected ->
+                showDatePicker = false
+                editedEducation = editedEducation.copy(endDate = selected.atDay(1))
+                onUpdate(editedEducation)
             },
-            dismissButton = {
-                OutlinedButton(onClick = { showDatePicker = null }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
+            onDismissRequest = { showDatePicker = false }
+        )
     }
 }
 
@@ -1489,17 +1450,17 @@ private fun ProjectItem(
                 maxLines = 4
             )
 
-            OutlinedTextField(
-                value = editedProject.link,
-                onValueChange = {
-                    editedProject = editedProject.copy(link = it)
-                    onUpdate(editedProject)
-                },
-                label = { Text("Project Link (Optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("https://github.com/...") }
-            )
+//            OutlinedTextField(
+//                value = editedProject.link,
+//                onValueChange = {
+//                    editedProject = editedProject.copy(link = it)
+//                    onUpdate(editedProject)
+//                },
+//                label = { Text("Project Link (Optional)") },
+//                modifier = Modifier.fillMaxWidth(),
+//                singleLine = true,
+//                placeholder = { Text("https://github.com/...") }
+//            )
 
             // Technologies as chips
             var newTech by remember { mutableStateOf("") }
@@ -1568,84 +1529,86 @@ private fun ProjectItem(
                 text = "Project Duration (Optional)",
                 style = MaterialTheme.typography.labelLarge
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = editedProject.startDate?.format(dateFormatter) ?: "",
-                    onValueChange = { },
-                    label = { Text("Start Date") },
-                    modifier = Modifier.weight(1f),
-                    readOnly = true,
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = DatePickerType.START }) {
-                            Icon(Icons.Filled.Edit, "Select date")
-                        }
-                    },
-                    placeholder = { Text("Click to select") }
-                )
-
-                OutlinedTextField(
-                    value = editedProject.endDate?.format(dateFormatter) ?: "",
-                    onValueChange = { },
-                    label = { Text("End Date") },
-                    modifier = Modifier.weight(1f),
-                    readOnly = true,
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = DatePickerType.END }) {
-                            Icon(Icons.Filled.Edit, "Select date")
-                        }
-                    },
-                    placeholder = { Text("Click to select") }
-                )
-            }
+//            // Date fields
+//            val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.spacedBy(8.dp)
+//            ) {
+//                OutlinedTextField(
+//                    value = editedProject.startDate?.format(dateFormatter) ?: "",
+//                    onValueChange = { },
+//                    label = { Text("Start Date") },
+//                    modifier = Modifier.weight(1f),
+//                    readOnly = true,
+//                    trailingIcon = {
+//                        IconButton(onClick = { showDatePicker = DatePickerType.START }) {
+//                            Icon(Icons.Filled.Edit, "Select date")
+//                        }
+//                    },
+//                    placeholder = { Text("Click to select") }
+//                )
+//
+//                OutlinedTextField(
+//                    value = editedProject.endDate?.format(dateFormatter) ?: "",
+//                    onValueChange = { },
+//                    label = { Text("End Date") },
+//                    modifier = Modifier.weight(1f),
+//                    readOnly = true,
+//                    trailingIcon = {
+//                        IconButton(onClick = { showDatePicker = DatePickerType.END }) {
+//                            Icon(Icons.Filled.Edit, "Select date")
+//                        }
+//                    },
+//                    placeholder = { Text("Click to select") }
+//                )
+//            }
         }
     }
 
-    // Date Picker Dialog
-    if (showDatePicker != null) {
-        val initialDate = when (showDatePicker) {
-            DatePickerType.START -> editedProject.startDate
-            DatePickerType.END -> editedProject.endDate
-            else -> null
-        }
-
-        val initialMillis = initialDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = null },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            val selectedDate = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-
-                            editedProject = when (showDatePicker) {
-                                DatePickerType.START -> editedProject.copy(startDate = selectedDate)
-                                DatePickerType.END -> editedProject.copy(endDate = selectedDate)
-                                else -> editedProject
-                            }
-                            onUpdate(editedProject)
-                        }
-                        showDatePicker = null
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showDatePicker = null }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
+//    // Date Picker Dialog
+//    if (showDatePicker != null) {
+//        val initialDate = when (showDatePicker) {
+//            DatePickerType.START -> editedProject.startDate
+//            DatePickerType.END -> editedProject.endDate
+//            else -> null
+//        }
+//
+//        val initialMillis = initialDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+//        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+//
+//        DatePickerDialog(
+//            onDismissRequest = { showDatePicker = null },
+//            confirmButton = {
+//                Button(
+//                    onClick = {
+//                        datePickerState.selectedDateMillis?.let { millis ->
+//                            val selectedDate = Instant.ofEpochMilli(millis)
+//                                .atZone(ZoneId.systemDefault())
+//                                .toLocalDate()
+//
+//                            editedProject = when (showDatePicker) {
+//                                DatePickerType.START -> editedProject.copy(startDate = selectedDate)
+//                                DatePickerType.END -> editedProject.copy(endDate = selectedDate)
+//                                else -> editedProject
+//                            }
+//                            onUpdate(editedProject)
+//                        }
+//                        showDatePicker = null
+//                    }
+//                ) {
+//                    Text("OK")
+//                }
+//            },
+//            dismissButton = {
+//                OutlinedButton(onClick = { showDatePicker = null }) {
+//                    Text("Cancel")
+//                }
+//            }
+//        ) {
+//            DatePicker(state = datePickerState)
+//        }
+//    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

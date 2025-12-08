@@ -8,6 +8,8 @@ import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository.IndustryInsightRecord
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository.IndustryInsightLoadResult
 import com.phamnhantucode.aicareercoach.data.industry.IndustryInsightsRepository.SalaryRangeRecord
+import com.phamnhantucode.aicareercoach.ui.onboarding.IndustriesData
+import com.phamnhantucode.aicareercoach.utils.IndustryFormatUtils
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -162,7 +164,12 @@ class IndustryInsightsViewModel(
             ?: resolvedLastUpdated.plus(7, ChronoUnit.DAYS)
         return IndustryInsightUiModel(
             id = id,
-            name = industry.formatDisplayName(),
+            name = IndustryFormatUtils.formatIndustryForDisplay(
+                formattedIndustry = industry,
+                industries = IndustriesData.industries,
+                getId = { it.id },
+                getName = { it.name }
+            ),
             marketOutlook = marketOutlook.toMarketOutlook(),
             growthRate = growthRate,
             demandLevel = demandLevel.toDemandLevel(),
@@ -198,23 +205,6 @@ class IndustryInsightsViewModel(
             "HIGH" -> DemandLevel.HIGH
             "LOW" -> DemandLevel.LOW
             else -> DemandLevel.MEDIUM
-        }
-    }
-
-    private fun String.formatDisplayName(): String {
-        val trimmed = trim()
-        if (trimmed.isEmpty()) return "Industry"
-        return trimmed.split(" ").joinToString(" ") { word ->
-            if (word.length == 1) {
-                word.uppercase(Locale.getDefault())
-            } else {
-                word.replaceFirstChar { char ->
-                    when {
-                        char.isLowerCase() -> char.titlecase(Locale.getDefault())
-                        else -> char.toString()
-                    }
-                }
-            }
         }
     }
 

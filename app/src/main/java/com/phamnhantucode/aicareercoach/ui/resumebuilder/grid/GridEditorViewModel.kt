@@ -451,29 +451,16 @@ class GridEditorViewModel(
                     )
                 }
 
-                // Also update the linked Resume table's json field with GridResume data
-                if (result.isSuccess && initialLinkedResumeId != null) {
-                    try {
-                        // Get the linked resume
-                        val linkedResumeResult = resumeRepository.getResume(initialLinkedResumeId)
-                        val linkedResume = linkedResumeResult.getOrNull()
-                        if (linkedResume != null) {
-                            // Update the Resume with GridResume JSON in the 'json' field
-                            // Include the thumbnail that was uploaded
-                            val gridResumeWithThumbnail = _gridResume.value.copy(thumbnail = thumbnail)
-                            @Suppress("DEPRECATION")
-                            resumeRepository.updateResume(
-                                resume = linkedResume,
-                                syncToRemote = true,
-                                gridResume = gridResumeWithThumbnail
-                            )
-                            android.util.Log.d("GridEditorViewModel", "Updated linked Resume ${initialLinkedResumeId} with GridResume JSON (thumbnail: ${thumbnail.take(50)}...)")
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("GridEditorViewModel", "Failed to update linked Resume", e)
-                        // Don't fail the whole save if this fails
-                    }
-                }
+                // Note: We do NOT need to call resumeRepository.updateResume here.
+                // GridResumeRepository.updateDesign (called above) already updates the 'json' column in the Resume table
+                // securely via NeonGridResumeService.
+                //
+                // Legacy Note: Calling resumeRepository.updateResume here causes a full wipe of related tables 
+                // (Education, Experience, etc.) because NeonResumeService.updateResume implements a "delete-all-and-insert" 
+                // strategy for related data. Since GridEditor doesn't always have the full related data, this 
+                // results in data loss.
+                //
+                // The GridResumeRepository methods are sufficient to save the design JSON.
 
                 if (result.isSuccess) {
                     _events.emit(GridEditorEvent.SaveSuccess("Resume saved successfully"))
@@ -1480,6 +1467,7 @@ class GridEditorViewModel(
                     UserInfoTag.LINKEDIN -> resume.personalInfo.linkedIn
                     UserInfoTag.GITHUB -> resume.personalInfo.github
                     UserInfoTag.WEBSITE -> resume.personalInfo.portfolio
+                    UserInfoTag.PROFESSION -> resume.personalInfo.profession
                     UserInfoTag.PROFESSIONAL_SUMMARY -> resume.professionalSummary
                     else -> element.content
                 }

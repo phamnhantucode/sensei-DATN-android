@@ -31,6 +31,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.LanguageProficiency
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.colorpicker.ColorPickerDialog // From colorpicker module
 import kotlinx.coroutines.launch
 
 /**
@@ -46,6 +47,7 @@ fun PropertyPanel(
     onRemoveElement: () -> Unit,
     onUpdateContainerLayoutMode: ((ResumeElement.ContainerElement, LayoutMode) -> Unit)? = null,
     parentContainer: ResumeElement.ContainerElement? = null,
+    gridConfig: GridConfig? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -91,6 +93,7 @@ fun PropertyPanel(
                             UserInfoTag.GITHUB -> currentPersonalInfo?.github ?: element.content
                             UserInfoTag.LINKEDIN -> currentPersonalInfo?.linkedIn ?: element.content
                             UserInfoTag.WEBSITE -> currentPersonalInfo?.portfolio ?: element.content
+                            UserInfoTag.PROFESSION -> currentPersonalInfo?.profession ?: element.content
                             UserInfoTag.PROFESSIONAL_SUMMARY -> currentResume.professionalSummary
                             else -> element.content
                         }
@@ -105,6 +108,56 @@ fun PropertyPanel(
                         if (avatar.isNotEmpty()) {
                             onUpdateElement(element.copy(imageUrl = avatar))
                         }
+                    }
+                }
+                is ResumeElement.WorkExperienceElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.WORK_EXPERIENCE && currentResume.workExperiences.isNotEmpty()) {
+                        // Convert form work experience to grid work experience items
+                        val workExperienceItems = currentResume.workExperiences.map { work ->
+                            WorkExperienceItem(
+                                jobTitle = work.jobTitle,
+                                company = work.company,
+                                location = work.location,
+                                startDate = work.startDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                endDate = if (work.isCurrentRole) {
+                                    "Present"
+                                } else {
+                                    work.endDate?.format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                    ) ?: ""
+                                },
+                                isCurrentRole = work.isCurrentRole,
+                                responsibilities = work.responsibilities.map { resp ->
+                                    ResponsibilityItem(text = resp)
+                                }
+                            )
+                        }
+                        onUpdateElement(element.copy(items = workExperienceItems))
+                    }
+                }
+                is ResumeElement.EducationElement -> {
+                    if ((element.items.isEmpty() || tagChanged) && element.userInfoTag == UserInfoTag.EDUCATION && currentResume.education.isNotEmpty()) {
+                        // Convert form education to grid education items
+                        val educationItems = currentResume.education.map { edu ->
+                            EducationItem(
+                                degree = edu.degree,
+                                institution = edu.institution,
+                                location = edu.location,
+                                startDate = edu.startDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                endDate = edu.endDate?.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM yyyy")
+                                ) ?: "",
+                                gpa = edu.gpa,
+                                achievements = edu.achievements.map { ach ->
+                                    AchievementItem(text = ach)
+                                }
+                            )
+                        }
+                        onUpdateElement(element.copy(items = educationItems))
                     }
                 }
                 is ResumeElement.SkillElement -> {
@@ -229,7 +282,8 @@ fun PropertyPanel(
                             personalInfo = formResume?.personalInfo
                         }
                     }
-                }
+                },
+                gridConfig = gridConfig
             )
 
             Divider()
@@ -398,7 +452,8 @@ private fun CommonPropertiesSection(
     onUpdateElement: (ResumeElement) -> Unit,
     personalInfo: PersonalInfo?,
     resume: Resume?,
-    onRefreshUserData: () -> Unit = {}
+    onRefreshUserData: () -> Unit = {},
+    gridConfig: GridConfig? = null
 ) {
     PropertySection(title = "Position & Size") {
         // Position
@@ -461,30 +516,61 @@ private fun CommonPropertiesSection(
 
         // Size (only show when not wrap content)
         if (element.position.widthMode == SizeMode.FIXED || element.position.heightMode == SizeMode.FIXED) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            val isDivider = (element as? ResumeElement.ShapeElement)?.shapeType == ShapeType.DIVIDER
+
+            if (isDivider) {
+                // Use sliders for dividers
                 if (element.position.heightMode == SizeMode.FIXED) {
-                    NumberField(
+                    val maxRows = gridConfig?.rows ?: 136
+                    SliderField(
                         label = "Height",
-                        value = element.position.rowSpan,
+                        value = element.position.rowSpan.toFloat(),
+                        valueRange = 1f..maxRows.toFloat(),
                         onValueChange = { newHeight ->
-                            val newPosition = element.position.copy(rowSpan = newHeight.coerceAtLeast(1))
+                            val newPosition = element.position.copy(rowSpan = newHeight.toInt().coerceAtLeast(1))
                             onUpdateElement(updateElementPosition(element, newPosition))
-                        },
-                        modifier = Modifier.weight(1f)
+                        }
                     )
                 }
                 if (element.position.widthMode == SizeMode.FIXED) {
-                    NumberField(
+                    val maxCols = gridConfig?.columns ?: 96
+                    SliderField(
                         label = "Width",
-                        value = element.position.colSpan,
+                        value = element.position.colSpan.toFloat(),
+                        valueRange = 1f..maxCols.toFloat(),
                         onValueChange = { newWidth ->
-                            val newPosition = element.position.copy(colSpan = newWidth.coerceAtLeast(1))
+                            val newPosition = element.position.copy(colSpan = newWidth.toInt().coerceAtLeast(1))
                             onUpdateElement(updateElementPosition(element, newPosition))
-                        },
-                        modifier = Modifier.weight(1f)
+                        }
                     )
+                }
+            } else {
+                // Use NumberFields for other elements
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (element.position.heightMode == SizeMode.FIXED) {
+                        NumberField(
+                            label = "Height",
+                            value = element.position.rowSpan,
+                            onValueChange = { newHeight ->
+                                val newPosition = element.position.copy(rowSpan = newHeight.coerceAtLeast(1))
+                                onUpdateElement(updateElementPosition(element, newPosition))
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (element.position.widthMode == SizeMode.FIXED) {
+                        NumberField(
+                            label = "Width",
+                            value = element.position.colSpan,
+                            onValueChange = { newWidth ->
+                                val newPosition = element.position.copy(colSpan = newWidth.coerceAtLeast(1))
+                                onUpdateElement(updateElementPosition(element, newPosition))
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
@@ -595,6 +681,7 @@ private fun CommonPropertiesSection(
                                                         UserInfoTag.GITHUB -> personalInfo.github
                                                         UserInfoTag.LINKEDIN -> personalInfo.linkedIn
                                                         UserInfoTag.WEBSITE -> personalInfo.portfolio
+                                                        UserInfoTag.PROFESSION -> personalInfo.profession
                                                         UserInfoTag.PROFESSIONAL_SUMMARY -> resume?.professionalSummary ?: updatedElement.content
                                                         UserInfoTag.AVATAR -> updatedElement.content
                                                         UserInfoTag.WORK_EXPERIENCE -> updatedElement.content
@@ -1359,8 +1446,91 @@ private fun ShapeElementProperties(
             }
         )
 
-        // Custom height (particularly useful for dividers)
-        if (element.shapeType == ShapeType.DIVIDER || element.customHeightDp != null) {
+        // Orientation control for dividers
+        if (element.shapeType == ShapeType.DIVIDER) {
+            var showOrientationMenu by remember { mutableStateOf(false) }
+            @OptIn(ExperimentalMaterial3Api::class)
+            ExposedDropdownMenuBox(
+                expanded = showOrientationMenu,
+                onExpandedChange = { showOrientationMenu = it }
+            ) {
+                OutlinedTextField(
+                    value = element.orientation.name,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Orientation") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showOrientationMenu) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = showOrientationMenu,
+                    onDismissRequest = { showOrientationMenu = false }
+                ) {
+                    DividerOrientation.values().forEach { orientation ->
+                        DropdownMenuItem(
+                            text = { Text(orientation.name) },
+                            onClick = {
+                                val newOrientation = orientation
+                                val updatedElement = if (newOrientation != element.orientation) {
+                                    // Orientation changed, swap dimensions to preserve thickness and reset length
+                                    if (newOrientation == DividerOrientation.VERTICAL) {
+                                        // Horizontal -> Vertical
+                                        // Current Height (Thickness) -> New Width (Thickness)
+                                        // Reset New Height (Length) to null (fill)
+                                        element.copy(
+                                            orientation = newOrientation,
+                                            customWidthDp = element.customHeightDp ?: 2f,
+                                            customHeightDp = null
+                                        )
+                                    } else {
+                                        // Vertical -> Horizontal
+                                        // Current Width (Thickness) -> New Height (Thickness)
+                                        // Reset New Width (Length) to null (fill)
+                                        element.copy(
+                                            orientation = newOrientation,
+                                            customHeightDp = element.customWidthDp ?: 2f,
+                                            customWidthDp = null
+                                        )
+                                    }
+                                } else {
+                                    element
+                                }
+                                onUpdateElement(updatedElement)
+                                showOrientationMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Thickness control for dividers
+        if (element.shapeType == ShapeType.DIVIDER) {
+             val currentThickness = if (element.orientation == DividerOrientation.HORIZONTAL) {
+                 element.customHeightDp ?: 2f
+             } else {
+                 element.customWidthDp ?: 2f
+             }
+
+             SliderField(
+                label = "Thickness: ${currentThickness.toInt()}dp",
+                value = currentThickness,
+                valueRange = 1f..20f,
+                onValueChange = { newThickness ->
+                    val updatedElement = if (element.orientation == DividerOrientation.HORIZONTAL) {
+                        element.copy(customHeightDp = newThickness)
+                    } else {
+                        element.copy(customWidthDp = newThickness)
+                    }
+                    onUpdateElement(updatedElement)
+                }
+            )
+        }
+
+        // Custom height for non-divider shapes
+        if (element.shapeType != ShapeType.DIVIDER && element.customHeightDp != null) {
             SliderField(
                 label = "Custom Height: ${element.customHeightDp?.toInt() ?: 2}dp",
                 value = element.customHeightDp ?: 2f,
@@ -1371,8 +1541,8 @@ private fun ShapeElementProperties(
             )
         }
 
-        // Custom width (optional, for vertical dividers)
-        if (element.shapeType == ShapeType.LINE || element.customWidthDp != null) {
+        // Custom width for LINE type
+        if (element.shapeType == ShapeType.LINE || (element.shapeType != ShapeType.DIVIDER && element.customWidthDp != null)) {
             SliderField(
                 label = "Custom Width: ${element.customWidthDp?.toInt() ?: 2}dp",
                 value = element.customWidthDp ?: 2f,
@@ -1601,6 +1771,24 @@ private fun ContactElementProperties(
                     onUpdateElement(element.copy(iconSize = newSize))
                 }
             )
+
+            // Icon Color
+            ColorPicker(
+                label = "Icon Color",
+                color = element.iconColor?.let { Color(it) },
+                onColorChange = { newColor ->
+                    val colorLong = newColor?.let {
+                        android.graphics.Color.argb(
+                            (it.alpha * 255).toInt(),
+                            (it.red * 255).toInt(),
+                            (it.green * 255).toInt(),
+                            (it.blue * 255).toInt()
+                        ).toLong()
+                    }
+                    onUpdateElement(element.copy(iconColor = colorLong))
+                },
+                nullable = true
+            )
         }
 
         // Padding (only if inside vertical container)
@@ -1791,7 +1979,27 @@ private fun ContactItemEditor(
                         DropdownMenuItem(
                             text = { Text(type.name) },
                             onClick = {
-                                onUpdate(item.copy(type = type))
+                                val iconName = when (type) {
+                                    ContactType.PHONE -> "phone"
+                                    ContactType.EMAIL -> "email"
+                                    ContactType.ADDRESS -> "address"
+                                    ContactType.LINKEDIN -> "linkedin"
+                                    ContactType.GITHUB -> "github"
+                                    ContactType.WEBSITE -> "website"
+                                    ContactType.CUSTOM -> "custom"
+                                }
+                                
+                                val label = when (type) {
+                                    ContactType.PHONE -> "Phone:"
+                                    ContactType.EMAIL -> "Email:"
+                                    ContactType.ADDRESS -> "Address:"
+                                    ContactType.LINKEDIN -> "LinkedIn:"
+                                    ContactType.GITHUB -> "GitHub:"
+                                    ContactType.WEBSITE -> "Website:"
+                                    ContactType.CUSTOM -> "Custom:"
+                                }
+                                
+                                onUpdate(item.copy(type = type, iconName = iconName, label = label))
                                 showTypeMenu = false
                             }
                         )
@@ -2686,6 +2894,7 @@ private fun ColorPicker(
     onColorChange: (Color?) -> Unit,
     nullable: Boolean = false
 ) {
+    val context = LocalContext.current
     var showColorPickerDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -2774,7 +2983,8 @@ private fun ColorPicker(
             onDismiss = { showColorPickerDialog = false },
             onColorSelected = { newColor ->
                 onColorChange(newColor)
-            }
+            },
+            context = context
         )
     }
 }
@@ -2887,6 +3097,20 @@ private fun EducationElementProperties(
                 checked = element.showDates,
                 onCheckedChange = { onUpdateElement(element.copy(showDates = it)) }
             )
+        }
+
+        if (element.showDates) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Date on New Line", fontSize = 12.sp)
+                Switch(
+                    checked = element.isDateOnNewLine,
+                    onCheckedChange = { onUpdateElement(element.copy(isDateOnNewLine = it)) }
+                )
+            }
         }
 
         Row(
@@ -3074,39 +3298,17 @@ private fun EducationItemEditor(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Location
-            OutlinedTextField(
-                value = item.location,
-                onValueChange = { onUpdate(item.copy(location = it)) },
-                label = { Text("Location") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Start Date
-            OutlinedTextField(
-                value = item.startDate,
-                onValueChange = { onUpdate(item.copy(startDate = it)) },
-                label = { Text("Start Date (yyyy-MM-dd)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("2016-09-01") }
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // End Date
+            // Graduated Date
             OutlinedTextField(
                 value = item.endDate,
                 onValueChange = { onUpdate(item.copy(endDate = it)) },
-                label = { Text("End Date (yyyy-MM-dd)") },
+                label = { Text("Graduated Date (MM/yyyy)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("2020-05-31") }
+                placeholder = { Text("05/2020") }
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -3440,6 +3642,32 @@ private fun ProjectElementProperties(
                 checked = element.showTechnologies,
                 onCheckedChange = { onUpdateElement(element.copy(showTechnologies = it)) }
             )
+        }
+
+        // Technologies Placement (only if technologies are shown)
+        if (element.showTechnologies) {
+            Text("Technologies Placement", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TechnologiesPlacement.entries.forEach { placement ->
+                    FilterChip(
+                        selected = element.technologiesPlacement == placement,
+                        onClick = {
+                            onUpdateElement(element.copy(technologiesPlacement = placement))
+                        },
+                        label = { 
+                            Text(
+                                when(placement) {
+                                    TechnologiesPlacement.BELOW_TITLE -> "Below Title"
+                                    TechnologiesPlacement.BELOW_DESCRIPTION -> "Below Desc"
+                                }
+                            ) 
+                        }
+                    )
+                }
+            }
         }
 
         Row(

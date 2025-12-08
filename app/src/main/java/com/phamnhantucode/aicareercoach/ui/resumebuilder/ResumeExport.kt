@@ -55,6 +55,9 @@ object ResumeFormatter {
         val contactParts = buildContactLine(resume.personalInfo)
         if (contactParts.isNotEmpty()) {
             appendLine("## <div align=\"center\">${resume.personalInfo.fullName.ifBlank { "Professional Resume" }}</div>")
+            if (resume.personalInfo.profession.isNotBlank()) {
+                appendLine("<div align=\"center\">${resume.personalInfo.profession}</div>")
+            }
             appendLine()
             appendLine("<div align=\"center\">")
             appendLine()
@@ -281,13 +284,21 @@ object ResumeFormatter {
         var github = ""
         var portfolio = ""
         var location = ""
+        var profession = ""
 
         // Find name in header (## <div align="center">Name</div>)
         for (i in startFrom until lines.size) {
             val line = lines[i].trim()
             if (line.startsWith("## <div")) {
                 fullName = line.replace(Regex("<[^>]*>"), "").replace("##", "").trim()
-                break
+            } else if (line.startsWith("<div align=\"center\">") && !line.contains("📧")) {
+                 // Check if it's profession (simple text inside div, not contact info container which usually has multiple lines or specific markers)
+                 // However, contact info block start is also <div align="center"> but typically followed by empty line or contact content
+                 // Simplified check: if fullName is found, and this line follows, and doesn't have emojis
+                 val content = line.replace(Regex("<[^>]*>"), "").trim()
+                 if (content.isNotBlank()) {
+                     profession = content
+                 }
             } else if (line.startsWith("##")) {
                 // If we hit another section header, stop
                 break
@@ -326,7 +337,8 @@ object ResumeFormatter {
             location = location,
             linkedIn = linkedIn,
             github = github,
-            portfolio = portfolio
+            portfolio = portfolio,
+            profession = profession
         )
     }
 
@@ -733,6 +745,9 @@ object ResumeFormatter {
             // Header
             append("<div class='header'>")
             append("<h1>${resume.personalInfo.fullName.ifBlank { "Professional Resume" }}</h1>")
+            if (resume.personalInfo.profession.isNotBlank()) {
+                append("<p style='font-size: 16px; margin-bottom: 8px; font-weight: 500;'>${resume.personalInfo.profession}</p>")
+            }
             
             val contactParts = buildContactLine(resume.personalInfo)
             if (contactParts.isNotEmpty()) {

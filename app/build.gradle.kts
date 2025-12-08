@@ -130,6 +130,9 @@ dependencies {
     // Reorderable LazyColumn for drag-drop reordering (local module)
     implementation(project(":reorderable"))
 
+    // Color picker library
+    implementation(project(":colorpicker"))
+
     // Vosk offline speech recognition
     implementation("com.alphacephei:vosk-android:0.3.47")
 }

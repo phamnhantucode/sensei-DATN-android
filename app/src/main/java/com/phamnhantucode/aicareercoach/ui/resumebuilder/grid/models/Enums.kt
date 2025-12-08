@@ -35,6 +35,7 @@ enum class ElementType {
 enum class UserInfoTag {
     NONE,                 // No tag - regular element
     NAME,                 // Full name
+    PROFESSION,           // Profession / Job Title
     EMAIL,                // Email address
     PHONE,                // Phone number
     LOCATION,             // Location/address
@@ -113,6 +114,11 @@ enum class ContactDisplayStyle {
 enum class ContactOrientation {
     VERTICAL,   // Stacked
     HORIZONTAL  // Side by side
+}
+
+enum class DividerOrientation {
+    HORIZONTAL,  // Default: fills width, fixed height
+    VERTICAL     // New: fills height, fixed width
 }
 
 enum class HorizontalAlignment {

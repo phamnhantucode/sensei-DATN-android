@@ -209,6 +209,16 @@ private fun ThemedPersonalInfoSection(info: PersonalInfo, theme: ResumeTheme) {
             fontWeight = FontWeight(theme.typography.headerWeight)
         )
 
+        // Profession
+        if (info.profession.isNotBlank()) {
+            ThemedText(
+                text = info.profession.uppercase(),
+                color = textColor,
+                fontSize = theme.typography.subHeaderSize.sp,
+                fontWeight = FontWeight(theme.typography.headerWeight)
+            )
+        }
+
         // Contact Info
         ThemedText(
             text = "${info.email} • ${info.phone}",

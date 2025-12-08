@@ -402,10 +402,21 @@ fun DraggableElement(
 
         // Properties button (rendered last, on top of everything)
         if (isSelected && !element.locked) {
-            FloatingToolbar(
-                onOpenProperties = { onOpenProperties(element) },
-                onDelete = { onDelete(element) }
-            )
+            val popupOffsetY = with(LocalDensity.current) { (-36).dp.roundToPx() }
+            
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopCenter,
+                offset = IntOffset(0, popupOffsetY),
+                properties = androidx.compose.ui.window.PopupProperties(
+                    focusable = false,
+                    clippingEnabled = false
+                )
+            ) {
+                FloatingToolbar(
+                    onOpenProperties = { onOpenProperties(element) },
+                    onDelete = { onDelete(element) }
+                )
+            }
         }
     }
 }
@@ -654,17 +665,14 @@ private fun BoxScope.TemplateTagIndicator(tag: UserInfoTag) {
  * Floating toolbar with Settings and Delete buttons
  */
 @Composable
-private fun BoxScope.FloatingToolbar(
+private fun FloatingToolbar(
     onOpenProperties: () -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
         modifier = Modifier
-            .wrapContentSize(unbounded = true)
-            .align(Alignment.TopCenter)
-            .offset(y = (-36).dp) // Float above the element
-            .height(32.dp)
-            .zIndex(200f), // Ensure it's above everything
+            // Removed offset and unbounded wrapContentSize as they are handled by Popup
+            .height(32.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color(0xFFFFC107), // Amber/Yellow color
         shadowElevation = 4.dp

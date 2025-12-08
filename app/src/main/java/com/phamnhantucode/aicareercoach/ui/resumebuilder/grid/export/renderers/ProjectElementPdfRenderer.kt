@@ -194,6 +194,15 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
         var currentY = y
         var partCount = 0
 
+        // Helper to render technologies
+        val renderTechnologiesBlock = {
+            if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                if (partCount > 0) currentY += itemSpacing
+                currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
+                partCount++
+            }
+        }
+
         // Project name and date on same row
         if (item.name.isNotEmpty()) {
             val dateText = if (element.showDates) formatDateRange(item, element) else ""
@@ -222,11 +231,9 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             partCount++
         }
 
-        // Technologies
-        if (element.showTechnologies && item.technologies.isNotEmpty()) {
-            if (partCount > 0) currentY += itemSpacing
-            currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
-            partCount++
+        // Technologies (if placement is BELOW_TITLE)
+        if (element.technologiesPlacement == TechnologiesPlacement.BELOW_TITLE || element.technologiesPlacement == null) {
+            renderTechnologiesBlock()
         }
 
         // Description
@@ -247,6 +254,11 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             
             currentY += descLayout.height.toFloat()
             partCount++
+        }
+        
+        // Technologies (if placement is BELOW_DESCRIPTION)
+        if (element.technologiesPlacement == TechnologiesPlacement.BELOW_DESCRIPTION) {
+            renderTechnologiesBlock()
         }
 
         // Link
@@ -326,7 +338,7 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             partCount++
         }
 
-        // Technologies
+        // Technologies (inline) - Compact style keeps technologies below date/inline
         if (element.showTechnologies && item.technologies.isNotEmpty()) {
             if (partCount > 0) currentY += itemSpacing
             currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
@@ -354,6 +366,15 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
     ): Float {
         var currentY = y
         var partCount = 0
+        
+        // Helper to render technologies
+        val renderTechnologiesBlock = {
+            if (element.showTechnologies && item.technologies.isNotEmpty()) {
+                if (partCount > 0) currentY += itemSpacing
+                currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
+                partCount++
+            }
+        }
 
         // Project name
         if (item.name.isNotEmpty()) {
@@ -389,11 +410,28 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             }
         }
 
-        // Technologies
-        if (element.showTechnologies && item.technologies.isNotEmpty()) {
+        // Link
+        if (element.showLink && item.link.isNotEmpty()) {
+            val linkLayout = android.text.StaticLayout.Builder
+                .obtain(item.link, 0, item.link.length, linkPaint, width.toInt().coerceAtLeast(1))
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1f)
+                .setIncludePad(false)
+                .build()
+            
             if (partCount > 0) currentY += itemSpacing
-            currentY += renderTechnologies(canvas, item, element, x, currentY, width, technologyPaint, mapper, context)
+            canvas.save()
+            canvas.translate(x, currentY)
+            linkLayout.draw(canvas)
+            canvas.restore()
+            
+            currentY += linkLayout.height.toFloat()
             partCount++
+        }
+        
+        // Technologies (if placement is BELOW_TITLE)
+        if (element.technologiesPlacement == TechnologiesPlacement.BELOW_TITLE || element.technologiesPlacement == null) {
+            renderTechnologiesBlock()
         }
 
         // Description
@@ -415,31 +453,17 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
             currentY += descLayout.height.toFloat()
             partCount++
         }
+        
+        // Technologies (if placement is BELOW_DESCRIPTION)
+        if (element.technologiesPlacement == TechnologiesPlacement.BELOW_DESCRIPTION) {
+            renderTechnologiesBlock()
+        }
 
         // Highlights
         if (item.highlights.isNotEmpty()) {
             if (partCount > 0) currentY += itemSpacing
             currentY += renderHighlights(canvas, item, element, x, currentY, width, highlightPaint, itemSpacing, mapper)
             partCount++
-        }
-
-        // Link
-        if (element.showLink && item.link.isNotEmpty()) {
-            if (partCount > 0) currentY += itemSpacing
-            
-            val linkLayout = android.text.StaticLayout.Builder
-                .obtain(item.link, 0, item.link.length, linkPaint, width.toInt().coerceAtLeast(1))
-                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(0f, 1f)
-                .setIncludePad(false)
-                .build()
-            
-            canvas.save()
-            canvas.translate(x, currentY)
-            linkLayout.draw(canvas)
-            canvas.restore()
-            
-            currentY += linkLayout.height.toFloat()
         }
 
         return currentY - y
@@ -709,6 +733,17 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
                         }
                     }
                     
+                    if (element.showLink && item.link.isNotEmpty()) {
+                        val linkLayout = android.text.StaticLayout.Builder
+                            .obtain(item.link, 0, item.link.length, linkPaint, bounds.width().toInt().coerceAtLeast(1))
+                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                            .setLineSpacing(0f, 1f)
+                            .setIncludePad(false)
+                            .build()
+                        itemHeight += linkLayout.height.toFloat()
+                        partCount++
+                    }
+                    
                     if (element.showTechnologies && item.technologies.isNotEmpty()) {
                         val technologies = item.technologies.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                         val verticalPadding = mapper.borderWidthToPdfPoints(6f)
@@ -753,17 +788,6 @@ class ProjectElementPdfRenderer : ElementPdfRenderer<ResumeElement.ProjectElemen
                         }
                         
                         if (item.highlights.isNotEmpty()) partCount++
-                    }
-                    
-                    if (element.showLink && item.link.isNotEmpty()) {
-                        val linkLayout = android.text.StaticLayout.Builder
-                            .obtain(item.link, 0, item.link.length, linkPaint, bounds.width().toInt().coerceAtLeast(1))
-                            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
-                            .setLineSpacing(0f, 1f)
-                            .setIncludePad(false)
-                            .build()
-                        itemHeight += linkLayout.height.toFloat()
-                        partCount++
                     }
                     
                     if (partCount > 1) {

@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "AICareerCoach"
 include(":app")
 include(":reorderable")
+include(":colorpicker")

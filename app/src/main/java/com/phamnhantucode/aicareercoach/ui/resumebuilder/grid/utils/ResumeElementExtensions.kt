@@ -27,7 +27,7 @@ fun ResumeElement.update(
         is ResumeElement.WorkExperienceElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
         is ResumeElement.EducationElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
         is ResumeElement.SkillElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
-        is ResumeElement.ProjectElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
+        is ResumeElement.ProjectElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible, technologiesPlacement = this.technologiesPlacement)
         is ResumeElement.CertificationElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
         is ResumeElement.LanguageElement -> copy(position = position, style = style, zIndex = zIndex, locked = locked, isVisible = isVisible)
     }

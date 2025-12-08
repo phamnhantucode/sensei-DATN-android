@@ -140,18 +140,7 @@ object NeonResumeService {
     ) {
         try {
             val personalInfo = resume.personalInfo
-            val payload = JSONObject().apply {
-                put("id", java.util.UUID.randomUUID().toString())
-                put("resumeId", resume.id)
-                put("fullName", personalInfo.fullName)
-                put("email", personalInfo.email)
-                put("phone", personalInfo.phone)
-                put("location", personalInfo.location)
-                put("linkedin", personalInfo.linkedIn)
-                put("website", personalInfo.portfolio)
-                put("image", personalInfo.avatar)
-                put("profession", "") // App doesn't have this
-            }
+            val payload = NeonResumeMapper.toNeonPersonalInfoPayload(resume.id, resume.personalInfo)
 
             val request = Request.Builder()
                 .url("$apiUrl/ResumePersonalInfo")
@@ -183,15 +172,7 @@ object NeonResumeService {
         var successCount = 0
         resume.education.forEach { edu ->
             try {
-                val payload = JSONObject().apply {
-                    put("id", edu.id)
-                    put("resumeId", resume.id)
-                    put("degree", edu.degree)
-                    put("institution", edu.institution)
-                    put("field", "") // Extract from degree if needed
-                    put("graduationDate", edu.endDate?.toString() ?: "")
-                    put("gpa", edu.gpa)
-                }
+                val payload = NeonResumeMapper.toNeonEducationPayload(resume.id, edu)
 
                 val request = Request.Builder()
                     .url("$apiUrl/ResumeEducation")
@@ -225,16 +206,7 @@ object NeonResumeService {
         var successCount = 0
         resume.workExperiences.forEach { exp ->
             try {
-                val payload = JSONObject().apply {
-                    put("id", exp.id)
-                    put("resumeId", resume.id)
-                    put("title", exp.jobTitle)
-                    put("organization", exp.company)
-                    put("description", exp.responsibilities.joinToString("\n• ", prefix = "• "))
-                    put("startDate", exp.startDate?.toString() ?: "")
-                    put("endDate", exp.endDate?.toString() ?: "")
-                    put("isCurrent", exp.isCurrentRole)
-                }
+                val payload = NeonResumeMapper.toNeonExperiencePayload(resume.id, exp)
 
                 val request = Request.Builder()
                     .url("$apiUrl/ResumeExperience")
@@ -268,13 +240,7 @@ object NeonResumeService {
         var successCount = 0
         resume.projects.forEach { project ->
             try {
-                val payload = JSONObject().apply {
-                    put("id", project.id)
-                    put("resumeId", resume.id)
-                    put("name", project.title)
-                    put("description", project.description)
-                    put("type", project.technologies.firstOrNull() ?: "Other")
-                }
+                val payload = NeonResumeMapper.toNeonProjectPayload(resume.id, project)
 
                 val request = Request.Builder()
                     .url("$apiUrl/ResumeProject")
@@ -283,6 +249,8 @@ object NeonResumeService {
                     .addHeader("Prefer", "return=minimal")
                     .post(payload.toString().toRequestBody(jsonMediaType))
                     .build()
+                    
+                Log.d(TAG, "[NeonSync] [$operationId] Saving project payload: $payload")
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
@@ -373,6 +341,8 @@ object NeonResumeService {
                 .addHeader("Authorization", authorizationHeader)
                 .delete()
                 .build()
+            
+            Log.d(TAG, "[NeonSync] [$operationId] Deleting from $table: ${request.url}")
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful && response.code != 404) {
@@ -399,9 +369,14 @@ object NeonResumeService {
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val encodedId = URLEncoder.encode(resumeId, UTF_8.name())
-
+            
+            // Use PostgREST embedding to fetch related tables in one go
+            // Query: select=*,ResumePersonalInfo(*),ResumeEducation(*),ResumeExperience(*),ResumeProject(*)
+            // Note: URL encoding is handled by OkHttp but for query params we need to be careful
+            val selectQuery = "*,ResumePersonalInfo(*),ResumeEducation(*),ResumeExperience(*),ResumeProject(*)"
+            
             val request = Request.Builder()
-                .url("$apiUrl/Resume?id=eq.$encodedId&limit=1")
+                .url("$apiUrl/Resume?id=eq.$encodedId&select=$selectQuery&limit=1")
                 .addHeader("Authorization", authorizationHeader)
                 .get()
                 .build()
@@ -423,7 +398,7 @@ object NeonResumeService {
 
                 val json = results.getJSONObject(0)
                 
-                // Use mapper to parse Neon row to Resume
+                // Use mapper to parse Neon row to Resume (including raw embedded data)
                 val resume = NeonResumeMapper.fromNeonResumeRow(json)
 
                 Log.d(TAG, "[NeonSync] [$operationId] Successfully retrieved resume")
@@ -451,8 +426,11 @@ object NeonResumeService {
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val encodedUserId = URLEncoder.encode(userId, UTF_8.name())
 
+            // Use PostgREST embedding to fetch related tables
+            val selectQuery = "*,ResumePersonalInfo(*),ResumeEducation(*),ResumeExperience(*),ResumeProject(*)"
+
             val request = Request.Builder()
-                .url("$apiUrl/Resume?userId=eq.$encodedUserId&order=updatedAt.desc")
+                .url("$apiUrl/Resume?userId=eq.$encodedUserId&select=$selectQuery&order=updatedAt.desc")
                 .addHeader("Authorization", authorizationHeader)
                 .get()
                 .build()

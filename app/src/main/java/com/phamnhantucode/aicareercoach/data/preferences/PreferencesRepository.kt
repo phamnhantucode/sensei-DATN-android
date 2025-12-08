@@ -44,7 +44,7 @@ class PreferencesRepository(private val context: Context) {
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data
         .map { preferences ->
-            val value = preferences[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name
+            val value = preferences[THEME_MODE_KEY] ?: ThemeMode.DARK.name
             ThemeMode.fromString(value)
         }
 

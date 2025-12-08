@@ -373,8 +373,9 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                 
                 if (svg != null) {
                     // Render SVG icon
+                    val tintColor = if (element.iconColor != null) element.iconColor else element.textStyle.color
                     val iconColor = context.colorConverter.toIntColorWithOpacity(
-                        element.textStyle.color,
+                        tintColor,
                         element.style.opacity
                     )
                     
@@ -392,9 +393,10 @@ class ContactElementPdfRenderer : ElementPdfRenderer<ResumeElement.ContactElemen
                     canvas.restore()
                 } else {
                     // Fallback: Draw placeholder circle
+                    val tintColor = if (element.iconColor != null) element.iconColor else element.textStyle.color
                     val iconPaint = Paint().apply {
                         color = context.colorConverter.toIntColorWithOpacity(
-                            element.textStyle.color,
+                            tintColor,
                             element.style.opacity
                         )
                         style = Paint.Style.STROKE

@@ -6,6 +6,11 @@ import java.util.UUID
 /**
  * Base class for all resume elements
  */
+enum class TechnologiesPlacement {
+    BELOW_TITLE,
+    BELOW_DESCRIPTION
+}
+
 sealed class ResumeElement {
     abstract val id: String
     abstract val position: GridPosition
@@ -68,6 +73,7 @@ sealed class ResumeElement {
         val cornerRadius: Float = 0f,
         val customHeightDp: Float? = null, // Custom height for dividers (overrides rowSpan)
         val customWidthDp: Float? = null,  // Custom width if needed
+        val orientation: DividerOrientation = DividerOrientation.HORIZONTAL,
         val padding: Padding? = Padding(0f, 0f, 0f, 0f)
     ) : ResumeElement()
 
@@ -145,6 +151,7 @@ sealed class ResumeElement {
         val iconSize: Float = 16f, // Size of icons in dp
         val horizontalAlignment: HorizontalAlignment? = HorizontalAlignment.START,
         val verticalAlignment: VerticalAlignment? = VerticalAlignment.CENTER,
+        val iconColor: Long? = null, // Custom icon color (null = use text color)
         val padding: Padding? = Padding(8f, 8f, 8f, 8f)
     ) : ResumeElement()
 
@@ -199,6 +206,7 @@ sealed class ResumeElement {
         val showLocation: Boolean = true,
         val showDates: Boolean = true,
         val showGPA: Boolean = true,
+        val isDateOnNewLine: Boolean = false,
         val spacing: Float = 16f, // dp between education entries
         val itemSpacing: Float = 4f, // dp between fields within an entry
         val achievementSpacing: Float = 4f, // dp between achievement bullets
@@ -289,6 +297,7 @@ sealed class ResumeElement {
         val dateFormat: DateFormat = DateFormat.MMM_YYYY,
         val dateSeparator: String = " - ",
         val bulletStyle: BulletStyle = BulletStyle.DISC,
+        val technologiesPlacement: TechnologiesPlacement? = TechnologiesPlacement.BELOW_TITLE,
         // Technology tag styling
         val technologyTagBackgroundColor: Long? = 0xFFE3F2FD,
         val technologyTagBorderColor: Long? = null,

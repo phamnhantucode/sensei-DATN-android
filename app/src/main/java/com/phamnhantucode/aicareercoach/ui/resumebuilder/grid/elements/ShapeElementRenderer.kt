@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.DividerOrientation
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.Padding
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ShapeType
@@ -48,10 +50,27 @@ fun ShapeElementRenderer(
             .then(
                 when (element.shapeType) {
                     ShapeType.LINE, ShapeType.DIVIDER -> {
-                        // Lines and dividers should only fill width
-                        // If no custom height is set, default to 2dp
-                        val height = element.customHeightDp?.dp ?: 2.dp
-                        Modifier.fillMaxWidth().height(height)
+                        // Lines and dividers support both horizontal and vertical orientation
+                        when (element.orientation) {
+                            DividerOrientation.HORIZONTAL -> {
+                                // Horizontal: customHeightDp = thickness, customWidthDp = width (or fill if null)
+                                val thickness = element.customHeightDp?.dp ?: 2.dp
+                                if (element.customWidthDp != null) {
+                                    Modifier.width(element.customWidthDp.dp).height(thickness)
+                                } else {
+                                    Modifier.fillMaxWidth().height(thickness)
+                                }
+                            }
+                            DividerOrientation.VERTICAL -> {
+                                // Vertical: customWidthDp = thickness, customHeightDp = height (or fill if null)
+                                val thickness = element.customWidthDp?.dp ?: 2.dp
+                                if (element.customHeightDp != null) {
+                                    Modifier.width(thickness).height(element.customHeightDp.dp)
+                                } else {
+                                    Modifier.fillMaxHeight().width(thickness)
+                                }
+                            }
+                        }
                     }
                     ShapeType.CIRCLE -> {
                         // Circles should maintain 1:1 aspect ratio

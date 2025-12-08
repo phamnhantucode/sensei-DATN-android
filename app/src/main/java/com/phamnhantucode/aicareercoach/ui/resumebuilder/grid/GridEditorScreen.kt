@@ -445,7 +445,8 @@ fun GridEditorScreen(
                                 },
                                 onUpdateContainerLayoutMode = { container, mode ->
                                     viewModel.updateContainerLayoutMode(container, mode)
-                                }
+                                },
+                                gridConfig = gridResume.gridConfig
                             )
                         }
                     }

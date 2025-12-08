@@ -68,8 +68,8 @@ class ThumbnailUploadManager private constructor(private val context: Context) {
             Log.d(TAG, "Uploading thumbnail for resume: $resumeId (base64 length: ${base64Thumbnail.length})")
             _uploadState.value = ThumbnailUploadState.Uploading(resumeId)
 
-            // Generate a unique filename
-            val fileName = "resume_thumb_${resumeId.take(8)}_${System.currentTimeMillis()}"
+            // Generate a unique filename (stable for this resume to overwrite previous versions)
+            val fileName = "resume_thumb_$resumeId"
 
             // Upload to Cloudinary
             val uploadResult = CloudinaryUploadService.uploadBase64Image(base64Thumbnail, fileName)

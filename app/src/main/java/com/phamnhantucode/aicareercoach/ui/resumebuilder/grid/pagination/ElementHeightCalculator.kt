@@ -226,58 +226,7 @@ class ElementHeightCalculator(
         }
     }
     
-    private fun calculateSingleEducationItemHeight(
-        item: EducationItem,
-        element: ResumeElement.EducationElement,
-        contentWidthDp: Float
-    ): Float {
-        var height = 0f
-        
-        // Degree
-        setupTextPaint(element.degreeStyle)
-        height += measureTextHeight(item.degree, contentWidthDp)
-        height += element.itemSpacing
-        
-        // Institution
-        setupTextPaint(element.institutionStyle)
-        height += measureTextHeight(item.institution, contentWidthDp)
-        height += element.itemSpacing
-        
-        // Date
-        if (element.showDates) {
-            setupTextPaint(element.dateStyle)
-            val dateText = buildDateText(item.startDate, item.endDate, false, element.dateSeparator)
-            height += measureTextHeight(dateText, contentWidthDp)
-            height += element.itemSpacing
-        }
-        
-        // Location
-        if (element.showLocation && item.location.isNotEmpty()) {
-            setupTextPaint(element.locationStyle)
-            height += measureTextHeight(item.location, contentWidthDp)
-            height += element.itemSpacing
-        }
-        
-        // GPA
-        if (element.showGPA && item.gpa.isNotEmpty()) {
-            setupTextPaint(element.gpaStyle)
-            height += measureTextHeight("GPA: ${item.gpa}", contentWidthDp)
-            height += element.itemSpacing
-        }
-        
-        // Achievements
-        item.achievements.forEachIndexed { index, achievement ->
-            setupTextPaint(element.achievementStyle)
-            val bulletWidth = 16f
-            height += measureTextHeight(achievement.text, contentWidthDp - bulletWidth)
-            
-            if (index < item.achievements.size - 1) {
-                height += element.achievementSpacing
-            }
-        }
-        
-        return height
-    }
+
     
     /**
      * Calculate height for skill element
@@ -728,7 +677,317 @@ class ElementHeightCalculator(
         
         return layout.height / context.resources.displayMetrics.density
     }
-    
+
+    private fun measureTextWidth(text: String): Float {
+        if (text.isBlank()) return 0f
+        return textPaint.measureText(text) / context.resources.displayMetrics.density
+    }
+
+    private fun calculateSingleEducationItemHeight(
+        item: EducationItem,
+        element: ResumeElement.EducationElement,
+        contentWidthDp: Float
+    ): Float {
+        return when (element.displayStyle) {
+            EducationDisplayStyle.STANDARD -> calculateStandardEducationItemHeight(item, element, contentWidthDp)
+            EducationDisplayStyle.COMPACT -> calculateCompactEducationItemHeight(item, element, contentWidthDp)
+            EducationDisplayStyle.DETAILED -> calculateDetailedEducationItemHeight(item, element, contentWidthDp)
+        }
+    }
+
+    private fun calculateStandardEducationItemHeight(
+        item: EducationItem,
+        element: ResumeElement.EducationElement,
+        contentWidthDp: Float
+    ): Float {
+        var height = 0f
+
+        // Degree
+        if (item.degree.isNotEmpty()) {
+            setupTextPaint(element.degreeStyle)
+            height += measureTextHeight(item.degree, contentWidthDp)
+        }
+        
+        // Institution and Date
+        var institutionHeight = 0f
+        var dateHeight = 0f
+        
+        // Calculate date text and width first if needed
+        val showDate = element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())
+        var dateText = ""
+        var dateWidth = 0f
+        
+        if (showDate) {
+            setupTextPaint(element.dateStyle)
+            dateText = buildDateText(item.startDate, item.endDate, false, element.dateSeparator)
+            if (dateText.isNotEmpty()) {
+                dateWidth = measureTextWidth(dateText)
+            }
+        }
+
+        if (element.isDateOnNewLine) {
+            // New line layout: Institution then Date VERTICALLY
+            if (item.institution.isNotEmpty()) {
+                // Add spacing if we had degree above
+                if (height > 0) height += element.itemSpacing
+                
+                setupTextPaint(element.institutionStyle)
+                height += measureTextHeight(item.institution, contentWidthDp)
+            }
+            
+            if (showDate && dateText.isNotEmpty()) {
+                // Add spacing if we had content above
+                if (height > 0) height += element.itemSpacing
+                
+                setupTextPaint(element.dateStyle)
+                height += measureTextHeight(dateText, contentWidthDp)
+            }
+        } else {
+            // Standard layout: Institution and Date on SAME line
+            // Row layout: [Institution ......... Date]
+            
+            // Add spacing if we had degree above
+            if (height > 0 && (item.institution.isNotEmpty() || (showDate && dateText.isNotEmpty()))) {
+                height += element.itemSpacing
+            }
+            
+            if (showDate && dateText.isNotEmpty()) {
+                setupTextPaint(element.dateStyle)
+                // Date takes exactly its needed width, capped at some check? 
+                // Usually date is short, but let's measure it.
+                // It's in a Row, so it affects available width for Institution
+                
+                // Measure date height (it might wrap if very narrow, but unlikely for date)
+                dateHeight = measureTextHeight(dateText, contentWidthDp) // Just in case it takes full width if single
+            }
+            
+            if (item.institution.isNotEmpty()) {
+                setupTextPaint(element.institutionStyle)
+                // Available width for institution is contentWidth - dateWidth - spacing
+                // (Using 8dp as a safe gap approximation or 0 if tight)
+                // The Renderer uses SpaceBetween.
+                
+                val availableForInstitution = if (showDate && dateText.isNotEmpty()) {
+                    contentWidthDp - dateWidth - 8f // minimal gap
+                } else {
+                    contentWidthDp
+                }
+                
+                institutionHeight = measureTextHeight(item.institution, availableForInstitution.coerceAtLeast(0f))
+            }
+            
+            // The row height is the max of the two
+            height += maxOf(institutionHeight, dateHeight)
+        }
+
+        // Location
+        if (element.showLocation && item.location.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            setupTextPaint(element.locationStyle)
+            height += measureTextHeight(item.location, contentWidthDp)
+        }
+
+        // GPA
+        if (element.showGPA && item.gpa.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            setupTextPaint(element.gpaStyle)
+            height += measureTextHeight("GPA: ${item.gpa}", contentWidthDp)
+        }
+
+        // Achievements
+        if (item.achievements.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            item.achievements.forEachIndexed { index, achievement ->
+                setupTextPaint(element.achievementStyle)
+                val bulletWidth = 16f
+                height += measureTextHeight(achievement.text, contentWidthDp - bulletWidth)
+
+                if (index < item.achievements.size - 1) {
+                    height += element.achievementSpacing
+                }
+            }
+        }
+
+        return height
+    }
+
+    private fun calculateCompactEducationItemHeight(
+        item: EducationItem,
+        element: ResumeElement.EducationElement,
+        contentWidthDp: Float
+    ): Float {
+        var height = 0f
+
+        // Row: [ Degree , Institution ......... Date ]
+        
+        var dateText = ""
+        var dateWidth = 0f
+        var dateHeight = 0f
+        val showDate = element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())
+        
+        if (showDate) {
+            setupTextPaint(element.dateStyle)
+            dateText = buildDateText(item.startDate, item.endDate, false, element.dateSeparator)
+            if (dateText.isNotEmpty()) {
+                dateWidth = measureTextWidth(dateText)
+                dateHeight = measureTextHeight(dateText, contentWidthDp)
+            }
+        }
+        
+        // Construct Degree + Institution string
+        // Note: Different styles might be used for Degree and Institution in renderer, 
+        // but COMPACT usually implies they share a line. 
+        // Renderer: buildString { append(degree); append(", "); append(institution) }
+        // Renderer uses `element.degreeStyle` for the hole combined string.
+        
+        val degreeInstitution = buildString {
+            if (item.degree.isNotEmpty()) append(item.degree)
+            if (item.degree.isNotEmpty() && item.institution.isNotEmpty()) append(", ")
+            if (item.institution.isNotEmpty()) append(item.institution)
+        }
+        
+        var mainTextHeight = 0f
+        if (degreeInstitution.isNotEmpty()) {
+            setupTextPaint(element.degreeStyle)
+             val availableForMain = if (showDate && dateText.isNotEmpty()) {
+                contentWidthDp - dateWidth - 8f
+            } else {
+                contentWidthDp
+            }
+            mainTextHeight = measureTextHeight(degreeInstitution, availableForMain.coerceAtLeast(0f))
+        }
+        
+        height += maxOf(mainTextHeight, dateHeight)
+
+        // Location & GPA Row
+        // Row: [ Location ......... GPA ]
+        var secondaryRowHeight = 0f
+        var gpaHeight = 0f
+        var gpaWidth = 0f
+        var locationHeight = 0f
+        
+        val showGpa = element.showGPA && item.gpa.isNotEmpty()
+        if (showGpa) {
+            setupTextPaint(element.gpaStyle)
+            val gpaText = "GPA: ${item.gpa}"
+            gpaWidth = measureTextWidth(gpaText)
+            gpaHeight = measureTextHeight(gpaText, contentWidthDp)
+        }
+        
+        val showLocation = element.showLocation && item.location.isNotEmpty()
+        if (showLocation) {
+            setupTextPaint(element.locationStyle)
+             val availableForLocation = if (showGpa) {
+                contentWidthDp - gpaWidth - 8f
+            } else {
+                contentWidthDp
+            }
+            locationHeight = measureTextHeight(item.location, availableForLocation.coerceAtLeast(0f))
+        }
+        
+        secondaryRowHeight = maxOf(locationHeight, gpaHeight)
+        
+        if (secondaryRowHeight > 0) {
+            if (height > 0) height += element.itemSpacing
+            height += secondaryRowHeight
+        }
+
+        // Achievements
+        if (item.achievements.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            item.achievements.forEachIndexed { index, achievement ->
+                setupTextPaint(element.achievementStyle)
+                val bulletWidth = 16f
+                height += measureTextHeight(achievement.text, contentWidthDp - bulletWidth)
+
+                if (index < item.achievements.size - 1) {
+                    height += element.achievementSpacing
+                }
+            }
+        }
+        
+        return height
+    }
+
+    private fun calculateDetailedEducationItemHeight(
+        item: EducationItem,
+        element: ResumeElement.EducationElement,
+        contentWidthDp: Float
+    ): Float {
+        var height = 0f
+
+        // Degree
+        if (item.degree.isNotEmpty()) {
+            setupTextPaint(element.degreeStyle)
+            height += measureTextHeight(item.degree, contentWidthDp)
+        }
+
+        // Institution
+        if (item.institution.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            setupTextPaint(element.institutionStyle)
+            height += measureTextHeight(item.institution, contentWidthDp)
+        }
+
+        // Location and Dates Row
+        // Row: [ Location ......... Date ]
+        var rowHeight = 0f
+        var dateWidth = 0f
+        var dateHeight = 0f
+        
+        val showDate = element.showDates && (item.startDate.isNotEmpty() || item.endDate.isNotEmpty())
+         if (showDate) {
+            setupTextPaint(element.dateStyle)
+            val dateText = buildDateText(item.startDate, item.endDate, false, element.dateSeparator)
+            if (dateText.isNotEmpty()) {
+                dateWidth = measureTextWidth(dateText)
+                dateHeight = measureTextHeight(dateText, contentWidthDp)
+            }
+        }
+        
+        var locationHeight = 0f
+        val showLocation = element.showLocation && item.location.isNotEmpty()
+        if (showLocation) {
+            setupTextPaint(element.locationStyle)
+            val availableForLocation = if (showDate && dateWidth > 0) {
+                contentWidthDp - dateWidth - 8f
+            } else {
+                contentWidthDp
+            }
+            locationHeight = measureTextHeight(item.location, availableForLocation.coerceAtLeast(0f))
+        }
+        
+        rowHeight = maxOf(locationHeight, dateHeight)
+        
+        if (rowHeight > 0) {
+            if (height > 0) height += element.itemSpacing
+            height += rowHeight
+        }
+
+        // GPA
+        if (element.showGPA && item.gpa.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            setupTextPaint(element.gpaStyle)
+            height += measureTextHeight("GPA: ${item.gpa}", contentWidthDp)
+        }
+
+        // Achievements
+        if (item.achievements.isNotEmpty()) {
+            if (height > 0) height += element.itemSpacing
+            item.achievements.forEachIndexed { index, achievement ->
+                setupTextPaint(element.achievementStyle)
+                val bulletWidth = 16f
+                height += measureTextHeight(achievement.text, contentWidthDp - bulletWidth)
+
+                if (index < item.achievements.size - 1) {
+                    height += element.achievementSpacing
+                }
+            }
+        }
+
+        return height
+    }
+
     private fun buildDateText(
         startDate: String,
         endDate: String,
