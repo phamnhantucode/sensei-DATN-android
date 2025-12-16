@@ -62,9 +62,6 @@ class InterviewPrepRepository(
         if (BuildConfig.NEON_API_URL.isBlank()) {
             throw IllegalStateException("Neon API URL is not configured.")
         }
-        if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-            throw IllegalStateException("Gemini API key is not configured.")
-        }
 
         var authHeader = resolveAuthorizationHeader(forceRefresh = forceRefreshAuth)
             ?: throw IllegalStateException("No Neon authentication method configured.")
@@ -845,69 +842,23 @@ class InterviewPrepRepository(
               }
             }
 
-            Requirements:
             - All JSON strings must escape quotes properly.
             - Return ONLY the JSON object without Markdown or commentary.
         """.trimIndent()
     }
 
-    private fun callGeminiForTips(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
-        val requestUrl =
-            HttpUrl.Builder()
-                .scheme("https")
-                .host(GEMINI_API_HOST)
-                .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
-                .build()
-
-        val payload = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put(
-                                "parts",
-                                JSONArray().apply {
-                                    put(JSONObject().apply { put("text", prompt) })
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-        }
-
-        val request =
-            Request.Builder()
-                .url(requestUrl)
-                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-                .addHeader("Content-Type", JSON_MEDIA_TYPE)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
-                .build()
-
-        val timeoutClient =
-            client.newBuilder()
-                .callTimeout(1, TimeUnit.MINUTES)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .build()
-
-        val rawText =
-            timeoutClient.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string()
-                    ?: throw IOException("Gemini returned an empty response.")
-                if (!response.isSuccessful) {
-                    throw IOException("Gemini request failed (${response.code}): $bodyString")
-                }
-                extractGeminiText(JSONObject(bodyString))
-                    ?: throw IOException("Gemini response did not include text content.")
-            }
+    private suspend fun callGeminiForTips(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
+        val messages = listOf(
+            com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(role = "user", content = prompt)
+        )
+        
+        val rawText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
 
         val cleaned = CODE_FENCE_REGEX.replace(rawText, "").trim()
         val json = try {
             JSONObject(cleaned)
         } catch (error: Exception) {
-            throw IOException("Gemini returned invalid JSON: ${error.message}\n$cleaned", error)
+            throw IOException("AI Service returned invalid JSON: ${error.message}\n$cleaned", error)
         }
 
         val practiceTips = json.optJSONArray("practiceTips").toTipSpecs()
@@ -924,63 +875,19 @@ class InterviewPrepRepository(
         return Pair(practiceTips, coachingNotes)
     }
 
-    private fun callGemini(prompt: String): GeminiInterviewBundle {
-        val requestUrl =
-            HttpUrl.Builder()
-                .scheme("https")
-                .host(GEMINI_API_HOST)
-                .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
-                .build()
+    private suspend fun callGemini(prompt: String): GeminiInterviewBundle {
+        val messages = listOf(
+            com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(role = "user", content = prompt)
+        )
 
-        val payload = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put(
-                                "parts",
-                                JSONArray().apply {
-                                    put(JSONObject().apply { put("text", prompt) })
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-        }
-
-        val request =
-            Request.Builder()
-                .url(requestUrl)
-                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-                .addHeader("Content-Type", JSON_MEDIA_TYPE)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
-                .build()
-
-        val timeoutClient =
-            client.newBuilder()
-                .callTimeout(6, TimeUnit.MINUTES)
-                .readTimeout(360, TimeUnit.SECONDS)
-                .writeTimeout(360, TimeUnit.SECONDS)
-                .build()
-
-        val rawText =
-            timeoutClient.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string()
-                    ?: throw IOException("Gemini returned an empty response.")
-                if (!response.isSuccessful) {
-                    throw IOException("Gemini request failed (${response.code}): $bodyString")
-                }
-                extractGeminiText(JSONObject(bodyString))
-                    ?: throw IOException("Gemini response did not include text content.")
-            }
+        // Increase timeout for batch generation if needed implicitly handled by OpenRouterService default or we can add param
+        val rawText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
 
         val cleaned = CODE_FENCE_REGEX.replace(rawText, "").trim()
         val json = try {
             JSONObject(cleaned)
         } catch (error: Exception) {
-            throw IOException("Gemini returned invalid JSON: ${error.message}\n$cleaned", error)
+            throw IOException("AI Service returned invalid JSON: ${error.message}\n$cleaned", error)
         }
 
         val quizQuestions = json.optJSONArray("quizQuestions").toQuestionSpecs()
@@ -1004,23 +911,12 @@ class InterviewPrepRepository(
         )
     }
 
-    private fun extractGeminiText(response: JSONObject): String? {
-        val candidates = response.optJSONArray("candidates") ?: return null
-        for (i in 0 until candidates.length()) {
-            val candidate = candidates.optJSONObject(i) ?: continue
-            val content = candidate.optJSONObject("content") ?: continue
-            val parts = content.optJSONArray("parts") ?: continue
-            val collected = buildString {
-                for (j in 0 until parts.length()) {
-                    val part = parts.optJSONObject(j) ?: continue
-                    val text = part.optString("text")
-                    if (!text.isNullOrBlank()) append(text)
-                }
-            }
-            if (collected.isNotBlank()) return collected
-        }
-        return null
-    }
+    // specific extractGeminiText is no longer needed as OpenRouterService handles it, 
+    // but we can leave it or remove it. It's safe to remove if unused.
+    // However, I will just remove the private method below via a separate chunk or let it be dead code for a moment if I don't select it.
+    // Actually, I'll remove it to be clean.
+
+
 
     private fun JSONArray?.toQuestionSpecs(): List<RepositoryQuestionSnapshot> {
         if (this == null || length() == 0) return emptyList()
@@ -1197,10 +1093,10 @@ class InterviewPrepRepository(
 
     companion object {
         private const val TAG = "InterviewPrepRepo"
-        private const val GEMINI_API_HOST = "generativelanguage.googleapis.com"
-        private const val GEMINI_MODEL_NAME = "gemini-2.5-flash"
         private const val JSON_MEDIA_TYPE = "application/json; charset=utf-8"
         private val CODE_FENCE_REGEX = Regex("```(?:json)?")
+
+        // Question pool configuration
 
         // Question pool configuration
         private const val MINIMUM_POOL_SIZE = 6 // Trigger batch generation when below this (30% of 20 = ~70-80% used)

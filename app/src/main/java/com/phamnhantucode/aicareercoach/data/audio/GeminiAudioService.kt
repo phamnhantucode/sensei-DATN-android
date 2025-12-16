@@ -172,64 +172,15 @@ IMPORTANT RULES:
         category: String,
     ): Result<FeedbackResult> = withContext(Dispatchers.IO) {
         try {
-            // Validate API key is configured
-            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-                Log.e(TAG, "GEMINI_API_KEY is not configured in local.properties")
-                return@withContext Result.failure(Exception("Gemini API key not configured"))
-            }
-
             val prompt = buildFeedbackPrompt(question, userAnswer, category)
 
-            val payload = JSONObject().apply {
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", prompt)
-                            })
-                        })
-                    })
-                })
-                put("generationConfig", JSONObject().apply {
-                    put("temperature", 0.7)
-                    put("maxOutputTokens", 2048)
-                })
-            }
+            val messages = listOf(
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            )
 
-            val requestUrl = HttpUrl.Builder()
-                .scheme("https")
-                .host(GEMINI_HOST)
-                .addPathSegments("v1beta/models/$GEMINI_MODEL:generateContent")
-                .build()
+            val feedbackText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
 
-            val request = Request.Builder()
-                .url(requestUrl)
-                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-                .addHeader("Content-Type", "application/json; charset=utf-8")
-                .post(payload.toString().toRequestBody())
-                .build()
-
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (!response.isSuccessful || responseBody == null) {
-                val errorDetails = buildString {
-                    append("Gemini API feedback request failed: ")
-                    append("HTTP ${response.code} ${response.message}")
-                    if (responseBody != null) {
-                        append(", Response: ${responseBody.take(500)}")
-                    } else {
-                        append(", Response body is null")
-                    }
-                }
-                Log.e(TAG, errorDetails)
-                return@withContext Result.failure(Exception("Failed to generate feedback: HTTP ${response.code}"))
-            }
-
-            val jsonResponse = JSONObject(responseBody)
-            val feedbackText = extractGeminiText(jsonResponse)
-
-            if (feedbackText.isNullOrBlank()) {
+            if (feedbackText.isBlank()) {
                 return@withContext Result.failure(Exception("No feedback found in response"))
             }
 
@@ -249,6 +200,77 @@ IMPORTANT RULES:
     }
 
     /**
+     * Generates feedback for all questions and answers at once.
+     * @param questionsAndAnswers List of triples containing (question, userAnswer, category)
+     * @return List of feedback results for each question
+     */
+    suspend fun generateBatchFeedback(
+        questionsAndAnswers: List<Triple<String, String, String>>
+    ): Result<List<FeedbackResult>> = withContext(Dispatchers.IO) {
+        try {
+            val prompt = buildBatchFeedbackPrompt(questionsAndAnswers)
+
+            val messages = listOf(
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            )
+
+            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+
+            if (response.isBlank()) {
+                return@withContext Result.failure(Exception("No feedback found in response"))
+            }
+
+            val feedbackList = parseBatchFeedbackResponse(response, questionsAndAnswers.size)
+            Log.d(TAG, "Generated feedback for ${feedbackList.size} questions")
+
+            Result.success(feedbackList)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error generating batch feedback", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Generates all interview questions at once for batch processing.
+     * @param category Question category
+     * @param questionCount Number of questions to generate
+     * @param userProfile Optional user profile info for personalization
+     * @return List of generated questions with correct answers
+     */
+    suspend fun generateAllQuestions(
+        category: String,
+        questionCount: Int,
+        userProfile: String? = null,
+    ): Result<List<QuestionResult>> = withContext(Dispatchers.IO) {
+        try {
+            val prompt = buildBatchQuestionPrompt(category, questionCount, userProfile)
+
+            val messages = listOf(
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            )
+
+            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+
+            if (response.isBlank()) {
+                return@withContext Result.failure(Exception("No questions found in response"))
+            }
+
+            val questions = parseBatchQuestionResponse(response)
+            if (questions.isEmpty()) {
+                return@withContext Result.failure(Exception("Failed to parse questions from response"))
+            }
+
+            Log.d(TAG, "Generated ${questions.size} questions for category: $category")
+            Result.success(questions)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error generating batch questions", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Generates the next interview question based on context.
      * @param category Question category
      * @param previousQuestions List of previously asked questions
@@ -261,64 +283,15 @@ IMPORTANT RULES:
         userProfile: String? = null,
     ): Result<QuestionResult> = withContext(Dispatchers.IO) {
         try {
-            // Validate API key is configured
-            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-                Log.e(TAG, "GEMINI_API_KEY is not configured in local.properties")
-                return@withContext Result.failure(Exception("Gemini API key not configured"))
-            }
-
             val prompt = buildQuestionPrompt(category, previousQuestions, userProfile)
 
-            val payload = JSONObject().apply {
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", prompt)
-                            })
-                        })
-                    })
-                })
-                put("generationConfig", JSONObject().apply {
-                    put("temperature", 0.8)
-                    put("maxOutputTokens", 1024)
-                })
-            }
+            val messages = listOf(
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            )
 
-            val requestUrl = HttpUrl.Builder()
-                .scheme("https")
-                .host(GEMINI_HOST)
-                .addPathSegments("v1beta/models/$GEMINI_MODEL:generateContent")
-                .build()
+            val questionText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
 
-            val request = Request.Builder()
-                .url(requestUrl)
-                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-                .addHeader("Content-Type", "application/json; charset=utf-8")
-                .post(payload.toString().toRequestBody())
-                .build()
-
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (!response.isSuccessful || responseBody == null) {
-                val errorDetails = buildString {
-                    append("Gemini API request failed: ")
-                    append("HTTP ${response.code} ${response.message}")
-                    if (responseBody != null) {
-                        append(", Response: ${responseBody.take(500)}")
-                    } else {
-                        append(", Response body is null")
-                    }
-                }
-                Log.e(TAG, errorDetails)
-                return@withContext Result.failure(Exception("Failed to generate question: HTTP ${response.code}"))
-            }
-
-            val jsonResponse = JSONObject(responseBody)
-            val questionText = extractGeminiText(jsonResponse)
-
-            if (questionText.isNullOrBlank()) {
+            if (questionText.isBlank()) {
                 return@withContext Result.failure(Exception("No question found in response"))
             }
 
@@ -409,6 +382,80 @@ IMPORTANT RULES:
         """.trimIndent()
     }
 
+    private fun buildBatchQuestionPrompt(
+        category: String,
+        questionCount: Int,
+        userProfile: String?,
+    ): String {
+        val profileContext = userProfile?.let { "\n\nCandidate Profile: $it" } ?: ""
+
+        return """
+            You are an expert interviewer conducting a live mock interview via voice.
+            Generate exactly $questionCount different $category interview questions for a complete interview session.
+            Each question should be answerable in 30-60 seconds.
+            $profileContext
+
+            IMPORTANT REQUIREMENTS:
+            - Each question must be unique and cover different aspects of $category skills
+            - Questions should be concise and focused on ONE specific point each
+            - Avoid multi-part questions or questions with multiple sub-questions
+            - The expected answers should be brief (2-4 key sentences each)
+            - Questions should be answerable without lengthy explanations
+            - For TECHNICAL questions: ask about different concepts/technologies
+            - For BEHAVIORAL questions: focus on different situations/examples
+            - For GENERAL questions: cover different interview aspects
+            - Create a progression from easier to more challenging questions
+
+            Format your response as:
+            QUESTION_1: [first interview question]
+            IDEAL_ANSWER_1: [2-4 key bullet points for a good answer]
+
+            QUESTION_2: [second interview question]
+            IDEAL_ANSWER_2: [2-4 key bullet points for a good answer]
+
+            ... and so on for all $questionCount questions.
+        """.trimIndent()
+    }
+
+    private fun buildBatchFeedbackPrompt(
+        questionsAndAnswers: List<Triple<String, String, String>>
+    ): String {
+        val questionsText = questionsAndAnswers.mapIndexed { index, (question, answer, category) ->
+            """
+            QUESTION_${index + 1} ($category):
+            Q: $question
+            A: $answer
+            """.trimIndent()
+        }.joinToString("\n\n")
+
+        return """
+            You are an expert interview coach evaluating a candidate's complete interview performance.
+            Analyze ALL the questions and answers together to provide comprehensive feedback.
+
+            INTERVIEW SESSION:
+            $questionsText
+
+            For EACH question, provide:
+            1. A rating from 1-10 (where 10 is excellent)
+            2. Specific, actionable feedback on the answer
+            3. Highlight strengths using **bold** for key points
+            4. Suggest improvements
+
+            Consider the overall interview performance and look for patterns across answers.
+
+            Format your response as:
+            FEEDBACK_1:
+            RATING: [number]
+            FEEDBACK: [detailed feedback for question 1]
+
+            FEEDBACK_2:
+            RATING: [number] 
+            FEEDBACK: [detailed feedback for question 2]
+
+            ... and so on for all questions.
+        """.trimIndent()
+    }
+
     private fun parseFeedbackResponse(feedbackText: String): FeedbackResult {
         val lines = feedbackText.lines()
         var rating = 5 // Default rating
@@ -454,6 +501,66 @@ IMPORTANT RULES:
         }
 
         return QuestionResult(question = question, idealAnswer = idealAnswer)
+    }
+
+    private fun parseBatchQuestionResponse(responseText: String): List<QuestionResult> {
+        val questions = mutableListOf<QuestionResult>()
+        val lines = responseText.lines()
+        
+        var currentQuestion = ""
+        var currentIdealAnswer = ""
+        var questionNumber = 1
+
+        lines.forEach { line ->
+            when {
+                line.startsWith("QUESTION_$questionNumber:", ignoreCase = true) -> {
+                    currentQuestion = line.substringAfter(":").trim()
+                }
+                line.startsWith("IDEAL_ANSWER_$questionNumber:", ignoreCase = true) -> {
+                    currentIdealAnswer = line.substringAfter(":").trim()
+                    
+                    // Add the completed question
+                    if (currentQuestion.isNotBlank()) {
+                        questions.add(QuestionResult(
+                            question = currentQuestion,
+                            idealAnswer = currentIdealAnswer
+                        ))
+                    }
+                    
+                    // Reset for next question
+                    currentQuestion = ""
+                    currentIdealAnswer = ""
+                    questionNumber++
+                }
+            }
+        }
+
+        return questions
+    }
+
+    private fun parseBatchFeedbackResponse(responseText: String, expectedCount: Int): List<FeedbackResult> {
+        val feedbackList = mutableListOf<FeedbackResult>()
+        
+        for (i in 1..expectedCount) {
+            val feedbackPattern = "FEEDBACK_$i:"
+            val nextFeedbackPattern = "FEEDBACK_${i + 1}:"
+            
+            val startIndex = responseText.indexOf(feedbackPattern, ignoreCase = true)
+            if (startIndex == -1) continue
+            
+            val endIndex = responseText.indexOf(nextFeedbackPattern, ignoreCase = true)
+            val feedbackSection = if (endIndex != -1) {
+                responseText.substring(startIndex, endIndex)
+            } else {
+                responseText.substring(startIndex)
+            }
+            
+            // Parse this feedback section
+            val feedback = parseFeedbackResponse(feedbackSection)
+            feedbackList.add(feedback)
+        }
+        
+        return feedbackList
     }
 }
 

@@ -105,6 +105,7 @@ object NeonGridResumeService {
                     put("title", gridResume.name) // Save title to main table
                     put("skills", "{}") // Save empty skills array to main table
                     put("json", gridResumeJsonString) // Store GridResume in json field
+                    put("template", gridResume.metadata.templateId.ifEmpty { "classic" }) // Save template type
                     put("atsScore", JSONObject.NULL)
                     put("feedback", JSONObject.NULL)
                     put("createdAt", now)
@@ -177,6 +178,7 @@ object NeonGridResumeService {
             val payload = JSONObject().apply {
                 put("json", gridResumeJsonString)
                 put("title", gridResume.name) // Update title in main table
+                put("template", gridResume.metadata.templateId.ifEmpty { "classic" }) // Update template type
                 put("updatedAt", now)
             }
 

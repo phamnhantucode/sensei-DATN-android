@@ -66,6 +66,14 @@ data class StartInterviewResult(
 )
 
 /**
+ * Result of starting a new batch interview with all questions pre-generated
+ */
+data class BatchStartInterviewResult(
+    val sessionId: String,
+    val questions: List<LiveQuestion>
+)
+
+/**
  * Result of processing an answer
  */
 data class AnswerResult(

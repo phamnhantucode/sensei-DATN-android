@@ -145,5 +145,6 @@ data class ResumeMetadata(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val version: Int = 1,
-    val editorType: EditorType = EditorType.GRID
+    val editorType: EditorType = EditorType.GRID,
+    val templateId: String = "classic" // Template type: classic, modern, minimal_image, minimal
 )

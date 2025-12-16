@@ -105,13 +105,7 @@ fun CoverLetterEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = screenTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        textAlign = TextAlign.Start
-                    )
-                },
+                title = { },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -187,6 +181,23 @@ fun CoverLetterEditorScreen(
                     .padding(bottom = if (showFormattingToolbar) 120.dp else 32.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
+                ) {
+                    Text(
+                        text = screenTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.padding(20.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
                 Text(
                     text = "Customize the email before you send it. Select any text to format it or drop in boilerplate snippets to speed things up.",
                     style = MaterialTheme.typography.bodyMedium,

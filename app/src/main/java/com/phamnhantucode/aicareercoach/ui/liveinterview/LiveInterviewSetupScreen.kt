@@ -141,6 +141,20 @@ fun LiveInterviewSetupScreen(
                 onCountChanged = { questionCount = it }
             )
 
+            // Interview mode selection
+            var useBatchMode by remember { mutableStateOf(true) }
+            
+            Text(
+                text = "Interview Mode",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            InterviewModeSelector(
+                useBatchMode = useBatchMode,
+                onModeChanged = { useBatchMode = it }
+            )
+
             // Permission check
             if (!hasAudioPermission) {
                 Card(
@@ -194,9 +208,10 @@ fun LiveInterviewSetupScreen(
                             val config = InterviewConfig(
                                 userId = user.id,
                                 interviewType = selectedType,
-                                questionCount = questionCount
+                                questionCount = questionCount,
+                                useBatchMode = useBatchMode
                             )
-                            Log.d(TAG, "Calling onStartInterview with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
+                            Log.d(TAG, "Calling onStartInterview with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}, batchMode=${config.useBatchMode}")
                             onStartInterview(config)
                             Log.d(TAG, "onStartInterview callback invoked")
                         } else {
@@ -373,6 +388,102 @@ private fun QuestionCountSelector(
             ) {
                 Text("5", style = MaterialTheme.typography.bodySmall)
                 Text("20", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InterviewModeSelector(
+    useBatchMode: Boolean,
+    onModeChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Batch Mode Card
+        Card(
+            onClick = { onModeChanged(true) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (useBatchMode)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            ),
+            border = if (useBatchMode)
+                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            else
+                null
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = useBatchMode,
+                    onClick = { onModeChanged(true) }
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "📝 Batch Mode (Recommended)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Answer all questions first, then get comprehensive feedback for everything",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        // Immediate Mode Card
+        Card(
+            onClick = { onModeChanged(false) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (!useBatchMode)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            ),
+            border = if (!useBatchMode)
+                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            else
+                null
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = !useBatchMode,
+                    onClick = { onModeChanged(false) }
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "⚡ Immediate Mode",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Get feedback after each individual question",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

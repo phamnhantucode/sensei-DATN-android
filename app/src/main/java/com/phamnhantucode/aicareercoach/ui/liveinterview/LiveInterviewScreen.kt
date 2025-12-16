@@ -32,9 +32,12 @@ fun LiveInterviewScreen(
         }
         is LiveInterviewUiState.Starting,
         is LiveInterviewUiState.ActiveQuestion,
+        is LiveInterviewUiState.AnswerCollection,
         is LiveInterviewUiState.Processing,
         is LiveInterviewUiState.ViewingFeedback,
         is LiveInterviewUiState.LoadingNextQuestion,
+        is LiveInterviewUiState.GeneratingBatchFeedback,
+        is LiveInterviewUiState.BatchFeedback,
         is LiveInterviewUiState.Paused,
         is LiveInterviewUiState.GeneratingSummary -> {
             LiveInterviewActiveScreen(

@@ -56,7 +56,8 @@ class TemplateLoader(private val context: Context) {
         try {
             val templateFiles = context.assets.list("template/$category") ?: return@withContext emptyList()
             
-            templateFiles.filter { it.endsWith(".json") }.mapNotNull { fileName ->
+            // Filter out template_1.json temporarily - only use template_2.json (classic)
+            templateFiles.filter { it.endsWith(".json") && it != "template_1.json" }.mapNotNull { fileName ->
                 val assetPath = "template/$category/$fileName"
                 val templateId = "${category}_${fileName.removeSuffix(".json")}"
                 
@@ -88,9 +89,15 @@ class TemplateLoader(private val context: Context) {
     suspend fun loadTemplateFromAsset(assetPath: String, category: String): ResumeTemplate? = withContext(Dispatchers.IO) {
         try {
             val json = context.assets.open(assetPath).bufferedReader().use { it.readText() }
-            val gridResume = gson.fromJson(json, GridResume::class.java)
+            var gridResume = gson.fromJson(json, GridResume::class.java)
             
             val templateId = assetPath.replace("/", "_").removeSuffix(".json")
+            
+            // Set the templateId in metadata based on category
+            // Valid templates: classic, modern, minimal_image, minimal
+            gridResume = gridResume.copy(
+                metadata = gridResume.metadata.copy(templateId = category)
+            )
             
             // Generate thumbnail
             val thumbnail = thumbnailGenerator.generateThumbnail(gridResume)

@@ -40,9 +40,6 @@ class IndustryInsightsRepository(
             if (BuildConfig.NEON_API_URL.isBlank()) {
                 throw IllegalStateException("Neon API URL is not configured.")
             }
-            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-                throw IllegalStateException("Gemini API key is not configured.")
-            }
 
             val authorizationHeader = resolveAuthorizationHeader()
                 ?: throw IllegalStateException("No Neon authentication method configured.")
@@ -54,9 +51,19 @@ class IndustryInsightsRepository(
 
             val existingInsight = neonUser.industryInsight
             val now = Instant.now()
+            
+            // Log the cache status for debugging
+            if (existingInsight != null) {
+                Log.d(TAG, "Found existing insight for ${existingInsight.industry}. Last Updated: ${existingInsight.lastUpdated}, Next Update: ${existingInsight.nextUpdate}")
+            } else {
+                Log.d(TAG, "No existing insight found for $userIndustry")
+            }
+
             val needsRefresh = forceRefresh ||
                 existingInsight == null ||
                 existingInsight.requiresRefresh(now)
+            
+            Log.d(TAG, "Load Result: needsRefresh=$needsRefresh (Force=$forceRefresh)")
 
             return@withContext IndustryInsightLoadResult(
                 industry = userIndustry,
@@ -141,30 +148,28 @@ class IndustryInsightsRepository(
         }
 
         // Otherwise, create it
-        // Try to generate with Gemini first, fallback to default if it fails
+        // Try to generate with AI first, fallback to default if it fails
         return@withContext try {
-            if (BuildConfig.GEMINI_API_KEY.isBlank()) {
-                Log.w(TAG, "Gemini API key not configured, using default insights")
-                createDefaultIndustryInsight(industry, authorizationHeader)
-            } else {
-                val generated = generateInsights(industry)
-                saveIndustryInsight(
-                    industry = industry,
-                    generated = generated,
-                    authorizationHeader = authorizationHeader,
-                )
-            }
+             val generated = generateInsights(industry)
+             saveIndustryInsight(
+                 industry = industry,
+                 generated = generated,
+                 authorizationHeader = authorizationHeader,
+             )
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to generate insights with Gemini, using defaults: ${e.message}")
+            Log.w(TAG, "Failed to generate insights with AI, using defaults: ${e.message}")
             createDefaultIndustryInsight(industry, authorizationHeader)
         }
     }
 
     private fun IndustryInsightRecord.requiresRefresh(referenceTime: Instant): Boolean {
         val dueByNextUpdate = !referenceTime.isBefore(nextUpdate)
-        val dueByLastUpdated =
-            lastUpdated.plus(7, ChronoUnit.DAYS).isBefore(referenceTime) ||
-                lastUpdated == Instant.EPOCH
+        val daysSinceUpdate = ChronoUnit.DAYS.between(lastUpdated, referenceTime)
+        val dueByLastUpdated = daysSinceUpdate >= 7 || lastUpdated == Instant.EPOCH
+                
+        if (dueByNextUpdate) Log.d(TAG, "Refresh required: Past nextUpdate time ($nextUpdate)")
+        if (dueByLastUpdated) Log.d(TAG, "Refresh required: Insight is old ($daysSinceUpdate days) or invalid date ($lastUpdated)")
+        
         return dueByNextUpdate || dueByLastUpdated
     }
 
@@ -343,61 +348,23 @@ class IndustryInsightsRepository(
             Include at least 5 skills and trends.
         """.trimIndent()
 
-        val requestUrl =
-            HttpUrl.Builder()
-                .scheme("https")
-                .host(GEMINI_API_HOST)
-                .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
-                .build()
+        val messages = listOf(
+            com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+        )
 
-        val payload = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put(
-                                "parts",
-                                JSONArray().apply {
-                                    put(JSONObject().apply { put("text", prompt) })
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-        }
-
-        val request =
-            Request.Builder()
-                .url(requestUrl)
-                .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-                .addHeader("Content-Type", JSON_MEDIA_TYPE)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
-                .build()
-        val timeoutClient =
-            client.newBuilder()
-                .callTimeout(2, TimeUnit.MINUTES)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(60, TimeUnit.SECONDS)
-                .build()
-
-        val rawText =
-            timeoutClient.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string()
-                    ?: throw IOException("Gemini returned an empty response.")
-                if (!response.isSuccessful) {
-                    throw IOException("Gemini request failed (${response.code}): $bodyString")
-                }
-                extractGeminiText(JSONObject(bodyString))
-                    ?: throw IOException("Gemini response did not include text content.")
-            }
+        // Request JSON object response format
+        val responseFormat = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.ResponseFormat(type = "json_object")
+        
+        val rawText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+            messages = messages,
+            responseFormat = responseFormat
+        )
 
         val cleaned = CODE_FENCE_REGEX.replace(rawText, "").trim()
         val json = try {
             JSONObject(cleaned)
         } catch (error: Exception) {
-            throw IOException("Gemini returned invalid JSON: ${error.message}\n$cleaned", error)
+            throw IOException("AI Service returned invalid JSON: ${error.message}\n$cleaned", error)
         }
 
         val salaryRanges = json.optJSONArray("salaryRanges")?.let { array ->
@@ -424,23 +391,6 @@ class IndustryInsightsRepository(
         )
     }
 
-    private fun extractGeminiText(response: JSONObject): String? {
-        val candidates = response.optJSONArray("candidates") ?: return null
-        for (i in 0 until candidates.length()) {
-            val candidate = candidates.optJSONObject(i) ?: continue
-            val content = candidate.optJSONObject("content") ?: continue
-            val parts = content.optJSONArray("parts") ?: continue
-            val collected = buildString {
-                for (j in 0 until parts.length()) {
-                    val part = parts.optJSONObject(j) ?: continue
-                    val text = part.optString("text")
-                    if (!text.isNullOrBlank()) append(text)
-                }
-            }
-            if (collected.isNotBlank()) return collected
-        }
-        return null
-    }
 
     private fun saveIndustryInsight(
         industry: String,
@@ -690,12 +640,47 @@ class IndustryInsightsRepository(
     private fun JSONObject.optInstant(vararg keys: String): Instant {
         for (key in keys) {
             val raw = optString(key).takeIf { it.isNotBlank() } ?: continue
-            val parsed = runCatching { Instant.parse(raw) }
-                .recoverCatching { OffsetDateTime.parse(raw).toInstant() }
-                .getOrNull()
+            val parsed = parseFlexibleInstant(raw)
             if (parsed != null) return parsed
+            
+            Log.w(TAG, "Failed to parse date for key '$key': '$raw'. Defaulting to EPOCH.")
         }
         return Instant.EPOCH
+    }
+
+    private fun parseFlexibleInstant(raw: String): Instant? {
+        return try {
+            // Try standard ISO-8601 (2023-10-01T12:00:00Z)
+            Instant.parse(raw)
+        } catch (e: Exception) {
+            try {
+                // Try with offset (2023-10-01T12:00:00+01:00)
+                OffsetDateTime.parse(raw).toInstant()
+            } catch (e2: Exception) {
+                try {
+                    // Try SQL Timestamp format (2023-10-01 12:00:00) - Assume UTC
+                    // Handle variable fractional seconds or none
+                    val cleanRaw = raw.replace("T", " ")
+                    val pattern = if (cleanRaw.length > 19) "yyyy-MM-dd HH:mm:ss.SSSSSS" else "yyyy-MM-dd HH:mm:ss"
+                    // If the string is shorter than the pattern (e.g. less micros), we might need to be more adaptive
+                    // But usually Postgres gives 6 digits or 0.
+                    
+                    // Simple variable parsing:
+                    val formatter = java.time.format.DateTimeFormatterBuilder()
+                        .appendPattern("yyyy-MM-dd HH:mm:ss")
+                        .appendOptional(java.time.format.DateTimeFormatterBuilder().appendPattern(".SSSSSS").toFormatter())
+                        .appendOptional(java.time.format.DateTimeFormatterBuilder().appendPattern(".SSS").toFormatter())
+                        .appendOptional(java.time.format.DateTimeFormatterBuilder().appendPattern(".S").toFormatter())
+                        .toFormatter()
+
+                    java.time.LocalDateTime.parse(cleanRaw, formatter)
+                        .atZone(java.time.ZoneId.of("UTC"))
+                        .toInstant()
+                } catch (e3: Exception) {
+                    null
+                }
+            }
+        }
     }
 
     private fun String.keyVariants(): Array<String> {

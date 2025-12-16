@@ -8,7 +8,10 @@ import com.phamnhantucode.aicareercoach.data.audio.GeminiAudioService
 import com.phamnhantucode.aicareercoach.data.audio.VoskSpeechRecognizer
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
 import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -37,10 +40,132 @@ class LiveInterviewRepository(
     private val geminiAudioService = GeminiAudioService()
     private val voskRecognizer = VoskSpeechRecognizer(context)
     private val userProfileCacheDao = database.userProfileCacheDao()
+    private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     companion object {
         private const val TAG = "LiveInterviewRepository"
     }
+
+    /**
+     * Starts a new live interview session with batch question generation.
+     */
+    suspend fun startBatchInterview(request: StartLiveInterviewRequest): Result<BatchStartInterviewResult> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "startBatchInterview() called with request: $request")
+
+                val user = Clerk.user
+                Log.d(TAG, "Clerk.user: ${if (user != null) "ID=${user.id}" else "NULL"}")
+                if (user == null) {
+                    Log.e(TAG, "User session unavailable")
+                    return@withContext Result.failure(Exception("User session unavailable"))
+                }
+
+                val apiUrl = BuildConfig.NEON_API_URL
+                Log.d(TAG, "NEON_API_URL configured: ${apiUrl.isNotBlank()}, value=${if (apiUrl.isNotBlank()) apiUrl else "BLANK"}")
+                if (apiUrl.isBlank()) {
+                    Log.e(TAG, "Neon API URL not configured")
+                    return@withContext Result.failure(Exception("Neon API URL not configured"))
+                }
+
+                Log.d(TAG, "Fetching authentication token...")
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                Log.d(TAG, "Auth token fetched: ${authToken != null}")
+
+                val authHeader = buildAuthorizationHeader(authToken)
+                if (authHeader == null) {
+                    Log.e(TAG, "Failed to build authorization header")
+                    return@withContext Result.failure(Exception("Authentication failed"))
+                }
+                Log.d(TAG, "Authorization header built successfully")
+
+                // Fetch Neon user profile to get the UUID
+                Log.d(TAG, "Fetching Neon user profile for Clerk user: ${user.id}")
+                val neonUser = fetchNeonUserProfile(user.id, authHeader)
+                Log.d(TAG, "Neon user profile fetched: ${if (neonUser != null) "SUCCESS (id=${neonUser.id})" else "NULL (FAILED)"}")
+                if (neonUser == null) {
+                    Log.e(TAG, "Failed to fetch user profile from Neon database for Clerk user: ${user.id}")
+                    return@withContext Result.failure(Exception("Failed to fetch user profile"))
+                }
+
+                // Create new interview session in database
+                Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")
+                val sessionId = createInterviewSession(
+                    userId = neonUser.id,
+                    authHeader = authHeader,
+                    role = request.interviewType.name,
+                    description = "Mock interview for ${request.interviewType.name}",
+                    yoes = request.experienceLevel ?: 0
+                )
+                Log.d(TAG, "Interview session created: ${if (sessionId != null) "SUCCESS (id=$sessionId)" else "NULL (FAILED)"}")
+                if (sessionId == null) {
+                    Log.e(TAG, "Failed to create interview session in database")
+                    return@withContext Result.failure(Exception("Failed to create interview session"))
+                }
+
+                // Generate ALL questions at once
+                Log.d(TAG, "Generating ${request.questionCount} questions for category=${request.interviewType.name}")
+                val questionsResult = geminiAudioService.generateAllQuestions(
+                    category = request.interviewType.name,
+                    questionCount = request.questionCount,
+                    userProfile = buildUserProfileContext(request)
+                )
+                Log.d(TAG, "Batch question generation result: ${if (questionsResult.isSuccess) "SUCCESS" else "FAILED"}")
+
+                if (questionsResult.isFailure) {
+                    val error = questionsResult.exceptionOrNull() ?: Exception("Failed to generate questions")
+                    Log.e(TAG, "Failed to generate questions", error)
+                    
+                    // Provide specific error message based on exception
+                    val userMessage = when {
+                        error.message?.contains("API key not configured") == true ->
+                            "Gemini API key is not configured. Please add GEMINI_API_KEY to local.properties"
+                        error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
+                            "Gemini API authentication failed. Please check your API key in local.properties"
+                        error.message?.contains("HTTP 429") == true ->
+                            "Gemini API rate limit exceeded. Please try again later"
+                        error.message?.contains("HTTP 5") == true ->
+                            "Gemini API server error. Please try again later"
+                        else -> "Failed to generate interview questions: ${error.message}"
+                    }
+
+                    return@withContext Result.failure(Exception(userMessage))
+                }
+
+                val questionResults = questionsResult.getOrNull()!!
+                
+                // Convert to LiveQuestion objects and save to database in background
+                val liveQuestions = questionResults.map { questionData ->
+                    LiveQuestion(
+                        liveMockInterviewId = sessionId,
+                        questionText = questionData.question,
+                        category = request.interviewType.name,
+                        correctAnswer = questionData.idealAnswer
+                    )
+                }
+
+                // Save all questions to database in background (fire and forget)
+                repositoryScope.launch {
+                    try {
+                        saveAllQuestionsToDatabase(liveQuestions, authHeader)
+                        Log.d(TAG, "All questions saved to database successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to save questions to database", e)
+                    }
+                }
+
+                Log.d(TAG, "Batch interview started successfully: sessionId=$sessionId, questionCount=${liveQuestions.size}")
+
+                Result.success(BatchStartInterviewResult(
+                    sessionId = sessionId, 
+                    questions = liveQuestions
+                ))
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception in startBatchInterview()", e)
+                Result.failure(e)
+            }
+        }
 
     /**
      * Starts a new live interview session and generates the first question.
@@ -379,6 +504,147 @@ class LiveInterviewRepository(
                 Result.failure(e)
             }
         }
+
+    /**
+     * Processes all answers at once and generates batch feedback.
+     */
+    suspend fun processBatchAnswers(
+        sessionId: String,
+        questionsAndAnswers: List<Triple<LiveQuestion, String, String>> // (question, transcription, category)
+    ): Result<List<LiveQuestion>> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Processing ${questionsAndAnswers.size} answers for batch feedback")
+
+            // Prepare data for batch feedback
+            val feedbackInput = questionsAndAnswers.map { (question, transcription, _) ->
+                Triple(question.questionText, transcription, question.category)
+            }
+
+            // Generate batch feedback
+            val feedbackResult = geminiAudioService.generateBatchFeedback(feedbackInput)
+            
+            if (feedbackResult.isFailure) {
+                return@withContext Result.failure(
+                    feedbackResult.exceptionOrNull() ?: Exception("Batch feedback generation failed")
+                )
+            }
+
+            val feedbackList = feedbackResult.getOrNull()!!
+            
+            // Update questions with feedback and save to database
+            val authToken = NeonAuth.fetchNeonAuthToken()
+            val authHeader = buildAuthorizationHeader(authToken)
+                ?: return@withContext Result.failure(Exception("Authentication failed"))
+
+            val updatedQuestions = questionsAndAnswers.mapIndexed { index, (question, transcription, _) ->
+                val feedback = if (index < feedbackList.size) feedbackList[index] else null
+                
+                question.copy(
+                    userAnswer = transcription,
+                    audioTranscript = transcription,
+                    feedback = feedback?.feedback,
+                    rating = feedback?.rating
+                ).also { updatedQuestion ->
+                    // Update question in database with feedback
+                    updateQuestionInDatabase(updatedQuestion, authHeader)
+                }
+            }
+
+            Log.d(TAG, "Batch feedback processing completed for ${updatedQuestions.size} questions")
+            Result.success(updatedQuestions)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in batch answer processing", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Saves user answer without feedback (for answer collection phase).
+     */
+    suspend fun saveUserAnswer(
+        questionId: String,
+        sessionId: String,
+        transcription: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val authToken = NeonAuth.fetchNeonAuthToken()
+            val authHeader = buildAuthorizationHeader(authToken)
+                ?: return@withContext Result.failure(Exception("Authentication failed"))
+
+            // Update question with user answer only
+            updateQuestionAnswerInDatabase(questionId, transcription, authHeader)
+            
+            Log.d(TAG, "User answer saved for question: $questionId")
+            Result.success(Unit)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving user answer", e)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun saveAllQuestionsToDatabase(questions: List<LiveQuestion>, authHeader: String) {
+        questions.forEach { question ->
+            try {
+                saveQuestionToDatabase(question, authHeader)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save question: ${question.questionText}", e)
+            }
+        }
+    }
+
+    private suspend fun updateQuestionInDatabase(question: LiveQuestion, authHeader: String) {
+        try {
+            val payload = JSONObject().apply {
+                put("userAnswer", question.userAnswer)
+                put("feedback", question.feedback)
+                put("rating", question.rating)
+                put("updatedAt", java.time.Instant.now().toString())
+            }
+
+            val url = "${BuildConfig.NEON_API_URL}/LiveInterviewQuestion?id=eq.${question.id}"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", authHeader)
+                .addHeader("Content-Type", "application/json")
+                .patch(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Failed to update question: ${response.code}")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating question in database", e)
+        }
+    }
+
+    private suspend fun updateQuestionAnswerInDatabase(questionId: String, userAnswer: String, authHeader: String) {
+        try {
+            val payload = JSONObject().apply {
+                put("userAnswer", userAnswer)
+                put("updatedAt", java.time.Instant.now().toString())
+            }
+
+            val url = "${BuildConfig.NEON_API_URL}/LiveInterviewQuestion?id=eq.$questionId"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", authHeader)
+                .addHeader("Content-Type", "application/json")
+                .patch(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Failed to update question answer: ${response.code}")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating question answer", e)
+        }
+    }
 
     private suspend fun fetchNeonUserProfile(clerkUserId: String, authHeader: String): NeonUserProfile? {
         return try {

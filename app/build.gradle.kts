@@ -17,7 +17,7 @@ val localProperties = Properties().also { properties ->
 val neonApiUrl =
     localProperties.getProperty(
         "NEON_API_URL",
-        "https://ep-calm-star-a8i9nyct.apirest.eastus2.azure.neon.tech/4sensei/rest/v2"
+        "https://ep-calm-star-a8i9nyct.apirest.eastus2.azure.neon.tech/4sensei/rest/v1"
     )
 val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
 val neonDbRole = localProperties.getProperty("NEON_DB_ROLE", "")
@@ -43,12 +43,12 @@ android {
         buildConfigField(
             "String",
             "CLERK_PUBLISHABLE_KEY",
-            "\"pk_test_YXJyaXZpbmctZm93bC05LmNsZXJrLmFjY291bnRzLmRldiQ\""
+            "\"pk_test_dG91Z2gtYWlyZWRhbGUtMTcuY2xlcmsuYWNjb3VudHMuZGV2JA\""
         )
         buildConfigField(
             "String",
             "CLERK_SECRET_KEY",
-            "\"sk_test_HLWvqkKidtIFeRAX79Au1LIha2ZIUB954rSKVrtgq7\""
+            "\"sk_test_oSU3FT0LXbRIqLIxucUrSpU0brJg9HK5aco9xnMZWN\""
         )
         buildConfigField("String", "NEON_API_URL", "\"$neonApiUrl\"")
         buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
@@ -59,6 +59,7 @@ android {
         buildConfigField("String", "CLDNR_API_SECRET", "\"$cldnrApiSecret\"")
         buildConfigField("String", "CLDNR_CLOUD_NAME", "\"$cldnrCloudName\"")
         buildConfigField("String", "CLDNR_UPLOAD_PRESET", "\"$cldnrUploadPreset\"")
+        buildConfigField("String", "OPENROUTER_API_KEY", "\"${localProperties.getProperty("OPENROUTER_API_KEY", "")}\"")
     }
 
     buildTypes {

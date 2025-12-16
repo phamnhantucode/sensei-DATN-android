@@ -47,9 +47,20 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
 
     private val _questionStartTime = MutableStateFlow(0L)
 
+    // New state for batch interview
+    private val _allQuestions = MutableStateFlow<List<LiveQuestion>>(emptyList())
+    val allQuestions: StateFlow<List<LiveQuestion>> = _allQuestions.asStateFlow()
+    
+    private val _currentQuestionIndex = MutableStateFlow(0)
+    val currentQuestionIndex: StateFlow<Int> = _currentQuestionIndex.asStateFlow()
+    
+    private val _useBatchMode = MutableStateFlow(true) // Default to new batch mode
+    val useBatchMode: StateFlow<Boolean> = _useBatchMode.asStateFlow()
+
     private var timerJob: Job? = null
     private var currentAudioFile: File? = null
     private val answeredQuestions = mutableListOf<LiveQuestion>()
+    private val userAnswers = mutableMapOf<Int, String>() // Index -> transcription
     private var recordingStartTime = 0L
 
     companion object {
@@ -64,14 +75,97 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Starts a new live interview with the specified configuration.
+     * Starts a new batch interview with all questions pre-generated.
      */
-    fun startInterview(config: InterviewConfig) {
-        Log.d(TAG, "startInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
+    fun startBatchInterview(config: InterviewConfig) {
+        Log.d(TAG, "startBatchInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Setting UI state to Starting")
                 _uiState.value = LiveInterviewUiState.Starting
+                _useBatchMode.value = true
+
+                val request = StartLiveInterviewRequest(
+                    userId = config.userId,
+                    interviewType = config.interviewType,
+                    questionCount = config.questionCount,
+                    industry = config.industry,
+                    experienceLevel = config.experienceLevel,
+                    skills = config.skills
+                )
+                Log.d(TAG, "Created StartLiveInterviewRequest: $request")
+
+                Log.d(TAG, "Calling repository.startBatchInterview()")
+                val result = repository.startBatchInterview(request)
+                Log.d(TAG, "Repository call completed. Success: ${result.isSuccess}")
+
+                if (result.isSuccess) {
+                    val startResult = result.getOrNull()!!
+                    Log.d(TAG, "Batch start result received: sessionId=${startResult.sessionId}, questionCount=${startResult.questions.size}")
+
+                    val session = LiveMockInterviewSession(
+                        id = startResult.sessionId,
+                        userId = config.userId,
+                        interviewType = config.interviewType,
+                        status = InterviewStatus.IN_PROGRESS,
+                        targetQuestionCount = config.questionCount,
+                        currentQuestionIndex = 0,
+                        startedAt = System.currentTimeMillis(),
+                        questions = startResult.questions
+                    )
+
+                    _interviewSession.value = session
+                    _allQuestions.value = startResult.questions
+                    _currentQuestionIndex.value = 0
+                    _currentQuestion.value = startResult.questions.firstOrNull()
+                    _currentFeedback.value = null
+                    _questionStartTime.value = System.currentTimeMillis()
+                    
+                    Log.d(TAG, "Setting UI state to AnswerCollection")
+                    _uiState.value = LiveInterviewUiState.AnswerCollection
+                    startTimer()
+
+                    Log.d(TAG, "Batch interview started successfully: ${startResult.sessionId}")
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Failed to start batch interview"
+                    Log.e(TAG, "Failed to start batch interview: $errorMsg", result.exceptionOrNull())
+                    _errorMessage.value = errorMsg
+                    Log.d(TAG, "Setting UI state back to Setup due to failure")
+                    _uiState.value = LiveInterviewUiState.Setup
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception in startBatchInterview()", e)
+                _errorMessage.value = e.message ?: "An error occurred"
+                Log.d(TAG, "Setting UI state back to Setup due to exception")
+                _uiState.value = LiveInterviewUiState.Setup
+            }
+        }
+    }
+
+    /**
+     * Starts a new live interview with the specified configuration.
+     */
+    fun startInterview(config: InterviewConfig) {
+        Log.d(TAG, "startInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}, batchMode=${config.useBatchMode}")
+        
+        if (config.useBatchMode) {
+            startBatchInterview(config)
+        } else {
+            startImmediateFeedbackInterview(config)
+        }
+    }
+
+    /**
+     * Starts interview with immediate feedback (original mode).
+     */
+    private fun startImmediateFeedbackInterview(config: InterviewConfig) {
+        Log.d(TAG, "startImmediateFeedbackInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Setting UI state to Starting")
+                _uiState.value = LiveInterviewUiState.Starting
+                _useBatchMode.value = false
 
                 val request = StartLiveInterviewRequest(
                     userId = config.userId,
@@ -119,7 +213,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Exception in startInterview()", e)
+                Log.e(TAG, "Exception in startImmediateFeedbackInterview()", e)
                 _errorMessage.value = e.message ?: "An error occurred"
                 Log.d(TAG, "Setting UI state back to Setup due to exception")
                 _uiState.value = LiveInterviewUiState.Setup
@@ -170,52 +264,167 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
 
                 _uiState.value = LiveInterviewUiState.Processing
 
-                val questionDuration = System.currentTimeMillis() - _questionStartTime.value
-                val updatedQuestion = question.copy(duration = questionDuration)
-
-                val isLastQuestion = session.currentQuestionIndex >= session.targetQuestionCount - 1
-                val previousQuestions = answeredQuestions.map { it.questionText }
-
-                val result = repository.processAnswer(
-                    audioFile = audioFile,
-                    question = updatedQuestion,
-                    sessionId = session.id,
-                    isLastQuestion = isLastQuestion,
-                    previousQuestions = previousQuestions
-                )
-
-                if (result.isSuccess) {
-                    val answerResult = result.getOrNull()!!
-
-                    // Update answered questions list
-                    answeredQuestions.add(updatedQuestion.copy(
-                        userAnswer = answerResult.transcription,
-                        feedback = answerResult.feedback,
-                        rating = answerResult.rating
-                    ))
-
-                    // Show feedback
-                    _currentFeedback.value = QuestionFeedback(
-                        transcription = answerResult.transcription,
-                        feedback = answerResult.feedback,
-                        rating = answerResult.rating,
-                        nextQuestion = answerResult.nextQuestion
-                    )
-
-                    _uiState.value = LiveInterviewUiState.ViewingFeedback
-
-                    Log.d(TAG, "Answer processed: rating=${answerResult.rating}")
-
+                if (_useBatchMode.value) {
+                    // Batch mode: just transcribe and save answer
+                    processBatchAnswer(audioFile, question, session)
                 } else {
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Failed to process answer"
-                    _uiState.value = LiveInterviewUiState.ActiveQuestion
+                    // Original mode: immediate feedback
+                    processImmediateFeedback(audioFile, question, session)
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing answer", e)
                 _errorMessage.value = e.message ?: "An error occurred while processing your answer"
-                _uiState.value = LiveInterviewUiState.ActiveQuestion
+                _uiState.value = if (_useBatchMode.value) LiveInterviewUiState.AnswerCollection else LiveInterviewUiState.ActiveQuestion
             }
+        }
+    }
+
+    private suspend fun processBatchAnswer(audioFile: File, question: LiveQuestion, session: LiveMockInterviewSession) {
+        // Pre-validate audio file
+        if (!audioFile.exists() || audioFile.length() <= 44) {
+            Log.e(TAG, "Audio file validation failed: exists=${audioFile.exists()}, size=${audioFile.length()}")
+            audioFile.delete()
+            _errorMessage.value = "Audio recording failed. Please try again."
+            _uiState.value = LiveInterviewUiState.AnswerCollection
+            return
+        }
+
+        Log.d(TAG, "Processing audio file for batch mode: ${audioFile.absolutePath}, size=${audioFile.length()} bytes")
+
+        // Transcribe audio using Vosk
+        val voskRecognizer = com.phamnhantucode.aicareercoach.data.audio.VoskSpeechRecognizer(getApplication())
+        val transcriptionResult = voskRecognizer.transcribeAudio(audioFile)
+
+        if (transcriptionResult.isFailure) {
+            val error = transcriptionResult.exceptionOrNull()
+            val userMessage = when {
+                error?.message?.contains("corrupted") == true || error?.message?.contains("invalid") == true ->
+                    "Audio file was corrupted. Please try recording again."
+                error?.message?.contains("No speech detected") == true ->
+                    "No speech detected. Please speak clearly into the microphone."
+                error?.message?.contains("model not available") == true ->
+                    "Speech recognition is initializing. Please wait and try again."
+                error?.message?.contains("empty") == true ->
+                    "Recording too short. Please speak for at least 2 seconds."
+                else ->
+                    "Transcription failed: ${error?.message ?: "Unknown error"}"
+            }
+
+            Log.e(TAG, "Transcription failed: ${error?.message}", error)
+            audioFile.delete()
+            _errorMessage.value = userMessage
+            _uiState.value = LiveInterviewUiState.AnswerCollection
+            return
+        }
+
+        val transcription = transcriptionResult.getOrNull()!!
+        Log.d(TAG, "Audio transcribed for batch mode: $transcription")
+
+        // Save user answer
+        userAnswers[_currentQuestionIndex.value] = transcription
+
+        // Save to database in background
+        repository.saveUserAnswer(question.id, session.id, transcription)
+
+        // Clean up audio file
+        audioFile.delete()
+
+        // Move to next question or finish
+        val nextIndex = _currentQuestionIndex.value + 1
+        val allQuestionsList = _allQuestions.value
+
+        if (nextIndex >= allQuestionsList.size) {
+            // All questions answered - start batch feedback processing
+            processBatchFeedback(session.id, allQuestionsList)
+        } else {
+            // Move to next question
+            _currentQuestionIndex.value = nextIndex
+            _currentQuestion.value = allQuestionsList[nextIndex]
+            _questionStartTime.value = System.currentTimeMillis()
+            
+            // Update session
+            _interviewSession.value = session.copy(currentQuestionIndex = nextIndex)
+            
+            // Reset audio recorder for next question
+            audioRecorder.reset()
+            
+            _uiState.value = LiveInterviewUiState.AnswerCollection
+        }
+    }
+
+    private suspend fun processImmediateFeedback(audioFile: File, question: LiveQuestion, session: LiveMockInterviewSession) {
+        val questionDuration = System.currentTimeMillis() - _questionStartTime.value
+        val updatedQuestion = question.copy(duration = questionDuration)
+
+        val isLastQuestion = session.currentQuestionIndex >= session.targetQuestionCount - 1
+        val previousQuestions = answeredQuestions.map { it.questionText }
+
+        val result = repository.processAnswer(
+            audioFile = audioFile,
+            question = updatedQuestion,
+            sessionId = session.id,
+            isLastQuestion = isLastQuestion,
+            previousQuestions = previousQuestions
+        )
+
+        if (result.isSuccess) {
+            val answerResult = result.getOrNull()!!
+
+            // Update answered questions list
+            answeredQuestions.add(updatedQuestion.copy(
+                userAnswer = answerResult.transcription,
+                feedback = answerResult.feedback,
+                rating = answerResult.rating
+            ))
+
+            // Show feedback
+            _currentFeedback.value = QuestionFeedback(
+                transcription = answerResult.transcription,
+                feedback = answerResult.feedback,
+                rating = answerResult.rating,
+                nextQuestion = answerResult.nextQuestion
+            )
+
+            _uiState.value = LiveInterviewUiState.ViewingFeedback
+
+            Log.d(TAG, "Answer processed: rating=${answerResult.rating}")
+
+        } else {
+            _errorMessage.value = result.exceptionOrNull()?.message ?: "Failed to process answer"
+            _uiState.value = LiveInterviewUiState.ActiveQuestion
+        }
+    }
+
+    private suspend fun processBatchFeedback(sessionId: String, questions: List<LiveQuestion>) {
+        _uiState.value = LiveInterviewUiState.GeneratingBatchFeedback
+
+        try {
+            // Prepare questions and answers for batch processing
+            val questionsAndAnswers = questions.mapIndexed { index, question ->
+                val userAnswer = userAnswers[index] ?: ""
+                Triple(question, userAnswer, question.category)
+            }
+
+            // Process all answers at once
+            val result = repository.processBatchAnswers(sessionId, questionsAndAnswers)
+
+            if (result.isSuccess) {
+                val updatedQuestions = result.getOrNull()!!
+                answeredQuestions.clear()
+                answeredQuestions.addAll(updatedQuestions)
+                
+                _uiState.value = LiveInterviewUiState.BatchFeedback(updatedQuestions)
+                Log.d(TAG, "Batch feedback processing completed for ${updatedQuestions.size} questions")
+            } else {
+                _errorMessage.value = result.exceptionOrNull()?.message ?: "Failed to process batch feedback"
+                _uiState.value = LiveInterviewUiState.AnswerCollection
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in batch feedback processing", e)
+            _errorMessage.value = e.message ?: "An error occurred while generating feedback"
+            _uiState.value = LiveInterviewUiState.AnswerCollection
         }
     }
 
@@ -328,6 +537,14 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
+     * Switches between batch mode and immediate feedback mode.
+     */
+    fun toggleInterviewMode(useBatch: Boolean) {
+        _useBatchMode.value = useBatch
+        Log.d(TAG, "Interview mode switched to: ${if (useBatch) "Batch" else "Immediate"}")
+    }
+
+    /**
      * Abandons the interview.
      */
     fun abandonInterview() {
@@ -339,7 +556,10 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         _interviewSession.value = null
         _currentQuestion.value = null
         _currentFeedback.value = null
+        _allQuestions.value = emptyList()
+        _currentQuestionIndex.value = 0
         answeredQuestions.clear()
+        userAnswers.clear()
     }
 
     /**
@@ -377,6 +597,11 @@ sealed class LiveInterviewUiState {
     object Paused : LiveInterviewUiState()
     object GeneratingSummary : LiveInterviewUiState()
     data class Completed(val summary: InterviewSummary) : LiveInterviewUiState()
+    
+    // New states for batch processing
+    object AnswerCollection : LiveInterviewUiState()  // Collecting answers without feedback
+    object GeneratingBatchFeedback : LiveInterviewUiState()  // Processing all answers at once
+    data class BatchFeedback(val questions: List<LiveQuestion>) : LiveInterviewUiState()  // Show all feedback
 }
 
 /**
@@ -388,7 +613,8 @@ data class InterviewConfig(
     val questionCount: Int,
     val industry: String? = null,
     val experienceLevel: Int? = null,
-    val skills: List<String> = emptyList()
+    val skills: List<String> = emptyList(),
+    val useBatchMode: Boolean = true
 )
 
 /**

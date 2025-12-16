@@ -1,26 +1,16 @@
 package com.phamnhantucode.aicareercoach.data.ai
 
-import com.phamnhantucode.aicareercoach.BuildConfig
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementOptions
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
- * Repository for AI-powered improvement of resume responsibility bullet points using Gemini AI.
+ * Repository for AI-powered improvement of resume responsibility bullet points using OpenRouter AI.
  */
-class ResponsibilityAIRepository(
-    private val client: OkHttpClient = OkHttpClient()
-) {
+class ResponsibilityAIRepository {
 
     /**
      * Improves a responsibility bullet point using AI
@@ -57,7 +47,7 @@ class ResponsibilityAIRepository(
             otherResponsibilities = otherResponsibilities
         )
 
-        val rawSuggestions = callGeminiApi(prompt)
+        val rawSuggestions = callOpenRouterApi(prompt)
 
         // Detect bullet format from original text
         val bulletInfo = detectBulletFormat(currentText)
@@ -194,87 +184,20 @@ class ResponsibilityAIRepository(
     }
 
     /**
-     * Calls the Gemini API and extracts the suggestions
+     * Calls the OpenRouter Service and extracts the suggestions
      */
-    private suspend fun callGeminiApi(prompt: String): List<String> {
-        val requestUrl = HttpUrl.Builder()
-            .scheme("https")
-            .host(GEMINI_API_HOST)
-            .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
-            .build()
-
-        val payload = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put(
-                                "parts",
-                                JSONArray().apply {
-                                    put(JSONObject().apply { put("text", prompt) })
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-            // Add generation config for more consistent JSON output
-            put(
-                "generationConfig",
-                JSONObject().apply {
-                    put("temperature", 0.7)
-                    put("topP", 0.8)
-                    put("topK", 40)
-                }
-            )
-        }
-
-        val request = Request.Builder()
-            .url(requestUrl)
-            .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-            .addHeader("Content-Type", JSON_MEDIA_TYPE)
-            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
-            .build()
-
-        val timeoutClient = client.newBuilder()
-            .callTimeout(90, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .build()
-
-        val rawText = timeoutClient.newCall(request).execute().use { response ->
-            val bodyString = response.body?.string()
-                ?: throw IOException("Gemini returned an empty response.")
-            if (!response.isSuccessful) {
-                throw IOException("Gemini request failed (${response.code}): $bodyString")
-            }
-            extractGeminiText(JSONObject(bodyString))
-                ?: throw IOException("Gemini response did not include text content.")
-        }
+    private suspend fun callOpenRouterApi(prompt: String): List<String> {
+        val messages = listOf(
+            OpenRouterService.Message(role = "user", content = prompt)
+        )
+        // Request JSON object for easier parsing if model supports it, but since we ask for array, we rely on prompt instructions primarily
+        // We can pass null or specific format if we switch to models that support strict schema
+        val rawText = OpenRouterService.chatCompletion(
+            messages = messages,
+            temperature = 0.7
+        )
 
         return parseSuggestions(rawText)
-    }
-
-    /**
-     * Extracts the text content from Gemini API response
-     */
-    private fun extractGeminiText(response: JSONObject): String? {
-        val candidates = response.optJSONArray("candidates") ?: return null
-        for (i in 0 until candidates.length()) {
-            val candidate = candidates.optJSONObject(i) ?: continue
-            val content = candidate.optJSONObject("content") ?: continue
-            val parts = content.optJSONArray("parts") ?: continue
-            val collected = buildString {
-                for (j in 0 until parts.length()) {
-                    val part = parts.optJSONObject(j) ?: continue
-                    val text = part.optString("text")
-                    if (!text.isNullOrBlank()) append(text)
-                }
-            }
-            if (collected.isNotBlank()) return collected
-        }
-        return null
     }
 
     /**
@@ -426,10 +349,4 @@ class ResponsibilityAIRepository(
         val skills: List<String> = emptyList(),
         val experienceYears: Int? = null
     )
-
-    companion object {
-        private const val GEMINI_API_HOST = "generativelanguage.googleapis.com"
-        private const val GEMINI_MODEL_NAME = "gemini-2.5-flash"
-        private const val JSON_MEDIA_TYPE = "application/json"
-    }
 }
