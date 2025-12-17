@@ -10,11 +10,9 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.OffsetDateTime
-import java.util.concurrent.TimeUnit
 import kotlin.text.Charsets.UTF_8
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -58,7 +56,27 @@ class CoverLetterRepository(
             userProfile = userProfile
         )
 
-        return@withContext callGeminiApi(prompt)
+        try {
+            val messages = listOf(
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(
+                    role = "system",
+                    content = "You are an expert career coach and professional writer specialized in creating compelling cover letters."
+                ),
+                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(
+                    role = "user",
+                    content = prompt
+                )
+            )
+
+            val content = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+                messages = messages,
+                model = "google/gemini-2.5-flash-lite" // Can be configured or left to default
+            )
+
+            return@withContext GeneratedCoverLetter(content = content.trim())
+        } catch (e: Exception) {
+            throw IOException("Failed to generate cover letter: ${e.message}", e)
+        }
     }
 
     suspend fun saveCoverLetter(
@@ -223,75 +241,6 @@ class CoverLetterRepository(
             
             Return ONLY the cover letter text, no additional commentary or explanations.
         """.trimIndent()
-    }
-
-    private suspend fun callGeminiApi(prompt: String): GeneratedCoverLetter {
-        val requestUrl = HttpUrl.Builder()
-            .scheme("https")
-            .host(GEMINI_API_HOST)
-            .addPathSegments("v1beta/models/$GEMINI_MODEL_NAME:generateContent")
-            .build()
-
-        val payload = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().apply {
-                    put(
-                        JSONObject().apply {
-                            put(
-                                "parts",
-                                JSONArray().apply {
-                                    put(JSONObject().apply { put("text", prompt) })
-                                }
-                            )
-                        }
-                    )
-                }
-            )
-        }
-
-        val request = Request.Builder()
-            .url(requestUrl)
-            .addHeader("x-goog-api-key", BuildConfig.GEMINI_API_KEY)
-            .addHeader("Content-Type", JSON_MEDIA_TYPE)
-            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE.toMediaType()))
-            .build()
-
-        val timeoutClient = client.newBuilder()
-            .callTimeout(2, TimeUnit.MINUTES)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
-
-        val rawText = timeoutClient.newCall(request).execute().use { response ->
-            val bodyString = response.body?.string()
-                ?: throw IOException("Gemini returned an empty response.")
-            if (!response.isSuccessful) {
-                throw IOException("Gemini request failed (${response.code}): $bodyString")
-            }
-            extractGeminiText(JSONObject(bodyString))
-                ?: throw IOException("Gemini response did not include text content.")
-        }
-
-        return GeneratedCoverLetter(content = rawText.trim())
-    }
-
-    private fun extractGeminiText(response: JSONObject): String? {
-        val candidates = response.optJSONArray("candidates") ?: return null
-        for (i in 0 until candidates.length()) {
-            val candidate = candidates.optJSONObject(i) ?: continue
-            val content = candidate.optJSONObject("content") ?: continue
-            val parts = content.optJSONArray("parts") ?: continue
-            val collected = buildString {
-                for (j in 0 until parts.length()) {
-                    val part = parts.optJSONObject(j) ?: continue
-                    val text = part.optString("text")
-                    if (!text.isNullOrBlank()) append(text)
-                }
-            }
-            if (collected.isNotBlank()) return collected
-        }
-        return null
     }
 
     private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
@@ -489,8 +438,6 @@ class CoverLetterRepository(
 
     companion object {
         private const val TAG = "CoverLetterRepository"
-        private const val GEMINI_API_HOST = "generativelanguage.googleapis.com"
-        private const val GEMINI_MODEL_NAME = "gemini-2.5-flash"
         private const val JSON_MEDIA_TYPE = "application/json; charset=utf-8"
     }
 }

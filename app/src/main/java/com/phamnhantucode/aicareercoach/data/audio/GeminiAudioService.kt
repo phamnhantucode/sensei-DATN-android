@@ -160,7 +160,7 @@ IMPORTANT RULES:
     }
 
     /**
-     * Generates AI feedback for an interview answer using Gemini.
+     * Generates AI feedback for an interview answer using Gemini (via OpenRouter).
      * @param question The interview question
      * @param userAnswer The user's transcribed answer
      * @param category The question category (TECHNICAL, BEHAVIORAL, SITUATIONAL)
@@ -178,7 +178,11 @@ IMPORTANT RULES:
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
             )
 
-            val feedbackText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+            // Use logic from OpenRouterService
+            val feedbackText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+                messages = messages,
+                model = "google/gemini-2.5-flash-lite" // Consistent with CoverLetter or use default
+            )
 
             if (feedbackText.isBlank()) {
                 return@withContext Result.failure(Exception("No feedback found in response"))
@@ -214,7 +218,10 @@ IMPORTANT RULES:
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
             )
 
-            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+                messages = messages,
+                model = "google/gemini-2.5-flash-lite"
+            )
 
             if (response.isBlank()) {
                 return@withContext Result.failure(Exception("No feedback found in response"))
@@ -250,7 +257,10 @@ IMPORTANT RULES:
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
             )
 
-            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+                messages = messages,
+                model = "google/gemini-2.5-flash-lite"
+            )
 
             if (response.isBlank()) {
                 return@withContext Result.failure(Exception("No questions found in response"))
@@ -289,7 +299,10 @@ IMPORTANT RULES:
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
             )
 
-            val questionText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(messages)
+            val questionText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+                messages = messages,
+                model = "google/gemini-2.5-flash-lite"
+            )
 
             if (questionText.isBlank()) {
                 return@withContext Result.failure(Exception("No question found in response"))

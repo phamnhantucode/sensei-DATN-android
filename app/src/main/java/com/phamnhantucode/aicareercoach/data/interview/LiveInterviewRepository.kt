@@ -119,13 +119,13 @@ class LiveInterviewRepository(
                     // Provide specific error message based on exception
                     val userMessage = when {
                         error.message?.contains("API key not configured") == true ->
-                            "Gemini API key is not configured. Please add GEMINI_API_KEY to local.properties"
+                            "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
                         error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
-                            "Gemini API authentication failed. Please check your API key in local.properties"
+                            "AI Service authentication failed. Please check your API key in local.properties"
                         error.message?.contains("HTTP 429") == true ->
-                            "Gemini API rate limit exceeded. Please try again later"
+                            "AI Service rate limit exceeded. Please try again later"
                         error.message?.contains("HTTP 5") == true ->
-                            "Gemini API server error. Please try again later"
+                            "AI Service server error. Please try again later"
                         else -> "Failed to generate interview questions: ${error.message}"
                     }
 
@@ -240,13 +240,13 @@ class LiveInterviewRepository(
                     // Provide specific error message based on exception
                     val userMessage = when {
                         error.message?.contains("API key not configured") == true ->
-                            "Gemini API key is not configured. Please add GEMINI_API_KEY to local.properties"
+                            "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
                         error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
-                            "Gemini API authentication failed. Please check your API key in local.properties"
+                            "AI Service authentication failed. Please check your API key in local.properties"
                         error.message?.contains("HTTP 429") == true ->
-                            "Gemini API rate limit exceeded. Please try again later"
+                            "AI Service rate limit exceeded. Please try again later"
                         error.message?.contains("HTTP 5") == true ->
-                            "Gemini API server error. Please try again later"
+                            "AI Service server error. Please try again later"
                         else -> "Failed to generate interview question: ${error.message}"
                     }
 

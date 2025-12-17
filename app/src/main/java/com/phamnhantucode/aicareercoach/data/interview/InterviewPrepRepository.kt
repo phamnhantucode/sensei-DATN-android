@@ -91,7 +91,7 @@ class InterviewPrepRepository(
         // Generate new questions in batch if pool is low
         if (quizPoolCount < MINIMUM_POOL_SIZE || interviewPoolCount < MINIMUM_POOL_SIZE) {
             val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
-            val generated = callGemini(prompt)
+            val generated = generateInterviewContent(prompt)
 
             // Store generated questions in the local pool
             if (quizPoolCount < MINIMUM_POOL_SIZE) {
@@ -109,7 +109,7 @@ class InterviewPrepRepository(
         // If pool is still empty (first time user), generate immediately
         val (finalQuizQuestions, finalInterviewQuestions, practiceTips, coachingNotes) = if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
             val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
-            val generated = callGemini(prompt)
+            val generated = generateInterviewContent(prompt)
 
             storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
             storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
@@ -524,7 +524,7 @@ class InterviewPrepRepository(
     suspend fun fetchAndCacheUserData() = withContext(Dispatchers.IO) {
         try {
             val user = Clerk.user ?: return@withContext
-            if (BuildConfig.NEON_API_URL.isBlank() || BuildConfig.GEMINI_API_KEY.isBlank()) {
+            if (BuildConfig.NEON_API_URL.isBlank()) {
                 return@withContext
             }
 
@@ -709,7 +709,7 @@ class InterviewPrepRepository(
         assessments: List<AssessmentRecord>,
     ): Pair<List<PracticeTipSpec>, CoachingNotes?> = withContext(Dispatchers.IO) {
         val prompt = buildTipsPrompt(profile, assessments)
-        val generated = callGeminiForTips(prompt)
+        val generated = generateTipsAndNotes(prompt)
         Pair(generated.first, generated.second)
     }
 
@@ -847,7 +847,7 @@ class InterviewPrepRepository(
         """.trimIndent()
     }
 
-    private suspend fun callGeminiForTips(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
+    private suspend fun generateTipsAndNotes(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
         val messages = listOf(
             com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(role = "user", content = prompt)
         )
@@ -875,7 +875,7 @@ class InterviewPrepRepository(
         return Pair(practiceTips, coachingNotes)
     }
 
-    private suspend fun callGemini(prompt: String): GeminiInterviewBundle {
+    private suspend fun generateInterviewContent(prompt: String): GeminiInterviewBundle {
         val messages = listOf(
             com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(role = "user", content = prompt)
         )
@@ -1049,7 +1049,7 @@ class InterviewPrepRepository(
     suspend fun preloadQuestionPools() = withContext(Dispatchers.IO) {
         try {
             val user = Clerk.user ?: return@withContext
-            if (BuildConfig.NEON_API_URL.isBlank() || BuildConfig.GEMINI_API_KEY.isBlank()) {
+            if (BuildConfig.NEON_API_URL.isBlank()) {
                 return@withContext
             }
 
@@ -1075,7 +1075,7 @@ class InterviewPrepRepository(
                 }
 
                 val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
-                val generated = callGemini(prompt)
+                val generated = generateInterviewContent(prompt)
 
                 // Store generated questions in the local pool
                 if (quizPoolCount < MINIMUM_POOL_SIZE) {
