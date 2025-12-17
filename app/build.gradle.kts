@@ -136,4 +136,7 @@ dependencies {
 
     // Vosk offline speech recognition
     implementation("com.alphacephei:vosk-android:0.3.47")
+
+    // PDFBox for PDF text extraction
+    implementation(libs.pdfbox)
 }

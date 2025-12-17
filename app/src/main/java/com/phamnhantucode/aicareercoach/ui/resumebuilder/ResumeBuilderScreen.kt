@@ -604,7 +604,7 @@ private fun ResumeSectionCard(
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -658,7 +658,7 @@ private fun ResumeSectionCard(
 //                        Icon(
 //                            imageVector = Icons.Filled.CheckCircle,
 //                            contentDescription = "Complete",
-//                            tint = MaterialTheme.colorScheme.primary,
+//                            tint = MaterialTheme.colorScheme.onPrimary,
 //                            modifier = Modifier.size(20.dp)
 //                        )
                     }
@@ -1326,7 +1326,7 @@ private fun SkillChip(
             Text(
                 text = skill,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onSurface
             )
             IconButton(
                 onClick = onRemove,
@@ -1335,7 +1335,7 @@ private fun SkillChip(
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = "Remove skill",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(16.dp)
                 )
             }

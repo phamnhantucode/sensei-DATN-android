@@ -249,7 +249,7 @@ private fun ProfileSection(
                             imageVector = Icons.Filled.Person,
                             contentDescription = "User avatar",
                             modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }

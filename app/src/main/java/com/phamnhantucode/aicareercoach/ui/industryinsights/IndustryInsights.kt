@@ -356,7 +356,7 @@ private fun HeaderSection(
                                             imageVector = icon,
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = MaterialTheme.colorScheme.onPrimary
                                         )
                                         Text(
                                             text = item,
@@ -1336,7 +1336,7 @@ private fun SalaryRangesCard(
                 Icon(
                     imageVector = Icons.Filled.AttachMoney,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)

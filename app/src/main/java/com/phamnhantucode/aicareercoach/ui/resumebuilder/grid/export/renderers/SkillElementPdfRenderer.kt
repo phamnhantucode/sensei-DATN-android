@@ -145,7 +145,7 @@ class SkillElementPdfRenderer : ElementPdfRenderer<ResumeElement.SkillElement> {
         mapper: GridCoordinateMapper,
         context: PdfRenderContext
     ) {
-        val textPaint = createSkillTextPaint(element, mapper, context)
+        val textPaint = createTextPaint(element.skillStyle.copy(color = element.tagTextColor), element.style.opacity, mapper, context)
         val spacing = mapper.borderWidthToPdfPoints(element.spacing)
         val tagPadding = mapper.borderWidthToPdfPoints(12f)
         val tagRadius = mapper.borderWidthToPdfPoints(element.tagCornerRadius)

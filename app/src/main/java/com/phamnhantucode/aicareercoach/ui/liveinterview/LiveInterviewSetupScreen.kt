@@ -97,7 +97,7 @@ fun LiveInterviewSetupScreen(
                         imageVector = Icons.Filled.Mic,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                     Column(
                         verticalArrangement = Arrangement.spacedBy(4.dp)

@@ -158,7 +158,7 @@ private fun drawSkillTags(
     height: Float,
     density: Float
 ) {
-    val textPaint = createTextPaint(element.skillStyle, context)
+    val textPaint = createTextPaint(element.skillStyle.copy(color = element.tagTextColor), context)
     val spacing = element.spacing * density
     val tagPadding = 12f * density
     val tagRadius = element.tagCornerRadius * density

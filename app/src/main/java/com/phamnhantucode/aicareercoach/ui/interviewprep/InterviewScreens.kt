@@ -215,7 +215,7 @@ fun InterviewActiveScreen(
                                     Icon(
                                         imageVector = Icons.Default.Lightbulb,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(

@@ -1281,7 +1281,7 @@ private fun ImageElementProperties(
                         Icon(
                             Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(4.dp))
@@ -3465,6 +3465,27 @@ private fun SkillElementProperties(
             valueRange = 0f..32f,
             onValueChange = { onUpdateElement(element.copy(spacing = it)) }
         )
+
+        // Tag text color (only for TAGS display style)
+        if (element.displayStyle == SkillDisplayStyle.TAGS) {
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            ColorPicker(
+                label = "Tag Text Color",
+                color = Color(element.tagTextColor),
+                onColorChange = { newColor ->
+                    newColor?.let {
+                        val colorLong = android.graphics.Color.argb(
+                            (it.alpha * 255).toInt(),
+                            (it.red * 255).toInt(),
+                            (it.green * 255).toInt(),
+                            (it.blue * 255).toInt()
+                        ).toLong()
+                        onUpdateElement(element.copy(tagTextColor = colorLong))
+                    }
+                }
+            )
+        }
 
         // Padding (only if inside vertical container)
         if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {

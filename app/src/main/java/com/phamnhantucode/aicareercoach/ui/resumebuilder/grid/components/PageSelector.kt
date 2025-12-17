@@ -304,7 +304,7 @@ private fun AddPageButton(
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = "Add page",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(if (compactMode) 20.dp else 24.dp)
             )
         }

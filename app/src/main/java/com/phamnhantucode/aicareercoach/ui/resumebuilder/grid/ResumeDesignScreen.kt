@@ -309,7 +309,7 @@ private fun ThumbnailPlaceholder() {
     Icon(
         imageVector = Icons.Default.Description,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
+        tint = MaterialTheme.colorScheme.onPrimary,
         modifier = Modifier.size(40.dp)
     )
 }

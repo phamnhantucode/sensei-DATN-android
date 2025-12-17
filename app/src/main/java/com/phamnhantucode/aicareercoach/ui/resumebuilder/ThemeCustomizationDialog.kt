@@ -216,7 +216,7 @@ private fun TemplateCard(
                         Icon(
                             imageVector = Icons.Filled.Check,
                             contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -556,7 +556,7 @@ private fun LayoutTypeCard(
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -598,7 +598,7 @@ private fun SectionStyleCard(
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }

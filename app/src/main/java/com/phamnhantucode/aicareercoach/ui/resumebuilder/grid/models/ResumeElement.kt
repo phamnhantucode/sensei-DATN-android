@@ -250,6 +250,7 @@ sealed class ResumeElement {
         val showProficiencyLabel: Boolean = false,
         // Tag style properties
         val tagBackgroundColor: Long? = 0xFFE3F2FD,
+        val tagTextColor: Long = 0xFF000000,
         val tagBorderColor: Long? = null,
         val tagBorderWidth: Float = 0f,
         val tagCornerRadius: Float = 16f,

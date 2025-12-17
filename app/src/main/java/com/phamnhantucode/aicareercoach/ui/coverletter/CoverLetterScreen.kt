@@ -392,7 +392,7 @@ private fun RowWithIconText(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .size(24.dp)
                     .padding(4.dp)
