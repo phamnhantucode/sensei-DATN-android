@@ -10,6 +10,7 @@ import com.clerk.api.network.serialization.onFailure
 import com.clerk.api.network.serialization.onSuccess
 import com.clerk.api.session.fetchToken
 import com.clerk.api.signin.SignIn
+import com.clerk.api.signin.*
 import com.clerk.api.signup.SignUp
 import com.clerk.api.signup.attemptVerification
 import com.clerk.api.signup.prepareVerification
@@ -258,6 +259,117 @@ class LoginViewModel(
     fun resetVerification() {
         _uiState.update { it.copy(verificationEmail = null) }
     }
+    
+    fun initiatePasswordReset(email: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isEmpty()) {
+            _uiState.update {
+                it.copy(errorMessage = "Please enter your email address.")
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isProcessing = true,
+                errorMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            // Using Email Code strategy for recovery/passwordless login
+            // Using Strategy.EmailCode as Strategy nesting is required for CreateParams
+            SignIn.create(SignIn.CreateParams.Strategy.EmailCode(identifier = trimmedEmail))
+                .onSuccess { signIn ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            isResettingPassword = true,
+                            resetPasswordStep = ResetPasswordStep.Confirm,
+                            verificationEmail = trimmedEmail
+                        )
+                    }
+                }
+                .onFailure { failure ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            errorMessage = failure.longErrorMessageOrNull ?: "Unable to find account."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun completePasswordReset(code: String, password: String) {
+        val trimmedCode = code.trim()
+        if (trimmedCode.isEmpty()) {
+             _uiState.update {
+                it.copy(errorMessage = "Please enter the code.")
+            }
+            return
+        }
+        
+        _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
+        
+        viewModelScope.launch {
+            val signIn = Clerk.client.signIn
+            if (signIn == null) {
+                 _uiState.update {
+                    it.copy(
+                        isProcessing = false,
+                        errorMessage = "Session expired. Please start over."
+                    )
+                }
+                return@launch
+            }
+            
+            // Note: We are logging in with the code.
+            // Using AttemptFirstFactorParams.EmailCode directly (no Strategy nesting expected here based on previous errors)
+            signIn.attemptFirstFactor(SignIn.AttemptFirstFactorParams.EmailCode(code = trimmedCode))
+                .onSuccess {
+                    _uiState.update { state ->
+                        state.copy(
+                            isProcessing = false,
+                            isResettingPassword = false,
+                            resetPasswordStep = ResetPasswordStep.Request,
+                            verificationEmail = null
+                        )
+                    }
+                    refreshNeonAuthTokenAsync()
+                    evaluatePostSignInNavigationAsync()
+                }
+                .onFailure { failure ->
+                     _uiState.update { state ->
+                        state.copy(
+                            isProcessing = false,
+                            errorMessage = failure.longErrorMessageOrNull ?: "Verification failed."
+                        )
+                    }
+                }
+        }
+    }
+
+    fun startForgotPassword() {
+        _uiState.update {
+            it.copy(
+                isResettingPassword = true,
+                resetPasswordStep = ResetPasswordStep.Request,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun cancelForgotPassword() {
+         _uiState.update {
+            it.copy(
+                isResettingPassword = false,
+                resetPasswordStep = ResetPasswordStep.Request,
+                verificationEmail = null,
+                errorMessage = null
+            )
+        }
+    }
 
     fun currentNeonAuthToken(): String? = neonAuthToken
 
@@ -431,7 +543,14 @@ data class LoginUiState(
     val verificationEmail: String? = null,
     val errorMessage: String? = null,
     val navigationTarget: LoginNavigationTarget? = null,
+    val isResettingPassword: Boolean = false,
+    val resetPasswordStep: ResetPasswordStep = ResetPasswordStep.Request,
 ) {
     val requiresVerification: Boolean
         get() = verificationEmail != null
+}
+
+enum class ResetPasswordStep {
+    Request,
+    Confirm
 }

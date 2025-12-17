@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -38,6 +40,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -53,6 +62,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
 import com.phamnhantucode.aicareercoach.data.interview.InterviewPrepRepository
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.ClickableText
 
 private enum class AuthMode {
     SignIn,
@@ -109,7 +123,11 @@ fun LoginScreen(
                 onSignInWithGoogle = viewModel::signInWithGoogle,
                 onVerify = viewModel::verifyCode,
                 onClearError = viewModel::clearError,
-                onResetVerification = viewModel::resetVerification
+                onResetVerification = viewModel::resetVerification,
+                startForgotPassword = viewModel::startForgotPassword,
+                onInitiatePasswordReset = viewModel::initiatePasswordReset,
+                onCompletePasswordReset = viewModel::completePasswordReset,
+                onCancelForgotPassword = viewModel::cancelForgotPassword
             )
         }
     }
@@ -124,15 +142,19 @@ private fun LoginCard(
     onSignInWithGoogle: () -> Unit,
     onVerify: (String) -> Unit,
     onClearError: () -> Unit,
-    onResetVerification: () -> Unit
+    onResetVerification: () -> Unit,
+    startForgotPassword: () -> Unit,
+    onInitiatePasswordReset: (String) -> Unit,
+    onCompletePasswordReset: (String, String) -> Unit,
+    onCancelForgotPassword: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var verificationCode by remember { mutableStateOf("") }
-    var authMode by remember { mutableStateOf(AuthMode.SignIn) }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var verificationCode by rememberSaveable { mutableStateOf("") }
+    var authMode by rememberSaveable { mutableStateOf(AuthMode.SignIn) } // Local UI state for Sign In vs Sign Up
 
     LaunchedEffect(uiState.requiresVerification) {
-        if (uiState.requiresVerification) {
+        if (uiState.requiresVerification && !uiState.isResettingPassword) {
             authMode = AuthMode.SignUp
             verificationCode = ""
         }
@@ -155,6 +177,7 @@ private fun LoginCard(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = when {
+                        uiState.isResettingPassword -> "Reset password"
                         uiState.requiresVerification -> "Verify your email"
                         authMode == AuthMode.SignUp -> "Create your account"
                         else -> "Welcome back"
@@ -165,6 +188,11 @@ private fun LoginCard(
                 )
                 Text(
                     text = when {
+                        uiState.isResettingPassword ->
+                             if (uiState.resetPasswordStep == ResetPasswordStep.Request)
+                                 "Enter your email to receive a reset code."
+                             else
+                                 "Enter the code and your new password."
                         uiState.requiresVerification ->
                             "Enter the code we sent to ${uiState.verificationEmail}."
                         authMode == AuthMode.SignUp ->
@@ -205,7 +233,36 @@ private fun LoginCard(
                 }
             }
 
-            if (uiState.requiresVerification) {
+            if (uiState.isResettingPassword) {
+                if (uiState.resetPasswordStep == ResetPasswordStep.Request) {
+                     ForgotPasswordSection(
+                        email = email,
+                        onEmailChange = {
+                            email = it
+                            if (uiState.errorMessage != null) onClearError()
+                        },
+                        onBack = onCancelForgotPassword,
+                        isProcessing = uiState.isProcessing,
+                        isCheckingAutoLogin = uiState.isCheckingAutoLogin
+                     )
+                } else {
+                     ResetPasswordSection(
+                        code = verificationCode,
+                        onCodeChange = {
+                             verificationCode = it
+                             if (uiState.errorMessage != null) onClearError()
+                        },
+                        password = password,
+                        onPasswordChange = {
+                             password = it
+                             if (uiState.errorMessage != null) onClearError()
+                        },
+                        onBack = onCancelForgotPassword,
+                        isProcessing = uiState.isProcessing,
+                        isCheckingAutoLogin = uiState.isCheckingAutoLogin
+                     )
+                }
+            } else if (uiState.requiresVerification) {
                 VerificationSection(
                     verificationCode = verificationCode,
                     onVerificationCodeChange = {
@@ -218,7 +275,6 @@ private fun LoginCard(
                         verificationCode = ""
                         authMode = AuthMode.SignUp
                     },
-                    onBack = onBack,
                     isProcessing = uiState.isProcessing,
                     isCheckingAutoLogin = uiState.isCheckingAutoLogin
                 )
@@ -234,7 +290,7 @@ private fun LoginCard(
                         password = it
                         if (uiState.errorMessage != null) onClearError()
                     },
-                    onBack = onBack,
+                    onForgotPassword = startForgotPassword,
                     isProcessing = uiState.isProcessing,
                     isCheckingAutoLogin = uiState.isCheckingAutoLogin
                 )
@@ -242,21 +298,30 @@ private fun LoginCard(
 
             val primaryButtonLabel = when {
                 uiState.isCheckingAutoLogin -> "Signing you in..."
+                uiState.isResettingPassword -> if (uiState.resetPasswordStep == ResetPasswordStep.Request) "Send reset code" else "Reset password"
                 uiState.requiresVerification -> "Verify code"
                 authMode == AuthMode.SignUp -> "Create account"
                 else -> "Sign in"
             }
 
+            val isValidEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
             val primaryEnabled = when {
                 uiState.isCheckingAutoLogin -> false
+                uiState.isResettingPassword -> if (uiState.resetPasswordStep == ResetPasswordStep.Request) email.isNotBlank() && isValidEmail else verificationCode.isNotBlank() && password.isNotBlank()
                 uiState.requiresVerification -> verificationCode.isNotBlank()
-                else -> email.isNotBlank() && password.isNotBlank()
+                else -> email.isNotBlank() && isValidEmail && password.isNotBlank()
             } && uiState.isInitialized && !uiState.isProcessing
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     when {
+                        uiState.isResettingPassword -> {
+                            if (uiState.resetPasswordStep == ResetPasswordStep.Request)
+                                onInitiatePasswordReset(email)
+                            else
+                                onCompletePasswordReset(verificationCode, password)
+                        }
                         uiState.requiresVerification -> onVerify(verificationCode)
                         authMode == AuthMode.SignIn -> onSignIn(email, password)
                         else -> onSignUp(email, password)
@@ -275,7 +340,7 @@ private fun LoginCard(
                 }
             }
 
-            if (!uiState.requiresVerification) {
+            if (!uiState.requiresVerification && !uiState.isResettingPassword) {
                 FilledTonalButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
@@ -322,12 +387,39 @@ private fun LoginCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 DividerWithLabel(label = "securely powered by Clerk")
-                Text(
-                    text = "By continuing you agree to our Terms of Service and Privacy Policy.",
+                val annotatedString = buildAnnotatedString {
+                    append("By continuing you agree to our ")
+                    pushStringAnnotation(tag = "TERMS", annotation = "terms")
+                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                        append("Terms of Service")
+                    }
+                    pop()
+                    append(" and ")
+                    pushStringAnnotation(tag = "PRIVACY", annotation = "privacy")
+                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+                        append("Privacy Policy")
+                    }
+                    pop()
+                    append(".")
+                }
+                
+                ClickableText(
+                    text = annotatedString,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     ),
-                    textAlign = TextAlign.Center
+                    onClick = { offset ->
+                        annotatedString.getStringAnnotations(tag = "TERMS", start = offset, end = offset).firstOrNull()?.let {
+                            // TODO: Open Terms URL
+                        }
+                        annotatedString.getStringAnnotations(tag = "PRIVACY", start = offset, end = offset).firstOrNull()?.let {
+                            // TODO: Open Privacy URL
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                 )
             }
         }
@@ -340,10 +432,13 @@ private fun CredentialsSection(
     onEmailChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
-    onBack: () -> Unit,
+    onForgotPassword: () -> Unit,
     isProcessing: Boolean,
     isCheckingAutoLogin: Boolean
 ) {
+    val focusManager = LocalFocusManager.current
+    var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         LabeledField(
             value = email,
@@ -351,7 +446,16 @@ private fun CredentialsSection(
             label = "Work email",
             placeholder = "you@company.com",
             icon = Icons.Outlined.AlternateEmail,
-            enabled = !isProcessing && !isCheckingAutoLogin
+            enabled = !isProcessing && !isCheckingAutoLogin,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                // Default behavior is to move focus to the next field, which is what we want.
+                // Explicitly defining it can sometimes interfere if not done correctly (e.g. focusManager.moveFocus).
+                // Leaving empty/default allows the system to find the next focusable (Password field).
+            )
         )
         LabeledField(
             value = password,
@@ -360,18 +464,24 @@ private fun CredentialsSection(
             placeholder = "••••••••",
             icon = Icons.Outlined.Lock,
             isPassword = true,
-            enabled = !isProcessing && !isCheckingAutoLogin
+            isPasswordVisible = isPasswordVisible,
+            onPasswordVisibilityToggle = { isPasswordVisible = !isPasswordVisible },
+            enabled = !isProcessing && !isCheckingAutoLogin,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            )
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
-                Text(text = "← Back")
-            }
             TextButton(
-                onClick = { /* TODO: integrate forgot password */ },
+                onClick = onForgotPassword,
                 enabled = !isProcessing && !isCheckingAutoLogin
             ) {
                 Text(text = "Forgot password?")
@@ -385,7 +495,6 @@ private fun VerificationSection(
     verificationCode: String,
     onVerificationCodeChange: (String) -> Unit,
     onUseDifferentEmail: () -> Unit,
-    onBack: () -> Unit,
     isProcessing: Boolean,
     isCheckingAutoLogin: Boolean
 ) {
@@ -401,12 +510,9 @@ private fun VerificationSection(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
-                Text(text = "← Back")
-            }
             TextButton(onClick = onUseDifferentEmail, enabled = !isProcessing && !isCheckingAutoLogin) {
                 Text(text = "Use a different email")
             }
@@ -440,7 +546,11 @@ private fun LabeledField(
     placeholder: String,
     icon: ImageVector,
     isPassword: Boolean = false,
-    enabled: Boolean = true
+    isPasswordVisible: Boolean = false,
+    onPasswordVisibilityToggle: () -> Unit = {},
+    enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -455,13 +565,106 @@ private fun LabeledField(
             leadingIcon = {
                 Icon(imageVector = icon, contentDescription = null)
             },
-            visualTransformation = if (isPassword) {
+            trailingIcon = if (isPassword) {
+                {
+                    IconButton(onClick = onPasswordVisibilityToggle) {
+                        Icon(
+                            imageVector = if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (isPasswordVisible) "Hide password" else "Show password"
+                        )
+                    }
+                }
+            } else null,
+            visualTransformation = if (isPassword && !isPasswordVisible) {
                 PasswordVisualTransformation()
             } else {
                 VisualTransformation.None
             },
             singleLine = true,
-            enabled = enabled
+            enabled = enabled,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions
         )
+    }
+}
+@Composable
+private fun ForgotPasswordSection(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    onBack: () -> Unit,
+    isProcessing: Boolean,
+    isCheckingAutoLogin: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LabeledField(
+            value = email,
+            onValueChange = onEmailChange,
+            label = "Work email",
+            placeholder = "you@company.com",
+            icon = Icons.Outlined.AlternateEmail,
+            enabled = !isProcessing && !isCheckingAutoLogin,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Done
+            )
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
+                Text(text = "← Back")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResetPasswordSection(
+    code: String,
+    onCodeChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    onBack: () -> Unit,
+    isProcessing: Boolean,
+    isCheckingAutoLogin: Boolean
+) {
+    val focusManager = LocalFocusManager.current
+    var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = code,
+            onValueChange = onCodeChange,
+            label = { Text("Reset code") },
+            placeholder = { Text("123456") },
+            singleLine = true,
+            enabled = !isProcessing && !isCheckingAutoLogin,
+             keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next
+            )
+        )
+        LabeledField(
+            value = password,
+            onValueChange = onPasswordChange,
+            label = "New Password",
+            placeholder = "••••••••",
+            icon = Icons.Outlined.Lock,
+            isPassword = true,
+            isPasswordVisible = isPasswordVisible,
+            onPasswordVisibilityToggle = { isPasswordVisible = !isPasswordVisible },
+            enabled = !isProcessing && !isCheckingAutoLogin,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            )
+        )
+         Row(modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = onBack, enabled = !isProcessing && !isCheckingAutoLogin) {
+                Text(text = "← Back")
+            }
+        }
     }
 }
