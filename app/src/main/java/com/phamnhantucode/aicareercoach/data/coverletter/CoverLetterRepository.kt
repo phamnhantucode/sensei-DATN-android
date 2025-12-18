@@ -39,6 +39,7 @@ class CoverLetterRepository(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
+        tone: String = "Professional",
         resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
     ): GeneratedCoverLetter = withContext(Dispatchers.IO) {
         val user = Clerk.user
@@ -53,6 +54,7 @@ class CoverLetterRepository(
             jobTitle = jobTitle,
             jobDescription = jobDescription,
             userProfile = userProfile,
+            tone = tone,
             resume = resume
         )
 
@@ -199,6 +201,7 @@ class CoverLetterRepository(
         jobTitle: String,
         jobDescription: String,
         userProfile: UserProfile,
+        tone: String,
         resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
     ): String {
         val industryContext = if (userProfile.industry.isNotBlank()) {
@@ -249,7 +252,8 @@ class CoverLetterRepository(
             $bioContext
             
             Requirements:
-            - Write in a professional, confident, and personable tone
+            Requirements:
+            - Write in a $tone tone
             - Highlight relevant skills and experience from the candidate's profile/resume that match the job description
             - Include specific examples of how the candidate's background aligns with the role
             - Show enthusiasm for the company and position

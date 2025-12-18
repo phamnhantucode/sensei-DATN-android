@@ -1,5 +1,6 @@
 package com.phamnhantucode.aicareercoach.ui.coverletter
 
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,16 +12,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Schedule
@@ -32,7 +34,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,6 +90,7 @@ fun CoverLetterScreen(
     val generationState by viewModel.generationState.collectAsState()
     val resumes by viewModel.resumes.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var letterToDelete by remember { mutableStateOf<CoverLetterEntry?>(null) }
 
     val hasExistingLetters = when (val state = uiState) {
         is CoverLetterUiState.Success -> state.coverLetters.isNotEmpty()
@@ -227,14 +234,39 @@ fun CoverLetterScreen(
                                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
                                     onOpen = { entry -> onOpenEditor(entry) },
                                     onDelete = { entry ->
-                                        viewModel.deleteCoverLetter(entry)
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
-                                        }
+                                        letterToDelete = entry
                                     }
                                 )
                             }
                         }
+                    }
+
+                    if (letterToDelete != null) {
+                        AlertDialog(
+                            onDismissRequest = { letterToDelete = null },
+                            title = { Text("Delete Cover Letter?") },
+                            text = { Text("This action cannot be undone.") },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        letterToDelete?.let { entry ->
+                                            viewModel.deleteCoverLetter(entry)
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
+                                            }
+                                        }
+                                        letterToDelete = null
+                                    }
+                                ) {
+                                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { letterToDelete = null }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
                     }
 
                     // Show loading indicator at top when generating
@@ -259,12 +291,13 @@ fun CoverLetterScreen(
                     isGenerating = generationState is GenerationState.Generating,
                     resumes = resumes,
                     onDismiss = { showCreateDialog = false },
-                    onCreate = { companyName, jobTitle, jobDescription, resume ->
+                    onCreate = { companyName, jobTitle, jobDescription, tone, resume ->
                         showCreateDialog = false
                         viewModel.generateCoverLetter(
                             companyName = companyName,
                             jobTitle = jobTitle,
                             jobDescription = jobDescription,
+                            tone = tone,
                             resume = resume,
                             onSuccess = { entry ->
                                 onOpenEditor(entry)
@@ -452,13 +485,20 @@ private fun CreateCoverLetterDialog(
     isGenerating: Boolean = false,
     resumes: List<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume>,
     onDismiss: () -> Unit,
-    onCreate: (companyName: String, jobTitle: String, jobDescription: String, resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume?) -> Unit
+    onCreate: (companyName: String, jobTitle: String, jobDescription: String, tone: String, resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume?) -> Unit
 ) {
     var companyName by rememberSaveable { mutableStateOf("") }
     var jobTitle by rememberSaveable { mutableStateOf("") }
     var jobDescription by rememberSaveable { mutableStateOf("") }
     var selectedResume by remember { mutableStateOf<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume?>(null) }
+    
+    // Tone State
+    val tones = listOf("Professional", "Enthusiastic", "Confident", "Concise", "Creative")
+    var selectedTone by rememberSaveable { mutableStateOf(tones.first()) }
+    var showToneDropdown by remember { mutableStateOf(false) }
+
     var showResumeDropdown by remember { mutableStateOf(false) }
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
     // If there's only one resume, select it automatically? No, keep it optional but perhaps suggest it if wanted. 
     // User requested "Use existing resume (optional)". So default to null is correct.
@@ -553,8 +593,48 @@ private fun CreateCoverLetterDialog(
                     value = jobDescription,
                     onValueChange = { jobDescription = it },
                     label = { Text("Job description") },
-                    minLines = 3
+                    minLines = 3,
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            clipboardManager.getText()?.text?.let {
+                                jobDescription = it
+                            }
+                        }) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
+                        }
+                    }
                 )
+
+                // Tone Selection
+                ExposedDropdownMenuBox(
+                    expanded = showToneDropdown,
+                    onExpandedChange = { showToneDropdown = !showToneDropdown }
+                ) {
+                    OutlinedTextField(
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        readOnly = true,
+                        value = selectedTone,
+                        onValueChange = {},
+                        label = { Text("Tone") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showToneDropdown) },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = showToneDropdown,
+                        onDismissRequest = { showToneDropdown = false },
+                    ) {
+                        tones.forEach { tone ->
+                            DropdownMenuItem(
+                                text = { Text(tone) },
+                                onClick = {
+                                    selectedTone = tone
+                                    showToneDropdown = false
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -564,6 +644,7 @@ private fun CreateCoverLetterDialog(
                         companyName.trim(),
                         jobTitle.trim(),
                         jobDescription.trim(),
+                        selectedTone,
                         selectedResume
                     )
                 },
@@ -600,7 +681,7 @@ private fun CreateCoverLetterDialogPreview() {
         CreateCoverLetterDialog(
             onDismiss = {},
             resumes = emptyList(),
-            onCreate = { _, _, _, _ -> }
+            onCreate = { _, _, _, _, _ -> }
         )
     }
 }

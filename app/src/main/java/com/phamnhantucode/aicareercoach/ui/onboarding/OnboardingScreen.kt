@@ -1,5 +1,13 @@
 package com.phamnhantucode.aicareercoach.ui.onboarding
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -160,23 +168,45 @@ fun OnboardingScreen(
                         Column(
                             modifier = Modifier.padding(24.dp)
                         ) {
-                            when (currentStep) {
-                                0 -> IndustrySelectionStep(
-                                    industries = industries,
-                                    formData = formData,
-                                    onDataChange = { formData = it }
-                                )
+                            // Validation Logic
+                            val isStepValid = when (currentStep) {
+                                0 -> formData.industryId.isNotBlank()
+                                1 -> formData.subIndustry.isNotBlank() && formData.experienceYears.isNotBlank()
+                                2 -> formData.skills.isNotBlank()
+                                else -> false
+                            }
 
-                                1 -> SpecializationExperienceStep(
-                                    industries = industries,
-                                    formData = formData,
-                                    onDataChange = { formData = it }
-                                )
+                            AnimatedContent(
+                                targetState = currentStep,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInHorizontally { width -> width } + fadeIn(animationSpec = tween(300))).togetherWith(
+                                            slideOutHorizontally { width -> -width } + fadeOut(animationSpec = tween(300)))
+                                    } else {
+                                        (slideInHorizontally { width -> -width } + fadeIn(animationSpec = tween(300))).togetherWith(
+                                            slideOutHorizontally { width -> width } + fadeOut(animationSpec = tween(300)))
+                                    }
+                                },
+                                label = "onboarding_steps"
+                            ) { step ->
+                                when (step) {
+                                    0 -> IndustrySelectionStep(
+                                        industries = industries,
+                                        formData = formData,
+                                        onDataChange = { formData = it }
+                                    )
 
-                                2 -> ProfileDetailsStep(
-                                    formData = formData,
-                                    onDataChange = { formData = it }
-                                )
+                                    1 -> SpecializationExperienceStep(
+                                        industries = industries,
+                                        formData = formData,
+                                        onDataChange = { formData = it }
+                                    )
+
+                                    2 -> ProfileDetailsStep(
+                                        formData = formData,
+                                        onDataChange = { formData = it }
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -287,7 +317,7 @@ fun OnboardingScreen(
                                             }
                                         }
                                     },
-                                    enabled = !isSubmitting,
+                                    enabled = !isSubmitting && isStepValid,
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {

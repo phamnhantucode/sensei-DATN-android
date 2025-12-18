@@ -102,6 +102,7 @@ class CoverLetterViewModel(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
+        tone: String,
         resume: Resume? = null,
         onSuccess: (CoverLetterEntry) -> Unit
     ) {
@@ -113,6 +114,7 @@ class CoverLetterViewModel(
                     companyName = companyName,
                     jobTitle = jobTitle,
                     jobDescription = jobDescription,
+                    tone = tone,
                     resume = resume
                 )
 
