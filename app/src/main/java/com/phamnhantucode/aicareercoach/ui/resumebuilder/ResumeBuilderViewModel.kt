@@ -69,10 +69,10 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         }
     }
 
-    // ========== Save/Load Functions ==========
+
 
     /**
-     * Loads a resume by ID
+     * Loads the resume with the given [id].
      */
     private suspend fun loadResumeById(id: String) {
         _isLoading.value = true
@@ -95,7 +95,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Loads a specific resume by ID
+     * Loads the resume with the given [resumeId] into the state.
      */
     fun loadResume(resumeId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -115,8 +115,8 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Manually saves the current resume
-     * Skips saving if the resume is essentially empty (no meaningful content)
+     * Manuall saves the current resume.
+     * Skips saving if the resume is empty.
      */
     fun saveResume(showToast: Boolean = true) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -152,9 +152,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Ensures the resume is saved to the database before navigating to Design tab.
-     * This prevents duplicate entries when GridEditor tries to create a linked design.
-     * Unlike saveResume(), this always saves regardless of content to ensure ID exists in DB.
+     * Ensures the resume is saved to the database.
      */
     suspend fun ensureResumeSaved() {
         val currentResume = _resume.value
@@ -175,8 +173,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Triggers auto-save with debounce (enqueues WorkManager sync 1000ms after last change)
-     * Uses WorkManager for reliable background sync that survives process death.
+     * Triggers auto-save with a debounce.
      */
     private fun triggerAutoSave() {
         if (!isAutoSaveEnabled || !isInitialLoadComplete) return
@@ -205,7 +202,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Enables or disables auto-save
+     * Sets whether auto-save is enabled.
      */
     fun setAutoSaveEnabled(enabled: Boolean) {
         isAutoSaveEnabled = enabled
@@ -215,14 +212,14 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
     }
 
     /**
-     * Creates a new blank resume
+     * Resets the state to a new blank resume.
      */
     fun createNewResume() {
         _resume.value = Resume()
         triggerAutoSave()
     }
 
-    // ========== Personal Info ==========
+
 
     fun updatePersonalInfo(personalInfo: PersonalInfo) {
         _resume.update { it.copy(personalInfo = personalInfo) }
@@ -295,14 +292,14 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         }
     }
 
-    // ========== Professional Summary ==========
+
 
     fun updateProfessionalSummary(summary: String) {
         _resume.update { it.copy(professionalSummary = summary) }
         triggerAutoSave()
     }
 
-    // ========== Work Experience ==========
+
 
     fun addWorkExperience(experience: WorkExperience) {
         _resume.update {
@@ -329,7 +326,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Education ==========
+
 
     fun addEducation(education: Education) {
         _resume.update {
@@ -356,7 +353,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Skills ==========
+
 
     fun addSkill(skill: String) {
         if (skill.isNotBlank() && skill !in _resume.value.skills) {
@@ -374,7 +371,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Projects ==========
+
 
     fun addProject(project: Project) {
         _resume.update {
@@ -401,7 +398,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Certifications ==========
+
 
     fun addCertification(certification: Certification) {
         _resume.update {
@@ -428,7 +425,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Languages ==========
+
 
     fun addLanguage(language: Language) {
         _resume.update {
@@ -455,7 +452,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Theme Management ==========
+
 
     fun updateTheme(theme: ResumeTheme) {
         _resume.update { it.copy(theme = theme) }
@@ -477,7 +474,7 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
         triggerAutoSave()
     }
 
-    // ========== Section Configuration ==========
+
 
     fun toggleSectionVisibility(sectionType: ResumeSectionType) {
         _resume.update { currentResume ->

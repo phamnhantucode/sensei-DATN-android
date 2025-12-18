@@ -85,7 +85,7 @@ fun ResumeMarkdownScreen(
     val topPadding = systemBarsPadding.calculateTopPadding()
     val bottomPadding = systemBarsPadding.calculateBottomPadding()
 
-    // Handle export events
+
     LaunchedEffect(viewModel) {
         viewModel.exportEvents.collect { event ->
             when (event) {
@@ -102,7 +102,7 @@ fun ResumeMarkdownScreen(
         }
     }
 
-    // Handle sync events
+
     LaunchedEffect(viewModel) {
         viewModel.syncEvents.collect { event ->
             Toast.makeText(context, event, Toast.LENGTH_SHORT).show()
@@ -116,7 +116,7 @@ fun ResumeMarkdownScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -133,7 +133,7 @@ fun ResumeMarkdownScreen(
                             bottom = 12.dp
                         )
                 ) {
-                    // First Row: Back button and Title
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -171,7 +171,7 @@ fun ResumeMarkdownScreen(
                         }
                     }
 
-                    // Second Row: Export Buttons
+
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier
@@ -180,7 +180,7 @@ fun ResumeMarkdownScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Copy to Clipboard
+
                         OutlinedButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(markdown))
@@ -198,7 +198,7 @@ fun ResumeMarkdownScreen(
                             Text("Copy")
                         }
 
-                        // Export as Markdown
+
                         Button(
                             onClick = { viewModel.exportMarkdown() },
                             shape = RoundedCornerShape(24.dp),
@@ -220,7 +220,7 @@ fun ResumeMarkdownScreen(
                             )
                         }
 
-                        // Export as PDF
+
                         Button(
                             onClick = { viewModel.exportPdf() },
                             shape = RoundedCornerShape(24.dp),
@@ -249,7 +249,7 @@ fun ResumeMarkdownScreen(
                 }
             }
 
-            // Markdown Content
+
             when (val state = uiState) {
                 is MarkdownUiState.Loading -> {
                     Box(
@@ -342,7 +342,7 @@ fun ResumeMarkdownScreen(
                             )
                         }
 
-                        // FAB to toggle view mode
+
                         FloatingActionButton(
                             onClick = { isPreviewMode = !isPreviewMode },
                             modifier = Modifier
@@ -369,13 +369,7 @@ private fun MarkdownWebView(
     markdown: String,
     modifier: Modifier = Modifier
 ) {
-    // Get theme colors
-    val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
-    val textColor = MaterialTheme.colorScheme.onBackground.toArgb()
-    val linkColor = MaterialTheme.colorScheme.primary.toArgb()
-    val codeBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-
-    // Convert colors to hex - memoized to prevent recalculation
+    // Memoized hex colors
     val bgHex = remember(backgroundColor) {
         String.format("#%06X", 0xFFFFFF and backgroundColor)
     }
@@ -536,8 +530,7 @@ private fun escapeJsString(str: String): String {
 }
 
 /**
- * Resume Markdown Content - for embedding in tabs
- * Shows the markdown preview/editor without the scaffold/app bar
+ * Resume Markdown Content for embedding in tabs.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -553,7 +546,7 @@ fun ResumeMarkdownContentInternal() {
 
     var isPreviewMode by remember { mutableStateOf(true) }
 
-    // Handle export events
+
     LaunchedEffect(viewModel) {
         viewModel.exportEvents.collect { event ->
             when (event) {
@@ -570,7 +563,7 @@ fun ResumeMarkdownContentInternal() {
         }
     }
 
-    // Handle sync events
+
     LaunchedEffect(viewModel) {
         viewModel.syncEvents.collect { event ->
             Toast.makeText(context, event, Toast.LENGTH_SHORT).show()
@@ -578,7 +571,7 @@ fun ResumeMarkdownContentInternal() {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Action buttons row
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -586,7 +579,7 @@ fun ResumeMarkdownContentInternal() {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Copy button
+
             OutlinedButton(
                 onClick = {
                     clipboardManager.setText(AnnotatedString(markdown))
@@ -603,7 +596,7 @@ fun ResumeMarkdownContentInternal() {
                 Text("Copy")
             }
 
-            // Export to PDF
+
             Button(
                 onClick = {
                     viewModel.exportPdf()
@@ -628,7 +621,7 @@ fun ResumeMarkdownContentInternal() {
                 Text("Export PDF")
             }
 
-            // Sync button (reloads from form data)
+
             OutlinedButton(
                 onClick = { viewModel.retry() },
                 enabled = uiState !is MarkdownUiState.Loading,
@@ -638,7 +631,7 @@ fun ResumeMarkdownContentInternal() {
             }
         }
 
-        // Markdown Content
+
         when (val state = uiState) {
             is MarkdownUiState.Loading -> {
                 Box(
@@ -688,7 +681,7 @@ fun ResumeMarkdownContentInternal() {
 
             is MarkdownUiState.Success, is MarkdownUiState.Syncing -> {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // WebView preview
+
                     MarkdownWebView(
                         markdown = markdown,
                         modifier = Modifier
@@ -698,7 +691,7 @@ fun ResumeMarkdownContentInternal() {
                             }
                     )
 
-                    // Raw text view
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -728,7 +721,7 @@ fun ResumeMarkdownContentInternal() {
                         Spacer(modifier = Modifier.height(80.dp))
                     }
 
-                    // FAB to toggle view mode
+
                     FloatingActionButton(
                         onClick = { isPreviewMode = !isPreviewMode },
                         modifier = Modifier

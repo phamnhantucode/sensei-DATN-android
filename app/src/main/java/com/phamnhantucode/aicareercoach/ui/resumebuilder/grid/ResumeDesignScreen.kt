@@ -90,7 +90,7 @@ fun ResumeDesignScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
-            // Error message
+
             error?.let { errorMessage ->
                 Card(
                     modifier = Modifier
@@ -108,7 +108,7 @@ fun ResumeDesignScreen(
                 }
             }
 
-            // Templates Section
+
             TemplatesSection(
                 templates = templates,
                 isLoading = isLoadingTemplates,
@@ -119,7 +119,7 @@ fun ResumeDesignScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // My Designs Section
+
             MyDesignsSection(
                 designs = designs,
                 isLoading = isLoading,
@@ -132,7 +132,7 @@ fun ResumeDesignScreen(
             )
             }
 
-            // Floating Action Button for New Design
+
             ExtendedFloatingActionButton(
                 onClick = { onNavigateToGridEditor(null, null, true, null) },
                 modifier = Modifier
@@ -152,7 +152,7 @@ fun ResumeDesignScreen(
         }
     }
 
-    // Delete Confirmation Dialog
+
     showDeleteConfirmation?.let { designId ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
@@ -224,16 +224,16 @@ private fun ResumeCard(
                     .fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Thumbnail section
+
                 ResumeCardThumbnail(variant = variant)
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Info section
+
                 ResumeCardInfo(variant = variant)
             }
 
-            // Actions overlay (delete button for designs)
+
             ResumeCardActions(variant = variant)
         }
     }
@@ -320,7 +320,7 @@ private fun ThumbnailPlaceholder() {
 @Composable
 private fun ResumeCardInfo(variant: ResumeCardVariant) {
     Column {
-        // Name/Title
+
         Text(
             text = when (variant) {
                 is ResumeCardVariant.Template -> variant.template.name
@@ -332,7 +332,7 @@ private fun ResumeCardInfo(variant: ResumeCardVariant) {
             overflow = TextOverflow.Ellipsis
         )
 
-        // Subtitle (description for templates, date for designs)
+
         Text(
             text = when (variant) {
                 is ResumeCardVariant.Template -> variant.template.description
@@ -594,7 +594,7 @@ fun ResumeDesignContent(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Error message
+
             error?.let { errorMessage ->
                 Card(
                     modifier = Modifier
@@ -612,7 +612,7 @@ fun ResumeDesignContent(
                 }
             }
 
-            // Current Design Section (if exists)
+
             if (hasDesign) {
                 CurrentDesignSection(
                     design = currentDesign!!,
@@ -625,7 +625,7 @@ fun ResumeDesignContent(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Templates Section - for selecting/changing template
+
             TemplateSelectorSection(
                 templates = templates,
                 isLoading = isLoadingTemplates,
@@ -645,7 +645,7 @@ fun ResumeDesignContent(
         }
     }
 
-    // Change Template Confirmation Dialog
+
     showChangeTemplateConfirmation?.let { template ->
         AlertDialog(
             onDismissRequest = { showChangeTemplateConfirmation = null },
@@ -789,7 +789,7 @@ private fun CurrentDesignSection(
                 }
             }
 
-            // Design info
+
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = design.name,

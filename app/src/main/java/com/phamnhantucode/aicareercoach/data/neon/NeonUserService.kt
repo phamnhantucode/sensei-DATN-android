@@ -16,20 +16,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.text.Charsets.UTF_8
 
-/**
- * Minimal client for Neon REST SQL API used to mirror Clerk users
- * into the Postgres schema defined under prisma/schema.prisma.
- */
+// Synces Clerk users to Neon DB
 object NeonUserService {
 
     private const val TAG = "NeonUserService"
     private val client = OkHttpClient()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    /**
-     * Generates a random ID matching Prisma's default: encode(gen_random_bytes(12), 'hex')
-     * This creates a 24-character hex string from 12 random bytes.
-     */
+    // Generates random 12-byte hex ID
     private fun generateRandomId(): String {
         val randomBytes = ByteArray(12)
         java.security.SecureRandom().nextBytes(randomBytes)
@@ -44,14 +38,7 @@ object NeonUserService {
      * @param industry The industry name (required for new users)
      * @param authToken Optional authentication token
      */
-    /**
-     * Creates or updates a user with the industry field.
-     * This should be used during onboarding after ensuring the IndustryInsight exists.
-     *
-     * @param user The Clerk user to sync
-     * @param industry The industry name (required for new users)
-     * @param authToken Optional authentication token
-     */
+    // Upserts user with industry
     suspend fun upsertUserWithIndustry(
         user: User,
         industry: String,
@@ -127,11 +114,7 @@ object NeonUserService {
         }
     }
 
-    /**
-     * Legacy method that creates/updates user without industry.
-     * WARNING: This will fail if the database requires industry to be non-null.
-     * Use upsertUserWithIndustry() instead for onboarding flow.
-     */
+    // Upsert user (legacy)
     suspend fun upsertUser(user: User, authToken: String? = null) = withContext(Dispatchers.IO) {
         val authorizationHeader = resolveAuthorizationHeader(authToken)
             ?: run {

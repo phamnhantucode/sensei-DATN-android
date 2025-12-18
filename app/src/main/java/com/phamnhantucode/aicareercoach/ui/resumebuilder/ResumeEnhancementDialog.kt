@@ -65,7 +65,7 @@ fun ResumeEnhancementDialog(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Enhanced Header with gradient background
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -88,7 +88,7 @@ fun ResumeEnhancementDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Animated sparkle icon
+
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -146,7 +146,7 @@ fun ResumeEnhancementDialog(
                     }
                 }
 
-                // Content
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -214,7 +214,7 @@ private fun EnhancedLoadingState() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Animated loading indicator with sparkle
+
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -264,7 +264,7 @@ private fun EnhancedLoadingState() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Progress steps
+
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.Start,
@@ -395,7 +395,7 @@ private fun EnhancedInputState(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Introduction card
+
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
@@ -430,7 +430,7 @@ private fun EnhancedInputState(
             }
         }
 
-        // Job Description Section
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -545,7 +545,7 @@ private fun EnhancedInputState(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Enhance Button
+
         Button(
             onClick = onEnhance,
             modifier = Modifier
@@ -584,7 +584,7 @@ private fun EnhancedSuggestionsContent(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Success header
+
         item {
             Card(
                 colors = CardDefaults.cardColors(
@@ -628,14 +628,14 @@ private fun EnhancedSuggestionsContent(
             }
         }
 
-        // Overall Feedback
+
         suggestions.overall?.let { overall ->
             item {
                 EnhancedOverallCard(overall)
             }
         }
 
-        // Professional Summary
+
         suggestions.professionalSummary?.let { summary ->
             item {
                 val key = "summary"
@@ -654,7 +654,7 @@ private fun EnhancedSuggestionsContent(
             }
         }
 
-        // Work Experience
+
         suggestions.workExperiences?.forEach { workExp ->
             val experience = resume.workExperiences.find { it.id == workExp.id }
             if (experience != null && workExp.responsibilities?.isNotEmpty() == true) {
@@ -673,7 +673,7 @@ private fun EnhancedSuggestionsContent(
             }
         }
 
-        // Skills
+
         suggestions.skills?.let { skills ->
             if (skills.suggested?.isNotEmpty() == true || skills.reorder?.isNotEmpty() == true) {
                 item {
@@ -691,7 +691,7 @@ private fun EnhancedSuggestionsContent(
             }
         }
 
-        // Bottom padding for better scrolling
+
         item {
             Spacer(modifier = Modifier.height(20.dp))
         }
@@ -839,7 +839,7 @@ private fun EnhancedSuggestionCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -897,7 +897,7 @@ private fun EnhancedSuggestionCard(
                 }
             }
 
-            // Enhanced version
+
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
@@ -933,7 +933,7 @@ private fun EnhancedSuggestionCard(
                 }
             }
 
-            // Original (when expanded)
+
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically() + fadeIn(),
@@ -987,7 +987,7 @@ private fun EnhancedSuggestionCard(
                 }
             }
 
-            // Apply button
+
             if (!isApplied) {
                 Button(
                     onClick = onApply,
@@ -1040,7 +1040,7 @@ private fun EnhancedWorkExperienceCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1106,7 +1106,7 @@ private fun EnhancedWorkExperienceCard(
                 }
             }
 
-            // Enhancement count badge
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1124,7 +1124,7 @@ private fun EnhancedWorkExperienceCard(
                 }
             }
 
-            // Responsibilities
+
             suggestions.responsibilities?.forEachIndexed { index, respSuggestion ->
                 Card(
                     colors = CardDefaults.cardColors(
@@ -1204,7 +1204,7 @@ private fun EnhancedWorkExperienceCard(
                 }
             }
 
-            // Apply button
+
             if (!isApplied) {
                 Button(
                     onClick = { onApply(selectedResponsibilities) },
@@ -1258,7 +1258,7 @@ private fun EnhancedSkillsCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1316,7 +1316,7 @@ private fun EnhancedSkillsCard(
                 }
             }
 
-            // Enhanced skills
+
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
@@ -1345,7 +1345,7 @@ private fun EnhancedSkillsCard(
                         )
                     }
                     
-                    // Skills as chips
+
                     androidx.compose.foundation.layout.FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1367,7 +1367,7 @@ private fun EnhancedSkillsCard(
                 }
             }
 
-            // Original and reason (when expanded)
+
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically() + fadeIn(),
@@ -1421,7 +1421,7 @@ private fun EnhancedSkillsCard(
                 }
             }
 
-            // Apply button
+
             if (!isApplied) {
                 Button(
                     onClick = { onApply(newSkills) },

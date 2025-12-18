@@ -75,20 +75,20 @@ fun DraggableElement(
     val density = LocalDensity.current.density
     val cellSizePx = gridConfig.cellSizeDp * density * zoomLevel
 
-    // Offset states for drag tracking
+
     var offsetX by remember(element.id) { mutableFloatStateOf(0f) }
     var offsetY by remember(element.id) { mutableFloatStateOf(0f) }
     var currentDragPosition by remember(element.id) { mutableStateOf(element.position) }
 
-    // Calculate base position in pixels (no animation - instant update)
+
     val baseX = element.position.col * cellSizePx
     val baseY = element.position.row * cellSizePx
 
-    // Track the last known position to detect when it changes
+
     var lastPosition by remember(element.id) { mutableStateOf(element.position) }
 
     // When element position changes, reset offsets synchronously
-    // When element position changes, reset offsets synchronously
+
     if (element.position != lastPosition) {
         // Only reset offsets if we're not currently dragging
         // This prevents the drag offset from being lost when the element is reordered (position changes) during a drag
@@ -99,20 +99,19 @@ fun DraggableElement(
         lastPosition = element.position
     }
 
-    // Calculate size in pixels
-    // For ShapeElements with custom dimensions, use those instead of grid-based sizing
+
     val width = if (containerWidth != null) {
         containerWidth
     } else if (element is ResumeElement.ShapeElement && element.customWidthDp != null) {
         element.customWidthDp * density * zoomLevel
     } else if (element.position.widthMode == SizeMode.WRAP_CONTENT) {
-        // For wrap content, we'll use a placeholder width that will be adjusted by the content
+
         element.position.colSpan * cellSizePx // Use colSpan as max width
     } else {
         element.position.colSpan * cellSizePx
     }
 
-    // Track if we need to update cached height
+
     var pendingHeightUpdate by remember(element.id, element.position.cachedHeightDp) { 
         mutableStateOf<Pair<Float, Int>?>(null) 
     }
@@ -120,7 +119,7 @@ fun DraggableElement(
     val height = if (element is ResumeElement.ShapeElement && element.customHeightDp != null) {
         element.customHeightDp * density * zoomLevel
     } else if (element.position.heightMode == SizeMode.WRAP_CONTENT) {
-        // Store in local variable to allow smart cast
+
         val cachedHeight = element.position.cachedHeightDp
         
         // Calculate actual content height for wrap content mode
@@ -152,7 +151,7 @@ fun DraggableElement(
         element.position.rowSpan * cellSizePx
     }
     
-    // Apply pending height updates after composition
+
     LaunchedEffect(pendingHeightUpdate) {
         pendingHeightUpdate?.let { (heightInDp, newRowSpan) ->
             val newPosition = element.position.copy(
@@ -374,10 +373,10 @@ fun DraggableElement(
                 }
             )
     ) {
-        // Content (rendered first, at the bottom)
+
         content()
 
-        // Selection border (rendered second, above content)
+
         val isDivider = (element as? ResumeElement.ShapeElement)?.shapeType == ShapeType.DIVIDER
         if (isSelected && !isDivider) {
             SelectionBorder(
@@ -390,17 +389,17 @@ fun DraggableElement(
             )
         }
 
-        // Lock indicator (rendered third, above selection border) - only when selected
+
         if (isSelected && element.locked) {
             LockIndicator()
         }
 
-        // Template tag indicator - shows when element is selected and has a tag
+
         if (isSelected && element.userInfoTag != null && element.userInfoTag != UserInfoTag.NONE) {
             TemplateTagIndicator(tag = element.userInfoTag!!)
         }
 
-        // Properties button (rendered last, on top of everything)
+
         if (isSelected && !element.locked) {
             val popupOffsetY = with(LocalDensity.current) { (-36).dp.roundToPx() }
             
@@ -443,7 +442,7 @@ private fun BoxScope.SelectionBorder(
             )
     )
 
-    // Resize handles (corners and edges)
+
     if (!element.locked && enabled) {
         ResizeHandles(
             element = element,
@@ -469,14 +468,14 @@ private fun BoxScope.ResizeHandles(
     val handleSize = 8.dp
     val handleColor = Color(0xFF2196F3)
 
-    // Key by element.id to reset state when element changes
+
     var accumulatedDeltaX by remember(element.id) { mutableFloatStateOf(0f) }
     var accumulatedDeltaY by remember(element.id) { mutableFloatStateOf(0f) }
 
-    // Use rememberUpdatedState to always get the latest position without recomposition
+
     val currentPosition = rememberUpdatedState(element.position)
 
-    // Capture the position at the START of resize gesture (nullable, only set during gesture)
+
     var gestureStartPosition by remember(element.id) { mutableStateOf<GridPosition?>(null) }
 
     val onResizeStart: () -> Unit = {
@@ -514,7 +513,7 @@ private fun BoxScope.ResizeHandles(
         gestureStartPosition = null  // Clear gesture state so next resize captures fresh position
     }
 
-    // Top-left
+
     ResizeHandle(
         handle = ResizeHandle.TOP_LEFT,
         size = handleSize,
@@ -525,7 +524,7 @@ private fun BoxScope.ResizeHandles(
         onResizeEnd = resetAccumulated
     )
 
-    // Top-right
+
     ResizeHandle(
         handle = ResizeHandle.TOP_RIGHT,
         size = handleSize,
@@ -536,7 +535,7 @@ private fun BoxScope.ResizeHandles(
         onResizeEnd = resetAccumulated
     )
 
-    // Bottom-left
+
     ResizeHandle(
         handle = ResizeHandle.BOTTOM_LEFT,
         size = handleSize,
@@ -547,7 +546,7 @@ private fun BoxScope.ResizeHandles(
         onResizeEnd = resetAccumulated
     )
 
-    // Bottom-right
+
     ResizeHandle(
         handle = ResizeHandle.BOTTOM_RIGHT,
         size = handleSize,
@@ -558,7 +557,7 @@ private fun BoxScope.ResizeHandles(
         onResizeEnd = resetAccumulated
     )
 
-    // Edge handles (optional - can add later)
+
 }
 
 /**
@@ -594,7 +593,7 @@ private fun BoxScope.ResizeHandle(
                 )
             }
     ) {
-        // Visual handle (smaller than the hit area)
+
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -682,7 +681,7 @@ private fun FloatingToolbar(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
-            // Settings Button
+
             IconButton(
                 onClick = onOpenProperties,
                 modifier = Modifier.size(24.dp)
@@ -695,7 +694,7 @@ private fun FloatingToolbar(
                 )
             }
 
-            // Separator
+
             Box(
                 modifier = Modifier
                     .width(1.dp)
@@ -703,7 +702,7 @@ private fun FloatingToolbar(
                     .background(Color.White.copy(alpha = 0.5f))
             )
 
-            // Delete Button
+
             IconButton(
                 onClick = onDelete,
                 modifier = Modifier.size(24.dp)

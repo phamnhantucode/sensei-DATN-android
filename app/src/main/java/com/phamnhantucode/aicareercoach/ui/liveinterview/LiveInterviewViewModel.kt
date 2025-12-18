@@ -15,10 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
-/**
- * ViewModel for managing live interview state and orchestrating audio recording,
- * transcription, and AI feedback.
- */
+// Live interview ViewModel
 class LiveInterviewViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = LiveInterviewRepository(context = application)
@@ -74,9 +71,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         timerJob?.cancel()
     }
 
-    /**
-     * Starts a new batch interview with all questions pre-generated.
-     */
+    // Starts batch interview
     fun startBatchInterview(config: InterviewConfig) {
         Log.d(TAG, "startBatchInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
         viewModelScope.launch {
@@ -143,9 +138,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Starts a new live interview with the specified configuration.
-     */
+    // Starts live interview
     fun startInterview(config: InterviewConfig) {
         Log.d(TAG, "startInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}, batchMode=${config.useBatchMode}")
         
@@ -156,9 +149,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Starts interview with immediate feedback (original mode).
-     */
+    // Starts immediate feedback interview
     private fun startImmediateFeedbackInterview(config: InterviewConfig) {
         Log.d(TAG, "startImmediateFeedbackInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}")
         viewModelScope.launch {
@@ -221,9 +212,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Starts recording audio (push-to-talk pressed).
-     */
+    // Starts audio recording
     fun startRecording() {
         recordingStartTime = System.currentTimeMillis()
         currentAudioFile = audioRecorder.startRecording()
@@ -232,9 +221,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Stops recording and processes the answer (push-to-talk released).
-     */
+    // Stops recording and processes answer
     fun stopRecordingAndProcess() {
         viewModelScope.launch {
             // Check minimum recording duration
@@ -428,9 +415,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Continues to the next question after viewing feedback.
-     */
+    // Continues to next question
     fun continueToNextQuestion() {
         val session = _interviewSession.value ?: return
         val nextIndex = session.currentQuestionIndex + 1
@@ -472,9 +457,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Pauses the interview.
-     */
+    // Pauses interview
     fun pauseInterview() {
         stopTimer()
         val session = _interviewSession.value ?: return
@@ -482,9 +465,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         _uiState.value = LiveInterviewUiState.Paused
     }
 
-    /**
-     * Resumes the interview from pause.
-     */
+    // Resumes interview
     fun resumeInterview() {
         startTimer()
         val session = _interviewSession.value ?: return
@@ -492,9 +473,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         _uiState.value = LiveInterviewUiState.ActiveQuestion
     }
 
-    /**
-     * Completes the interview and generates summary.
-     */
+    // Completes interview
     fun completeInterview() {
         stopTimer()
         val session = _interviewSession.value ?: return
@@ -536,17 +515,13 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /**
-     * Switches between batch mode and immediate feedback mode.
-     */
+    // Toggles interview mode
     fun toggleInterviewMode(useBatch: Boolean) {
         _useBatchMode.value = useBatch
         Log.d(TAG, "Interview mode switched to: ${if (useBatch) "Batch" else "Immediate"}")
     }
 
-    /**
-     * Abandons the interview.
-     */
+    // Abandons interview
     fun abandonInterview() {
         stopTimer()
         viewModelScope.launch {
@@ -562,9 +537,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         userAnswers.clear()
     }
 
-    /**
-     * Clears error message.
-     */
+    // Clears error
     fun clearError() {
         _errorMessage.value = null
     }
@@ -584,9 +557,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     }
 }
 
-/**
- * UI state for live interview screen.
- */
+// Live interview UI state
 sealed class LiveInterviewUiState {
     object Setup : LiveInterviewUiState()
     object Starting : LiveInterviewUiState()
@@ -604,9 +575,7 @@ sealed class LiveInterviewUiState {
     data class BatchFeedback(val questions: List<LiveQuestion>) : LiveInterviewUiState()  // Show all feedback
 }
 
-/**
- * Configuration for starting an interview.
- */
+// Interview configuration
 data class InterviewConfig(
     val userId: String,
     val interviewType: InterviewType,
@@ -617,9 +586,7 @@ data class InterviewConfig(
     val useBatchMode: Boolean = true
 )
 
-/**
- * Feedback for a single question.
- */
+// Question feedback
 data class QuestionFeedback(
     val transcription: String,
     val feedback: String,

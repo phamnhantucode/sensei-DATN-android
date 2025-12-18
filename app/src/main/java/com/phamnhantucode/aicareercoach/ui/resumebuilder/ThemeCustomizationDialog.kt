@@ -41,7 +41,7 @@ fun ThemeCustomizationDialog(
             tonalElevation = 8.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
+
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surfaceVariant
@@ -67,7 +67,7 @@ fun ThemeCustomizationDialog(
                     }
                 }
 
-                // Tabs
+
                 TabRow(
                     selectedTabIndex = selectedTab,
                     modifier = Modifier.fillMaxWidth()
@@ -94,7 +94,7 @@ fun ThemeCustomizationDialog(
                     )
                 }
 
-                // Content
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -120,7 +120,7 @@ fun ThemeCustomizationDialog(
                     }
                 }
 
-                // Footer Buttons
+
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -229,7 +229,7 @@ private fun TemplateCard(
                 )
             }
 
-            // Color preview
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -303,7 +303,7 @@ private fun ColorPicker(
     color: Color,
     onColorSelected: (Color) -> Unit
 ) {
-    // Predefined color palette for quick selection
+    // Quick color palette
     val colorPalette = listOf(
         Color(0xFF000000), Color(0xFF212121), Color(0xFF424242), Color(0xFF757575),
         Color(0xFF1976D2), Color(0xFF0288D1), Color(0xFF0097A7), Color(0xFF00796B),
@@ -332,7 +332,7 @@ private fun ColorPicker(
             )
         }
 
-        // Color palette grid
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -380,7 +380,7 @@ private fun TypographyTab(
             fontWeight = FontWeight.Bold
         )
 
-        // Font sizes
+
         SliderSetting(
             label = "Header Size",
             value = typography.headerSize,
@@ -415,7 +415,7 @@ private fun TypographyTab(
 
         Divider()
 
-        // Font weights
+
         SliderSetting(
             label = "Header Weight",
             value = typography.headerWeight.toFloat(),
@@ -468,7 +468,7 @@ private fun LayoutTab(
             fontWeight = FontWeight.Bold
         )
 
-        // Layout Type
+
         Text(
             text = "Layout Type",
             style = MaterialTheme.typography.labelLarge
@@ -485,7 +485,7 @@ private fun LayoutTab(
 
         Divider()
 
-        // Section Style
+
         Text(
             text = "Section Style",
             style = MaterialTheme.typography.labelLarge
@@ -502,7 +502,7 @@ private fun LayoutTab(
 
         Divider()
 
-        // Spacing
+
         SliderSetting(
             label = "Spacing",
             value = layout.spacing.toFloat(),

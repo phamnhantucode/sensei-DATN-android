@@ -14,10 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Repository responsible for managing resume data.
- * Now operates in Neon-only mode (local caching disabled to fix sync corruption issues).
- */
+// Manages resume data
 class ResumeRepository private constructor(context: Context) {
 
     // Keep DAO reference for potential future use, but don't use it for now
@@ -42,10 +39,7 @@ class ResumeRepository private constructor(context: Context) {
      * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
      * If the user doesn't exist in Neon yet, creates them first.
      */
-    /**
-     * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
-     * If the user doesn't exist in Neon yet, creates them first.
-     */
+    // Get current Neon user ID
     suspend fun getCurrentUserId(): String? {
         return try {
             val clerkUser = Clerk.user ?: return null
@@ -72,19 +66,12 @@ class ResumeRepository private constructor(context: Context) {
         }
     }
     
-    /**
-     * Gets current user ID, throws if not available
-     */
+    // Require current user ID
     private suspend fun requireCurrentUserId(): String {
         return getCurrentUserId() ?: throw IllegalStateException("User not logged in or failed to get user ID")
     }
 
-    /**
-     * Saves a resume directly to Neon (local caching disabled)
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, preserve existing 'json' field when gridResume is null (default: true)
-     * @deprecated Use GridResumeRepository.saveDesign() instead. Form-based resumes are deprecated in favor of GridResume.
-     */
+    // Save resume
     @Deprecated(
         message = "Use GridResumeRepository.saveDesign() instead",
         replaceWith = ReplaceWith(
@@ -120,12 +107,7 @@ class ResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Updates an existing resume directly in Neon (local caching disabled)
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, preserve existing 'json' field when gridResume is null (default: true)
-     * @deprecated Use GridResumeRepository.updateDesign() instead. Form-based resumes are deprecated in favor of GridResume.
-     */
+    // Update resume
     @Deprecated(
         message = "Use GridResumeRepository.updateDesign() instead",
         replaceWith = ReplaceWith(
@@ -159,9 +141,7 @@ class ResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets a resume by ID directly from Neon (local caching disabled)
-     */
+    // Get resume
     suspend fun getResume(resumeId: String, forceRemote: Boolean = false): Result<Resume?> =
         withContext(Dispatchers.IO) {
             try {
@@ -184,9 +164,7 @@ class ResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets all resumes for the current user directly from Neon (local caching disabled)
-     */
+    // Get all resumes
     suspend fun getAllResumes(forceRemote: Boolean = false): Result<List<Resume>> =
         withContext(Dispatchers.IO) {
             try {
@@ -211,9 +189,7 @@ class ResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets the most recently updated resume for the current user
-     */
+    // Get latest resume
     suspend fun getLatestResume(): Result<Resume?> = withContext(Dispatchers.IO) {
         try {
             val allResumes = getAllResumes(forceRemote = true)
@@ -227,9 +203,7 @@ class ResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Deletes a resume from Neon (local caching disabled)
-     */
+    // Delete resume
     suspend fun deleteResume(resumeId: String, syncToRemote: Boolean = true): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
@@ -251,9 +225,7 @@ class ResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets the count of resumes for the current user (from Neon)
-     */
+    // Get resume count
     suspend fun getResumeCount(): Int = withContext(Dispatchers.IO) {
         try {
             val allResumes = getAllResumes(forceRemote = true)
@@ -264,18 +236,14 @@ class ResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Clears all local resume cache (no-op in Neon-only mode)
-     */
+    // Clear local cache
     suspend fun clearLocalCache(): Result<Unit> = withContext(Dispatchers.IO) {
         // No-op in Neon-only mode
         Log.d(TAG, "[ResumeRepository] clearLocalCache called but local caching is disabled")
         Result.success(Unit)
     }
 
-    /**
-     * Syncs all local resumes to remote (no-op in Neon-only mode)
-     */
+    // Sync all to remote
     suspend fun syncAllToRemote(): Result<Int> = withContext(Dispatchers.IO) {
         // No-op in Neon-only mode - data is already in Neon
         Log.d(TAG, "[ResumeRepository] syncAllToRemote called but local caching is disabled")

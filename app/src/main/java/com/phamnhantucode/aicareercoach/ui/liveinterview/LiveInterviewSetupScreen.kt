@@ -25,9 +25,7 @@ import com.phamnhantucode.aicareercoach.data.interview.InterviewType
 
 private const val TAG = "LiveInterviewSetupScreen"
 
-/**
- * Setup screen for configuring live interview parameters.
- */
+// Interview setup screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveInterviewSetupScreen(

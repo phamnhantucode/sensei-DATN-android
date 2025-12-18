@@ -56,7 +56,7 @@ fun PropertyPanel(
     var resume by remember { mutableStateOf<Resume?>(null) }
     var personalInfo by remember { mutableStateOf<PersonalInfo?>(null) }
 
-    // Load resume when panel opens
+
     LaunchedEffect(Unit) {
         scope.launch {
             val result = repository.getLatestResume()
@@ -67,10 +67,10 @@ fun PropertyPanel(
         }
     }
 
-    // Track previous tag to detect changes
+
     var previousTag by remember { mutableStateOf(element.userInfoTag) }
     
-    // Auto-update text elements with user data when personalInfo loads and element has a tag
+
     LaunchedEffect(personalInfo, element.userInfoTag) {
         // Update content if:
         // 1. Content is empty (initial fill), OR
@@ -235,7 +235,7 @@ fun PropertyPanel(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        // Header
+
         Surface(
             tonalElevation = 1.dp
         ) {
@@ -259,7 +259,7 @@ fun PropertyPanel(
 
         Divider()
 
-        // Scrollable content
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -267,14 +267,14 @@ fun PropertyPanel(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Common properties (all elements)
+
             CommonPropertiesSection(
                 element = element,
                 onUpdateElement = onUpdateElement,
                 personalInfo = personalInfo,
                 resume = resume,
                 onRefreshUserData = {
-                    // Reload resume data
+
                     scope.launch {
                         val result = repository.getLatestResume()
                         result.onSuccess { formResume ->
@@ -288,7 +288,7 @@ fun PropertyPanel(
 
             Divider()
 
-            // Type-specific properties
+
             when (element) {
                 is ResumeElement.TextElement -> {
                     TextElementProperties(
@@ -389,7 +389,7 @@ fun PropertyPanel(
 
             Divider()
 
-            // Style properties
+
             StylePropertiesSection(
                 element = element,
                 onUpdateElement = onUpdateElement
@@ -397,7 +397,7 @@ fun PropertyPanel(
 
             Divider()
 
-            // Remove element button
+
             var showDeleteConfirmation by remember { mutableStateOf(false) }
 
             Button(
@@ -412,7 +412,7 @@ fun PropertyPanel(
                 Text("Remove Element")
             }
 
-            // Delete confirmation dialog
+
             if (showDeleteConfirmation) {
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmation = false },
@@ -456,7 +456,7 @@ private fun CommonPropertiesSection(
     gridConfig: GridConfig? = null
 ) {
     PropertySection(title = "Position & Size") {
-        // Position
+
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -480,7 +480,7 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Size Mode Toggles
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -507,19 +507,19 @@ private fun CommonPropertiesSection(
                 checked = element.position.heightMode == SizeMode.WRAP_CONTENT,
                 onCheckedChange = { wrapHeight ->
                     val newMode = if (wrapHeight) SizeMode.WRAP_CONTENT else SizeMode.FIXED
-                    // Clear cached height when changing mode so it recalculates
+
                     val newPosition = element.position.copy(heightMode = newMode, cachedHeightDp = null)
                     onUpdateElement(updateElementPosition(element, newPosition))
                 }
             )
         }
 
-        // Size (only show when not wrap content)
+
         if (element.position.widthMode == SizeMode.FIXED || element.position.heightMode == SizeMode.FIXED) {
             val isDivider = (element as? ResumeElement.ShapeElement)?.shapeType == ShapeType.DIVIDER
 
             if (isDivider) {
-                // Use sliders for dividers
+
                 if (element.position.heightMode == SizeMode.FIXED) {
                     val maxRows = gridConfig?.rows ?: 136
                     SliderField(
@@ -545,7 +545,7 @@ private fun CommonPropertiesSection(
                     )
                 }
             } else {
-                // Use NumberFields for other elements
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -575,7 +575,7 @@ private fun CommonPropertiesSection(
             }
         }
 
-        // Z-Index
+
         NumberField(
             label = "Layer (Z-Index)",
             value = element.zIndex,
@@ -585,7 +585,7 @@ private fun CommonPropertiesSection(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Lock toggle
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -600,7 +600,7 @@ private fun CommonPropertiesSection(
             )
         }
 
-        // Template Mode Tag (for TextElement, ImageElement, and data elements)
+
         if (element is ResumeElement.TextElement ||
             element is ResumeElement.ImageElement ||
             element is ResumeElement.WorkExperienceElement ||
@@ -669,7 +669,7 @@ private fun CommonPropertiesSection(
                                         val newTag = if (tag == UserInfoTag.NONE) null else tag
                                         var updatedElement = updateElementTag(element, newTag)
 
-                                        // Auto-apply user data if personalInfo is available and tag is not NONE
+
                                         if (newTag != null && personalInfo != null) {
                                             updatedElement = when (updatedElement) {
                                                 is ResumeElement.TextElement -> {
@@ -1436,7 +1436,7 @@ private fun ShapeElementProperties(
             }
         }
 
-        // Corner radius
+
         SliderField(
             label = "Corner Radius: ${element.cornerRadius.toInt()}dp",
             value = element.cornerRadius,
@@ -1506,7 +1506,7 @@ private fun ShapeElementProperties(
             }
         }
 
-        // Thickness control for dividers
+
         if (element.shapeType == ShapeType.DIVIDER) {
              val currentThickness = if (element.orientation == DividerOrientation.HORIZONTAL) {
                  element.customHeightDp ?: 2f
@@ -1529,7 +1529,7 @@ private fun ShapeElementProperties(
             )
         }
 
-        // Custom height for non-divider shapes
+
         if (element.shapeType != ShapeType.DIVIDER && element.customHeightDp != null) {
             SliderField(
                 label = "Custom Height: ${element.customHeightDp?.toInt() ?: 2}dp",
@@ -1541,7 +1541,7 @@ private fun ShapeElementProperties(
             )
         }
 
-        // Custom width for LINE type
+
         if (element.shapeType == ShapeType.LINE || (element.shapeType != ShapeType.DIVIDER && element.customWidthDp != null)) {
             SliderField(
                 label = "Custom Width: ${element.customWidthDp?.toInt() ?: 2}dp",
@@ -1553,7 +1553,7 @@ private fun ShapeElementProperties(
             )
         }
 
-        // Padding (only if inside vertical container)
+
         if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
             Divider(modifier = Modifier.padding(vertical = 8.dp))
             PaddingControl(
@@ -1578,7 +1578,7 @@ private fun ChartElementProperties(
     PropertySection(title = "Chart") {
         Text("Chart properties coming soon...")
 
-        // Padding (only if inside vertical container)
+
         if (parentContainer?.effectiveLayoutMode == LayoutMode.VERTICAL) {
             Divider(modifier = Modifier.padding(vertical = 8.dp))
             PaddingControl(

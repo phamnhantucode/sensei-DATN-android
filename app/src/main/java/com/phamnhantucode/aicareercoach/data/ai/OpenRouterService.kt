@@ -11,9 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/**
- * Service for interacting with OpenRouter API (OpenAI-compatible)
- */
+// Connects to OpenRouter
 object OpenRouterService {
 
     private const val BASE_URL = "https://openrouter.ai/api/v1"
@@ -30,9 +28,7 @@ object OpenRouterService {
     private val gson = GsonBuilder().create()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    /**
-     * Performs a chat completion request to OpenRouter
-     */
+    // Sends chat request
     suspend fun chatCompletion(
         messages: List<Message>,
         model: String = DEFAULT_MODEL,
@@ -80,7 +76,7 @@ object OpenRouterService {
         }
     }
 
-    // Data Models
+    // Models
     data class ChatRequest(
         val model: String,
         val messages: List<Message>,

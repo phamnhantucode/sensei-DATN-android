@@ -4,10 +4,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-/**
- * Main container for live interview feature that manages navigation between
- * setup, active interview, and results screens.
- */
+// Live interview feature container
 @Composable
 fun LiveInterviewScreen(
     onBack: () -> Unit

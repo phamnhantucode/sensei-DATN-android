@@ -64,8 +64,7 @@ import java.util.*
 import kotlin.math.roundToInt
 
 /**
- * Resume List Screen
- * Shows all user's resumes and allows creating new ones or editing existing ones
+ * Screen for displaying and managing the user's resumes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +77,7 @@ fun ResumeListScreen(
         ResumeListViewModel(context)
     }
 
-    // Refresh data when screen becomes visible (e.g., navigating back)
+
     LaunchedEffect(Unit) {
         viewModel.loadResumes()
     }
@@ -102,13 +101,13 @@ fun ResumeListScreen(
     val parsingError by viewModel.parsingError.collectAsState()
     val parsedResume by viewModel.parsedResume.collectAsState()
     
-    // Enhancement state
+
     val isEnhancing by viewModel.isEnhancing.collectAsState()
     val enhancementSuggestions by viewModel.enhancementSuggestions.collectAsState()
     val enhancementError by viewModel.enhancementError.collectAsState()
     var showEnhancementDialog by remember { mutableStateOf<String?>(null) }
     
-    // PDF Picker
+
     val pdfPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -274,7 +273,7 @@ fun ResumeListScreen(
                 }
             }
             
-            // Enhanced Parsing Dialog with stages
+
             if (parsingStage != ResumeListViewModel.ParsingStage.IDLE) {
                 CVImportDialog(
                     parsingStage = parsingStage,
@@ -291,7 +290,7 @@ fun ResumeListScreen(
         }
     }
 
-    // Enhancement Dialog
+
     showEnhancementDialog?.let { resumeId ->
         val resume = resumes.find { it.resume.id == resumeId }?.resume
         if (resume != null) {
@@ -314,7 +313,7 @@ fun ResumeListScreen(
         }
     }
 
-    // Delete Confirmation Dialog
+
     showDeleteConfirmation?.let { resumeId ->
         val resumeToDelete = resumes.find { it.resume.id == resumeId }?.resume
         val resumeName = resumeToDelete?.personalInfo?.fullName?.ifBlank { "Untitled Resume" } ?: "Untitled Resume"
@@ -375,14 +374,13 @@ private fun ResumeListItem(
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
 
-    // State to track if the background behind icons is dark
-    // Default to false (light background) -> Dark Icons
+    // Track background brightness for icon visibility
     var isBackgroundDark by remember { mutableStateOf(false) }
 
     // Determine the icon color based on background darkness
     val iconTint = if (isBackgroundDark) Color.White else MaterialTheme.colorScheme.surface
 
-    // Helper to check brightness of the top part of the bitmap
+    // Checks if the top part of the bitmap is dark
     fun checkBrightness(bitmap: android.graphics.Bitmap) {
         // We only care about the top part where icons are (approx top 40dp)
         // Let's sample the top 20% of the image to be safe

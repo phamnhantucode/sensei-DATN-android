@@ -17,10 +17,7 @@ import com.phamnhantucode.aicareercoach.data.neon.NeonResumeService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import java.util.concurrent.TimeUnit
 
-/**
- * WorkManager worker for reliable resume sync to Neon.
- * Survives app process death and retries with exponential backoff on failure.
- */
+// Worker for resume sync
 class ResumeSyncWorker(
     context: Context,
     params: WorkerParameters
@@ -32,10 +29,7 @@ class ResumeSyncWorker(
         private const val KEY_USER_ID = "user_id"
         private const val KEY_IS_UPDATE = "is_update"
 
-        /**
-         * Enqueues a resume sync operation.
-         * Uses REPLACE policy to coalesce rapid auto-save requests for the same resume.
-         */
+        // Enqueues sync
         fun enqueue(
             context: Context,
             resume: Resume,

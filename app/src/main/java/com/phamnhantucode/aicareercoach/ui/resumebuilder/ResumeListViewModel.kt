@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Data class to hold resume with its design thumbnail
+ * Resume with its thumbnail.
  */
 data class ResumeWithThumbnail(
     val resume: Resume,
@@ -21,8 +21,7 @@ data class ResumeWithThumbnail(
 )
 
 /**
- * ViewModel for ResumeListScreen
- * Manages the list of user's resumes
+ * ViewModel for managing the resume list.
  */
 class ResumeListViewModel(context: Context) : ViewModel() {
 
@@ -45,7 +44,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
     
-    // For undo functionality - stores the deleted resume temporarily
+    // Stores deleted resume for undo
     private var pendingDeleteResume: ResumeWithThumbnail? = null
     private var pendingDeleteIndex: Int = -1
 
@@ -54,7 +53,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * Loads all resumes for the current user
+     * Loads the user's resumes.
      */
     fun loadResumes() {
         _isLoading.value = true
@@ -71,7 +70,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                     val gridDesignsResult = gridResumeRepository.getAllDesigns()
                     val gridDesigns = gridDesignsResult.getOrNull() ?: emptyList()
                     
-                    // Debug: Log all IDs to understand the mismatch
+
                     Log.d(TAG, "=== THUMBNAIL DEBUG ===")
                     Log.d(TAG, "Resume IDs: ${resumeList.map { it.id }}")
                     Log.d(TAG, "Grid Design IDs: ${gridDesigns.map { it.id }}")
@@ -92,7 +91,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                     }
                     Log.d(TAG, "Loaded ${_resumes.value.size} resumes with ${thumbnailMap.size} thumbnails")
                     
-                    // No need to sync - data is already from Neon (Neon-only mode)
+
                 } else {
                     _error.value = result.exceptionOrNull()?.message ?: "Failed to load resumes"
                     Log.e(TAG, "Failed to load resumes", result.exceptionOrNull())
@@ -107,8 +106,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * Deletes a resume by ID with callback for undo support
-     * The deletion is optimistic - UI updates immediately, then syncs to backend
+     * Deletes a resume by ID with undo support.
      */
     fun deleteResume(resumeId: String, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -139,7 +137,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
     
     /**
-     * Confirms the pending deletion - actually deletes from database
+     * Permanently deletes the resume pending deletion.
      */
     fun confirmDelete() {
         val resumeToDelete = pendingDeleteResume ?: return
@@ -164,7 +162,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
     
     /**
-     * Undoes the pending deletion - restores the resume to the list
+     * Restores the recently deleted resume.
      */
     fun undoDelete() {
         val resumeToRestore = pendingDeleteResume ?: return
@@ -187,7 +185,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * Duplicates an existing resume
+     * Creates a copy of the specified resume.
      */
     fun duplicateResume(resumeId: String) {
         val resumeToDuplicate = _resumes.value.find { it.resume.id == resumeId }?.resume ?: return
@@ -242,7 +240,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * Parsing state with detailed progress
+     * Stages of the resume parsing process.
      */
     enum class ParsingStage {
         IDLE,
@@ -272,7 +270,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     private val resumeParserRepository = com.phamnhantucode.aicareercoach.data.ai.ResumeParserRepository()
 
     /**
-     * Parses a resume from a PDF URI with detailed progress tracking
+     * Parses a resume from the given [pdfUri].
      */
     fun parseResumeFromPdf(context: Context, pdfUri: android.net.Uri) {
         lastPdfUri = pdfUri
@@ -326,7 +324,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
     
     /**
-     * Retry parsing the last PDF
+     * Retry parsing the last PDF.
      */
     fun retryParsing(context: Context) {
         lastPdfUri?.let { uri ->
@@ -335,7 +333,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
     
     /**
-     * Dismiss the parsing dialog (success or error)
+     * Dismiss the parsing dialog.
      */
     fun dismissParsingDialog() {
         _parsingStage.value = ParsingStage.IDLE
@@ -344,7 +342,7 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     }
 
     /**
-     * Clears any error message
+     * Clears any error message.
      */
     fun clearError() {
         _error.value = null

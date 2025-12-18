@@ -123,7 +123,7 @@ fun ResumeBuilderScreen(
     val tabs = ResumeBuilderTab.entries
     val pagerState = rememberPagerState(pageCount = { tabs.size })
 
-    // Handle export events
+
     LaunchedEffect(viewModel) {
         viewModel.exportEvents.collect { event ->
             when (event) {
@@ -140,7 +140,7 @@ fun ResumeBuilderScreen(
         }
     }
 
-    // Handle save events
+
     LaunchedEffect(viewModel) {
         viewModel.saveEvents.collect { event ->
             when (event) {
@@ -154,7 +154,7 @@ fun ResumeBuilderScreen(
         }
     }
 
-    // Save data when leaving the screen (lifecycle-aware save)
+    // Save resume on exit
     DisposableEffect(viewModel) {
         onDispose {
             viewModel.saveResume(showToast = false)
@@ -168,7 +168,7 @@ fun ResumeBuilderScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with back button and save
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -217,7 +217,7 @@ fun ResumeBuilderScreen(
                             }
                         }
 
-                        // Save Button
+
                         Button(
                             onClick = { viewModel.saveResume(showToast = true) },
                             shape = RoundedCornerShape(24.dp),
@@ -238,7 +238,7 @@ fun ResumeBuilderScreen(
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    // Tab Row
+
                     ScrollableTabRow(
                         selectedTabIndex = pagerState.currentPage,
                         edgePadding = 0.dp,
@@ -270,14 +270,14 @@ fun ResumeBuilderScreen(
                 }
             }
 
-            // Auto-save when switching to Design tab (handles swipe navigation)
+
             LaunchedEffect(pagerState.currentPage) {
                 if (tabs[pagerState.currentPage] == ResumeBuilderTab.DESIGN) {
                     viewModel.ensureResumeSaved()
                 }
             }
 
-            // Tab Content
+
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
@@ -305,7 +305,7 @@ fun ResumeBuilderScreen(
 }
 
 /**
- * Form tab content - displays all resume form sections
+ * Displays the form for editing resume sections.
  */
 @Composable
 private fun ResumeFormContent(
@@ -322,7 +322,7 @@ private fun ResumeFormContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Helper function to get section visibility
+
         fun getSectionVisibility(type: ResumeSectionType): Boolean {
             return resume.sectionConfig.find { it.sectionType == type }?.isVisible ?: true
         }
@@ -354,7 +354,7 @@ private fun ResumeFormContent(
             )
         }
 
-        // Professional Summary
+
         ResumeSectionCard(
             title = "Professional Summary",
             icon = Icons.Outlined.WorkOutline,
@@ -377,7 +377,7 @@ private fun ResumeFormContent(
             )
         }
 
-        // Work Experience
+
         ResumeSectionCard(
             title = "Work Experience",
             icon = Icons.Outlined.Business,
@@ -537,7 +537,7 @@ private fun ResumeFormContent(
 }
 
 /**
- * Design tab content - embeds ResumeDesignScreen content
+ * Displays the design selection screen.
  */
 @Composable
 private fun ResumeDesignContent(
@@ -551,7 +551,7 @@ private fun ResumeDesignContent(
 }
 
 /**
- * Markdown tab content - embeds ResumeMarkdownScreen content
+ * Displays the markdown preview/edit screen.
  */
 @Composable
 private fun ResumeMarkdownContent() {

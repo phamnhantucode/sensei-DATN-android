@@ -20,10 +20,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlin.text.Charsets.UTF_8
 
-/**
- * Client for Neon REST SQL API to manage GridResume data
- * Stores GridResume as JSONB in the 'json' field of the Resume table
- */
+// Client for Neon GridResume data
 object NeonGridResumeService {
 
     private const val TAG = "NeonGridResumeService"
@@ -40,9 +37,7 @@ object NeonGridResumeService {
         .serializeNulls()
         .create()
 
-    /**
-     * Creates or updates a GridResume in Neon database (stored in Resume table's json field)
-     */
+    // Creates or updates a GridResume
     suspend fun saveGridResume(
         gridResume: GridResume,
         userId: String,
@@ -139,9 +134,7 @@ object NeonGridResumeService {
         }
     }
 
-    /**
-     * Updates an existing GridResume in Neon database
-     */
+    // Updates existing GridResume
     suspend fun updateGridResume(
         gridResume: GridResume,
         thumbnail: String? = null,
@@ -209,9 +202,7 @@ object NeonGridResumeService {
         }
     }
 
-    /**
-     * Retrieves a specific GridResume from Neon database
-     */
+    // Retrieves a specific GridResume
     suspend fun getGridResume(
         resumeId: String,
         authToken: String? = null
@@ -289,9 +280,7 @@ object NeonGridResumeService {
         }
     }
 
-    /**
-     * Retrieves all GridResumes for a specific user from Neon database
-     */
+    // Retrieves all GridResumes for a user
     suspend fun getAllGridResumesForUser(
         userId: String,
         authToken: String? = null
@@ -373,9 +362,7 @@ object NeonGridResumeService {
         }
     }
 
-    /**
-     * Deletes a GridResume from Neon database (deletes the Resume entry)
-     */
+    // Deletes a GridResume
     suspend fun deleteGridResume(
         resumeId: String,
         authToken: String? = null
@@ -412,9 +399,7 @@ object NeonGridResumeService {
         }
     }
 
-    /**
-     * Resolves authorization header from token or BuildConfig credentials
-     */
+    // Resolves authorization header
     private fun resolveAuthorizationHeader(authToken: String?): String? {
         val bearerToken = authToken?.takeUnless { it.isBlank() }
             ?: BuildConfig.NEON_API_KEY.takeUnless { it.isBlank() }

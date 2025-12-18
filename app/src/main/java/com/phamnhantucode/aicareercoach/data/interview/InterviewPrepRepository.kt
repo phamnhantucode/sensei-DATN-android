@@ -32,13 +32,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Repository that orchestrates Interview Prep content:
- * - Loads user profile data from Neon
- * - Generates tailored practice material via Gemini
- * - Stores and retrieves historical assessments in Neon
- * - Caches questions locally using Room database
- */
+// Orchestrates Interview Prep
 class InterviewPrepRepository(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(360, TimeUnit.SECONDS)
@@ -470,10 +464,7 @@ class InterviewPrepRepository(
         }
     }
 
-    /**
-     * Loads cached interview prep content without making network calls.
-     * Returns null if no cached data is available.
-     */
+    // Loads cached content
     suspend fun loadCachedContent(): InterviewPrepContent? = withContext(Dispatchers.IO) {
         try {
             val user = Clerk.user ?: return@withContext null
@@ -517,10 +508,7 @@ class InterviewPrepRepository(
         }
     }
 
-    /**
-     * Fetches and caches user data silently in the background.
-     * Used after login or for background refreshes.
-     */
+    // Fetches and caches user data
     suspend fun fetchAndCacheUserData() = withContext(Dispatchers.IO) {
         try {
             val user = Clerk.user ?: return@withContext

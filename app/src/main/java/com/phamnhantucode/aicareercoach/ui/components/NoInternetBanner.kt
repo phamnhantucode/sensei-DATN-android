@@ -39,10 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.phamnhantucode.aicareercoach.utils.NetworkConnectivityObserver
 import kotlinx.coroutines.delay
 
-/**
- * A banner that shows when there's no internet connection.
- * Appears at the top of the screen with an animation.
- */
+// No internet connection banner
 @Composable
 fun NoInternetBanner(
     isConnected: Boolean,
@@ -109,10 +106,7 @@ fun NoInternetBanner(
     }
 }
 
-/**
- * A wrapper composable that shows content with a network connectivity banner.
- * The banner appears at the top when there's no internet connection.
- */
+// Wrapper showing content with network banner
 @Composable
 fun NetworkAwareContent(
     modifier: Modifier = Modifier,

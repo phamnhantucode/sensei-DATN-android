@@ -49,7 +49,7 @@ fun LayersPanel(
     onOpenProperties: (ResumeElement) -> Unit,
     onClose: () -> Unit
 ) {
-    // Helper to build the tree structure
+
     val (topLevelElements, childMap) = remember(elements) {
         val children = elements.filterIsInstance<ResumeElement.ContainerElement>()
             .flatMap { it.children }
@@ -66,7 +66,7 @@ fun LayersPanel(
 
     val topLevelList = remember(topLevelElements) { topLevelElements.toMutableStateList() }
 
-    // State for nesting drag-and-drop
+
     var nestingDragElementId by remember { mutableStateOf<String?>(null) }
     var nestingDragPosition by remember { mutableStateOf(Offset.Zero) }
     val itemBounds = remember { mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
@@ -85,7 +85,7 @@ fun LayersPanel(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
         ) {
-            // Header
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -105,7 +105,7 @@ fun LayersPanel(
 
             Divider()
 
-            // Layers List
+
             androidx.compose.foundation.lazy.LazyColumn(
                 state = lazyListState,
                 modifier = Modifier
@@ -170,7 +170,7 @@ fun LayersPanel(
             }
         }
         
-        // Drag Overlay using Popup to ensure it's on top and uses global coordinates
+
         if (nestingDragElementId != null) {
             val element = elements.find { it.id == nestingDragElementId }
             if (element != null) {
@@ -245,7 +245,7 @@ private fun LayerItem(
                 .padding(start = (depth * 16).dp), // Indentation
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Element Icon - Draggable for nesting
+
             Icon(
                 imageVector = getElementIcon(element),
                 contentDescription = null,
@@ -270,7 +270,7 @@ private fun LayerItem(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Element Name/Description
+
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -282,7 +282,7 @@ private fun LayerItem(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
                 
-                // Optional: Show Z-index or type as subtitle
+
                 Text(
                     text = element.javaClass.simpleName.replace("Element", ""),
                     style = MaterialTheme.typography.bodySmall,
@@ -291,11 +291,11 @@ private fun LayerItem(
                 )
             }
 
-            // Actions
+
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Move Out (if depth > 0)
+
                 if (depth > 0) {
                     IconButton(
                         onClick = { onMoveOut(element.id) },
@@ -310,7 +310,7 @@ private fun LayerItem(
                     }
                 }
 
-                // Visibility
+
                 IconButton(
                     onClick = onToggleVisibility,
                     modifier = Modifier.size(32.dp)
@@ -323,7 +323,7 @@ private fun LayerItem(
                     )
                 }
 
-                // Lock
+
                 IconButton(
                     onClick = onToggleLock,
                     modifier = Modifier.size(32.dp)
@@ -336,7 +336,7 @@ private fun LayerItem(
                     )
                 }
 
-                // Drag Handle Icon (at the end) - Only for top level for now
+
                 if (depth == 0) {
                     Icon(
                         imageVector = Icons.Default.DragIndicator,
@@ -350,7 +350,7 @@ private fun LayerItem(
             }
         }
         
-        // Render children
+
         val childrenIds = childMap[element.id]
         if (!childrenIds.isNullOrEmpty()) {
             childrenIds.forEach { childId ->

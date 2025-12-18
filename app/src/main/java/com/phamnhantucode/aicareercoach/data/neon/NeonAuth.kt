@@ -12,14 +12,7 @@ import kotlinx.coroutines.isActive
 object NeonAuth {
     private const val TAG = "NeonAuth"
 
-    /**
-     * Returns a token string suitable for Neon Authorization header usage:
-     * - If Clerk session JWT is available, returns that (to be used as Bearer token)
-     * - Else falls back to NEON_API_KEY (also used as Bearer token)
-     * - Else, if NEON_DB_ROLE/NEON_DB_PASSWORD are configured, returns empty string ""
-     *   signaling callers to use Basic auth via NeonUserService.resolveAuthorizationHeader
-     * - Else returns null to indicate no credentials available
-     */
+    // Fetches Neon auth token (Clerk JWT or API Key)
     suspend fun fetchNeonAuthToken(): String? {
         if (!coroutineContext.isActive) return null
 

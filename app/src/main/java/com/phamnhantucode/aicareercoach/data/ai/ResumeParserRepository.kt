@@ -10,18 +10,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
-/**
- * Repository for parsing raw text into structured Resume objects using AI
- */
+// Parse text to Resume
 class ResumeParserRepository {
 
     private val gson = Gson()
 
-    /**
-     * Parses raw resume text into a structured Resume object
-     */
+    // Parse resume text
     suspend fun parseResume(rawText: String): Resume = withContext(Dispatchers.IO) {
-        // Truncate text if it's too long to avoid token limits (though reasonably sized resumes should be fine)
+        // Truncate to save tokens
         val truncatedText = rawText.take(20000) 
 
         val prompt = buildResumeParsePrompt(truncatedText)
@@ -38,15 +34,14 @@ class ResumeParserRepository {
                 )
             )
 
-            // Configure response format to JSON object if supported by the model, 
-            // otherwise relying on system prompt instructions.
+            // Request JSON
             val responseText = OpenRouterService.chatCompletion(
                 messages = messages,
                 temperature = 0.1, // Low temperature for consistent extraction
                 responseFormat = OpenRouterService.ResponseFormat(type = "json_object")
             )
 
-            // Parse JSON response
+            // Parse result
             val cleanJson = cleanJsonString(responseText)
             val parsedData = gson.fromJson(cleanJson, ParsedResumeData::class.java)
             
@@ -154,8 +149,7 @@ class ResumeParserRepository {
     }
 
     private fun mapToResume(data: ParsedResumeData): Resume {
-        // Create a new Resume object with extracted data
-        // Note: Creating with a random ID
+        // Create new Resume
         return Resume(
             id = UUID.randomUUID().toString(),
             personalInfo = com.phamnhantucode.aicareercoach.ui.resumebuilder.PersonalInfo(
@@ -225,7 +219,7 @@ class ResumeParserRepository {
         )
     }
 
-    // Internal data classes for JSON parsing
+    // JSON Models
     private data class ParsedResumeData(
         val fullName: String?,
         val profession: String?,
@@ -304,7 +298,7 @@ class ResumeParserRepository {
                 return LocalDate.parse(dateString, format)
             } catch (_: DateTimeParseException) { }
         }
-        // Try parsing just year
+        // Try just year
         try {
             val year = dateString.trim().toIntOrNull()
             if (year != null && year in 1900..2100) {

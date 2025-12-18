@@ -20,9 +20,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Repository for managing cover letter generation via Gemini AI and storage in Neon database.
- */
+// Manages cover letters using Gemini and Neon DB
 class CoverLetterRepository(
     private val client: OkHttpClient = OkHttpClient(),
 ) {
@@ -94,7 +92,7 @@ class CoverLetterRepository(
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val payload = JSONObject().apply {
-                // Generate a random hex ID similar to what the database would generate
+                // Make random ID
                 val randomBytes = ByteArray(12)
                 java.security.SecureRandom().nextBytes(randomBytes)
                 val hexId = randomBytes.joinToString("") { "%02x".format(it) }
@@ -245,7 +243,7 @@ class CoverLetterRepository(
 
     private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
         val bearer = if (forceRefresh) {
-            // Force fetch fresh token, skip cached
+            // Get new token
             fetchClerkSessionToken()
         } else {
             fetchClerkSessionToken()
@@ -273,10 +271,10 @@ class CoverLetterRepository(
         return try {
             block(authHeader)
         } catch (e: IOException) {
-            // Check if it's a 401 Unauthorized error
+            
             if (e.message?.contains("401") == true || e.message?.contains("Unauthorized") == true) {
                 Log.w(TAG, "Got 401 error, refreshing auth token and retrying...")
-                // Refresh auth header and retry once
+                // Refresh and retry
                 authHeader = resolveAuthorizationHeader(forceRefresh = true)
                     ?: throw IllegalStateException("Failed to refresh authentication token.")
                 block(authHeader)
@@ -289,12 +287,12 @@ class CoverLetterRepository(
     private suspend fun fetchClerkSessionToken(): String? {
         val session = Clerk.session ?: return null
 
-        // Always fetch a fresh token to avoid using expired cached tokens
+        // Get fresh token
         return when (val result = session.fetchToken()) {
             is ClerkResult.Success -> result.value.jwt.takeUnless { it.isBlank() }
             is ClerkResult.Failure -> {
                 Log.w(TAG, "Failed to fetch fresh Clerk token: ${result.error}")
-                // As fallback, try cached token (might be expired but worth trying)
+                // Try cached token
                 session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
             }
             else -> null

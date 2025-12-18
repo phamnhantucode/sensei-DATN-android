@@ -14,10 +14,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/**
- * GeminiAudioService handles audio-related operations with Gemini AI,
- * including speech-to-text transcription and generating responses based on audio input.
- */
+// Audio operations with Gemini
 class GeminiAudioService {
 
     private val client = OkHttpClient.Builder()
@@ -32,11 +29,7 @@ class GeminiAudioService {
         private const val GEMINI_HOST = "generativelanguage.googleapis.com"
     }
 
-    /**
-     * Transcribes audio file to text using Gemini's multimodal API.
-     * @param audioFile The audio file to transcribe (must be .m4a, .mp3, .wav, etc.)
-     * @return Transcribed text, or null if transcription failed
-     */
+    // Transcribe audio
     suspend fun transcribeAudio(audioFile: File): Result<String> = withContext(Dispatchers.IO) {
         try {
             if (!audioFile.exists() || audioFile.length() == 0L) {
@@ -159,13 +152,7 @@ IMPORTANT RULES:
         }
     }
 
-    /**
-     * Generates AI feedback for an interview answer using Gemini (via OpenRouter).
-     * @param question The interview question
-     * @param userAnswer The user's transcribed answer
-     * @param category The question category (TECHNICAL, BEHAVIORAL, SITUATIONAL)
-     * @return AI-generated feedback with rating
-     */
+    // Generate feedback
     suspend fun generateFeedback(
         question: String,
         userAnswer: String,
@@ -203,11 +190,7 @@ IMPORTANT RULES:
         }
     }
 
-    /**
-     * Generates feedback for all questions and answers at once.
-     * @param questionsAndAnswers List of triples containing (question, userAnswer, category)
-     * @return List of feedback results for each question
-     */
+    // Batch feedback
     suspend fun generateBatchFeedback(
         questionsAndAnswers: List<Triple<String, String, String>>
     ): Result<List<FeedbackResult>> = withContext(Dispatchers.IO) {
@@ -238,13 +221,7 @@ IMPORTANT RULES:
         }
     }
 
-    /**
-     * Generates all interview questions at once for batch processing.
-     * @param category Question category
-     * @param questionCount Number of questions to generate
-     * @param userProfile Optional user profile info for personalization
-     * @return List of generated questions with correct answers
-     */
+    // Generate all questions
     suspend fun generateAllQuestions(
         category: String,
         questionCount: Int,
@@ -280,13 +257,7 @@ IMPORTANT RULES:
         }
     }
 
-    /**
-     * Generates the next interview question based on context.
-     * @param category Question category
-     * @param previousQuestions List of previously asked questions
-     * @param userProfile Optional user profile info for personalization
-     * @return Generated question with correct answer
-     */
+    // Generate next question
     suspend fun generateNextQuestion(
         category: String,
         previousQuestions: List<String>,
@@ -577,17 +548,13 @@ IMPORTANT RULES:
     }
 }
 
-/**
- * Result of AI feedback generation
- */
+// Feedback Result
 data class FeedbackResult(
     val rating: Int,      // 1-10 rating
     val feedback: String,  // Detailed feedback text
 )
 
-/**
- * Result of question generation
- */
+// Question Result
 data class QuestionResult(
     val question: String,      // The interview question
     val idealAnswer: String,    // Key points for an ideal answer

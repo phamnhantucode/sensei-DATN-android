@@ -8,16 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
-/**
- * Manages thumbnail image uploads to Cloudinary for resume designs.
- * Converts Base64 thumbnails to hosted URLs for faster loading in the resume list.
- * 
- * Benefits of using Cloudinary for thumbnails:
- * - Faster loading: CDN-hosted images load faster than Base64 decoding
- * - Smaller database: URLs (~100 chars) vs Base64 (~50KB+ per thumbnail)
- * - Better caching: Browser/app can cache URL-based images
- * - Image transformations: Cloudinary supports on-the-fly resizing
- */
+// Uploads thumbnails to Cloudinary
 class ThumbnailUploadManager private constructor(private val context: Context) {
 
     companion object {
@@ -35,19 +26,11 @@ class ThumbnailUploadManager private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Upload state flow for observing upload progress
-     */
+    // Upload state flow
     private val _uploadState = MutableStateFlow<ThumbnailUploadState>(ThumbnailUploadState.Idle)
     val uploadState: StateFlow<ThumbnailUploadState> = _uploadState.asStateFlow()
 
-    /**
-     * Uploads a Base64 encoded thumbnail to Cloudinary
-     *
-     * @param base64Thumbnail Base64 encoded PNG image from ThumbnailGenerator
-     * @param resumeId Resume ID to use for naming the uploaded file
-     * @return Result with the Cloudinary URL on success, or the original Base64 on failure
-     */
+    // Uploads Base64 thumbnail
     suspend fun uploadThumbnail(
         base64Thumbnail: String,
         resumeId: String
@@ -101,28 +84,19 @@ class ThumbnailUploadManager private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Checks if a thumbnail string is a URL or Base64 data
-     *
-     * @param thumbnail The thumbnail string to check
-     * @return true if the thumbnail is a URL, false if Base64 or empty
-     */
+    // Check if URL
     fun isUrl(thumbnail: String): Boolean {
         return thumbnail.startsWith("http://") || thumbnail.startsWith("https://")
     }
 
-    /**
-     * Resets upload state to idle
-     */
+    // Reset state
     fun resetState() {
         _uploadState.value = ThumbnailUploadState.Idle
         Log.d(TAG, "Upload state reset to idle")
     }
 }
 
-/**
- * Upload state for thumbnail uploads
- */
+// Thumbnail upload state
 sealed class ThumbnailUploadState {
     data object Idle : ThumbnailUploadState()
     data class Uploading(val resumeId: String) : ThumbnailUploadState()

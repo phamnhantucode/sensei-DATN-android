@@ -1,12 +1,8 @@
 package com.phamnhantucode.aicareercoach.data.interview
 
-/**
- * Domain models for live interview feature
- */
+// Domain models for live interview
 
-/**
- * Represents a live mock interview session
- */
+// Live mock interview session
 data class LiveMockInterviewSession(
     val id: String = "",
     val userId: String,
@@ -20,9 +16,7 @@ data class LiveMockInterviewSession(
     val overallScore: Float? = null
 )
 
-/**
- * Represents a single question in a live interview
- */
+// Single question in live interview
 data class LiveQuestion(
     val id: String = "",
     val liveMockInterviewId: String = "",
@@ -37,18 +31,14 @@ data class LiveQuestion(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-/**
- * Interview types
- */
+// Interview types
 enum class InterviewType {
     TECHNICAL,
     BEHAVIORAL,
     GENERAL
 }
 
-/**
- * Interview status
- */
+// Interview status
 enum class InterviewStatus {
     NOT_STARTED,
     IN_PROGRESS,
@@ -57,25 +47,19 @@ enum class InterviewStatus {
     ABANDONED
 }
 
-/**
- * Result of starting a new live interview
- */
+// Start interview result
 data class StartInterviewResult(
     val sessionId: String,
     val firstQuestion: LiveQuestion
 )
 
-/**
- * Result of starting a new batch interview with all questions pre-generated
- */
+// Batch start result
 data class BatchStartInterviewResult(
     val sessionId: String,
     val questions: List<LiveQuestion>
 )
 
-/**
- * Result of processing an answer
- */
+// Answer processing result
 data class AnswerResult(
     val transcription: String,
     val feedback: String,
@@ -83,9 +67,7 @@ data class AnswerResult(
     val nextQuestion: LiveQuestion?
 )
 
-/**
- * Complete interview summary
- */
+// Interview summary
 data class InterviewSummary(
     val sessionId: String,
     val overallScore: Float,
@@ -97,18 +79,14 @@ data class InterviewSummary(
     val questions: List<LiveQuestion>
 )
 
-/**
- * Performance breakdown by category
- */
+// Category performance
 data class CategoryPerformance(
     val category: String,
     val averageRating: Float,
     val questionsCount: Int
 )
 
-/**
- * Request to start a live interview
- */
+// Start request
 data class StartLiveInterviewRequest(
     val userId: String,
     val interviewType: InterviewType,
@@ -118,9 +96,7 @@ data class StartLiveInterviewRequest(
     val skills: List<String> = emptyList()
 )
 
-/**
- * Network models for API communication
- */
+// Network models
 data class LiveMockInterviewDto(
     val id: String? = null,
     val userId: String,
@@ -140,9 +116,7 @@ data class LiveInterviewQuestionDto(
     val updatedAt: String? = null
 )
 
-/**
- * Request to save a completed interview to the database
- */
+// Save interview request
 data class SaveInterviewRequest(
     val interview: LiveMockInterviewDto,
     val questions: List<LiveInterviewQuestionDto>

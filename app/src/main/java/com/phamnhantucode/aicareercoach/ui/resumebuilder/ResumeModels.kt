@@ -19,14 +19,14 @@ data class Resume(
 
 data class PersonalInfo(
     val fullName: String = "",
-    val profession: String = "", // Added profession field
+    val profession: String = "",
     val email: String = "",
     val phone: String = "",
     val location: String = "",
     val linkedIn: String = "",
     val portfolio: String = "",
     val github: String = "",
-    val avatar: String = "" // Profile picture URI or URL
+    val avatar: String = ""
 )
 
 data class WorkExperience(
@@ -84,7 +84,7 @@ enum class LanguageProficiency(val displayName: String) {
     NATIVE("Native")
 }
 
-// ============= Theme System =============
+
 
 data class ResumeTheme(
     val templateId: String = "professional",
@@ -108,14 +108,14 @@ data class TypographyScheme(
     val subHeaderSize: Float = 18f,
     val bodySize: Float = 14f,
     val captionSize: Float = 12f,
-    val headerWeight: Int = 700, // Bold
-    val bodyWeight: Int = 400 // Normal
+    val headerWeight: Int = 700,
+    val bodyWeight: Int = 400
 )
 
 data class LayoutConfig(
     val type: LayoutType = LayoutType.SINGLE_COLUMN,
-    val spacing: Int = 16, // dp
-    val sectionSpacing: Int = 24, // dp
+    val spacing: Int = 16,
+    val sectionSpacing: Int = 24,
     val sectionStyle: SectionStyle = SectionStyle.CARD
 )
 
@@ -133,7 +133,7 @@ enum class SectionStyle(val displayName: String) {
     BORDERED("Bordered")
 }
 
-// ============= Section Management =============
+
 
 sealed class ResumeSectionType(val id: String, val displayName: String, val isRequired: Boolean) {
     object PersonalInfo : ResumeSectionType("personal_info", "Personal Information", true)

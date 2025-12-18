@@ -22,16 +22,12 @@ class ResponsibilityAIViewModel(
     private val _options = MutableStateFlow(ResponsibilityImprovementOptions())
     val options: StateFlow<ResponsibilityImprovementOptions> = _options.asStateFlow()
 
-    /**
-     * Updates the improvement options
-     */
+
     fun updateOptions(newOptions: ResponsibilityImprovementOptions) {
         _options.value = newOptions
     }
 
-    /**
-     * Toggles a specific option
-     */
+
     fun toggleOption(optionType: OptionType) {
         _options.value = when (optionType) {
             OptionType.PROFESSIONAL -> _options.value.copy(makeProfessional = !_options.value.makeProfessional)
@@ -42,16 +38,12 @@ class ResponsibilityAIViewModel(
         }
     }
 
-    /**
-     * Sets the bullet format option
-     */
+
     fun setBulletFormat(enabled: Boolean) {
         _options.value = _options.value.copy(formatAsBullets = enabled)
     }
 
-    /**
-     * Generates AI suggestions based on current options
-     */
+
     fun generateSuggestions(
         currentText: String,
         jobTitle: String,
@@ -84,17 +76,13 @@ class ResponsibilityAIViewModel(
         }
     }
 
-    /**
-     * Resets the state back to initial
-     */
+
     fun reset() {
         _uiState.value = ResponsibilityAIState.Initial
         _options.value = ResponsibilityImprovementOptions()
     }
 
-    /**
-     * Dismisses error state
-     */
+
     fun dismissError() {
         if (_uiState.value is ResponsibilityAIState.Error) {
             _uiState.value = ResponsibilityAIState.Initial

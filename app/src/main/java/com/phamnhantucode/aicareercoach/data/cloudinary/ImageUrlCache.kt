@@ -18,10 +18,7 @@ private val Context.imageUrlDataStore: DataStore<Preferences> by preferencesData
     name = "image_url_cache"
 )
 
-/**
- * Caches URI-to-URL mappings to avoid re-uploading same images
- * Uses DataStore for persistence across app restarts
- */
+// Caches upload mappings
 class ImageUrlCache private constructor(private val context: Context) {
 
     companion object {
@@ -41,11 +38,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         private val URI_TO_URL_KEY = stringPreferencesKey("uri_to_url_mappings")
     }
 
-    /**
-     * Gets cached URL for a local URI
-     * @param localUri The local content:// URI
-     * @return Remote Cloudinary URL if cached, null otherwise
-     */
+    // Get cached URL
     suspend fun getCachedUrl(localUri: String): String? = withContext(Dispatchers.IO) {
         try {
             val mappings = getMappings()
@@ -56,11 +49,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Caches a URI-to-URL mapping
-     * @param localUri The local content:// URI
-     * @param remoteUrl The remote Cloudinary URL
-     */
+    // Cache a mapping
     suspend fun cacheUrl(localUri: String, remoteUrl: String) = withContext(Dispatchers.IO) {
         try {
             val mappings = getMappings().toMutableMap()
@@ -72,10 +61,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Removes a cached mapping
-     * @param localUri The local URI to remove from cache
-     */
+    // Remove mapping
     suspend fun removeCachedUrl(localUri: String) = withContext(Dispatchers.IO) {
         try {
             val mappings = getMappings().toMutableMap()
@@ -88,9 +74,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Clears all cached mappings
-     */
+    // Clears all
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         try {
             context.imageUrlDataStore.edit { preferences ->
@@ -102,9 +86,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Get all mappings from DataStore
-     */
+    // Get all mappings
     private suspend fun getMappings(): Map<String, String> {
         return try {
             val jsonString = context.imageUrlDataStore.data
@@ -127,9 +109,7 @@ class ImageUrlCache private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Save mappings to DataStore
-     */
+    // Save mappings
     private suspend fun saveMappings(mappings: Map<String, String>) {
         try {
             val jsonObject = JSONObject()

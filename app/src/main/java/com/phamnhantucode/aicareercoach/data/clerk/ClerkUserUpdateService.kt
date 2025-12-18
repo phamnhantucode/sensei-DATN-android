@@ -17,10 +17,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Service for updating Clerk user profile data via Clerk Backend API
- * Uses Clerk Secret Key for authentication (server-side operations)
- */
+// Updates Clerk user profile
 class ClerkUserUpdateService(private val context: Context) {
 
     private val client = OkHttpClient()
@@ -31,13 +28,7 @@ class ClerkUserUpdateService(private val context: Context) {
         private const val CLERK_API_BASE = "https://api.clerk.com/v1"
     }
 
-    /**
-     * Update user's first and last name
-     *
-     * @param firstName New first name
-     * @param lastName New last name
-     * @return Result with success/error message
-     */
+    // Update name
     suspend fun updateUserName(
         firstName: String,
         lastName: String
@@ -78,12 +69,7 @@ class ClerkUserUpdateService(private val context: Context) {
         }
     }
 
-    /**
-     * Update user's profile image
-     *
-     * @param imageUri URI of the image to upload
-     * @return Result with success/error message
-     */
+    // Update avatar
     suspend fun updateProfileImage(imageUri: Uri): UpdateResult = withContext(Dispatchers.IO) {
         try {
             val userId = Clerk.user?.id
@@ -131,9 +117,7 @@ class ClerkUserUpdateService(private val context: Context) {
         }
     }
 
-    /**
-     * Convert URI to temporary File for upload
-     */
+    // Convert URI to File
     private fun uriToFile(uri: Uri): File? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return null
@@ -158,9 +142,7 @@ class ClerkUserUpdateService(private val context: Context) {
         }
     }
 
-    /**
-     * Result sealed class for update operations
-     */
+    // Update result
     sealed class UpdateResult {
         data object Success : UpdateResult()
         data class Error(val message: String) : UpdateResult()

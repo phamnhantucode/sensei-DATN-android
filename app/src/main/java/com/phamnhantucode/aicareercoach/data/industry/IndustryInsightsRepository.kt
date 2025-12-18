@@ -25,10 +25,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Repository responsible for orchestrating Industry Insight retrieval.
- * It prefers existing Neon records and falls back to Gemini to generate fresh data.
- */
+// Manages Industry Insights
 class IndustryInsightsRepository(
     private val client: OkHttpClient = OkHttpClient(),
 ) {
@@ -99,14 +96,7 @@ class IndustryInsightsRepository(
         )
     }
 
-    /**
-     * Ensures an IndustryInsight record exists for the given industry.
-     * This method is designed to be called during onboarding before setting User.industry.
-     *
-     * @param industry The industry name to check/create
-     * @param authorizationHeader The authorization header for Neon API calls
-     * @return The IndustryInsightRecord (either existing or newly created)
-     */
+    // Ensure insight exists
     suspend fun ensureIndustryInsightExists(
         industry: String,
         authorizationHeader: String,
@@ -277,10 +267,7 @@ class IndustryInsightsRepository(
         return NeonUserRecord(industry = industry, industryInsight = insight)
     }
 
-    /**
-     * Creates a default IndustryInsight record with placeholder data.
-     * Used as a fallback when Gemini API is unavailable.
-     */
+    // Create default data
     private fun createDefaultIndustryInsight(
         industry: String,
         authorizationHeader: String,

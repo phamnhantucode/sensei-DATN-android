@@ -28,10 +28,7 @@ import com.phamnhantucode.aicareercoach.data.interview.InterviewSummary
 import com.phamnhantucode.aicareercoach.data.interview.LiveQuestion
 import kotlin.math.roundToInt
 
-/**
- * Push-to-talk button for recording audio.
- * Animates while pressed and recording.
- */
+// Push-to-talk button
 @Composable
 fun PushToTalkButton(
     isRecording: Boolean,
@@ -116,9 +113,7 @@ fun PushToTalkButton(
     }
 }
 
-/**
- * Displays the current interview question.
- */
+// Current question card
 @Composable
 fun QuestionCard(
     question: LiveQuestion,
@@ -165,9 +160,7 @@ fun QuestionCard(
     }
 }
 
-/**
- * Displays AI feedback with rating.
- */
+// AI feedback card
 @Composable
 fun FeedbackCard(
     transcription: String,
@@ -235,9 +228,7 @@ fun FeedbackCard(
     }
 }
 
-/**
- * Renders text with basic markdown support (bold, italic).
- */
+// Markdown text renderer
 @Composable
 fun MarkdownText(
     text: String,
@@ -301,9 +292,7 @@ fun MarkdownText(
     )
 }
 
-/**
- * Displays rating as stars (1-10 scale shown as 1-5 stars).
- */
+// Star rating display
 @Composable
 fun RatingDisplay(
     rating: Int,
@@ -338,9 +327,7 @@ fun RatingDisplay(
     }
 }
 
-/**
- * Small chip for displaying category labels.
- */
+// Category label chip
 @Composable
 fun Chip(
     label: String,
@@ -361,9 +348,7 @@ fun Chip(
     }
 }
 
-/**
- * Progress indicator showing current question number.
- */
+// Question progress indicator
 @Composable
 fun InterviewProgressIndicator(
     currentQuestion: Int,
@@ -406,9 +391,7 @@ fun InterviewProgressIndicator(
     }
 }
 
-/**
- * Timer display for interview duration.
- */
+// Interview timer
 @Composable
 fun TimerDisplay(
     durationSeconds: Long,
@@ -437,9 +420,7 @@ fun TimerDisplay(
     }
 }
 
-/**
- * Summary card for completed interview.
- */
+// Interview summary card
 @Composable
 fun InterviewSummaryCard(
     summary: InterviewSummary,

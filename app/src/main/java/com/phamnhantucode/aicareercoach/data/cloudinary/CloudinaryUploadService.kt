@@ -17,10 +17,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
-/**
- * Service for uploading images to Cloudinary API
- * Uses Cloudinary's unsigned upload with upload preset
- */
+// Uploads images to Cloudinary
 object CloudinaryUploadService {
 
     private const val TAG = "CloudinaryUploadService"
@@ -31,14 +28,7 @@ object CloudinaryUploadService {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /**
-     * Uploads an image to Cloudinary
-     *
-     * @param context Android context for reading content URI
-     * @param imageUri Content URI from Android photo picker
-     * @param fileName Optional filename for the uploaded image
-     * @return Result with CloudinaryUploadResponse on success
-     */
+    // Uploads image
     suspend fun uploadImage(
         context: Context,
         imageUri: Uri,
@@ -112,9 +102,7 @@ object CloudinaryUploadService {
         }
     }
 
-    /**
-     * Convert content:// URI to temporary File for upload
-     */
+    // Convert URI to File
     private fun uriToFile(context: Context, uri: Uri): File? {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return null
@@ -149,14 +137,7 @@ object CloudinaryUploadService {
         }
     }
 
-    /**
-     * Uploads a Base64 encoded image to Cloudinary
-     * Used for uploading thumbnails generated from resume designs
-     *
-     * @param base64Image Base64 encoded image string (without data URI prefix)
-     * @param fileName Optional filename for the uploaded image
-     * @return Result with CloudinaryUploadResponse on success
-     */
+    // Uploads Base64 image
     suspend fun uploadBase64Image(
         base64Image: String,
         fileName: String? = null
@@ -227,9 +208,7 @@ object CloudinaryUploadService {
         }
     }
 
-    /**
-     * Build multipart upload request for Cloudinary API (unsigned upload)
-     */
+    // Build upload request
     private fun buildUploadRequest(file: File, fileName: String?): Request {
         val uploadUrl = "https://api.cloudinary.com/v1_1/${BuildConfig.CLDNR_CLOUD_NAME}/image/upload"
 
@@ -255,10 +234,7 @@ object CloudinaryUploadService {
             .build()
     }
 
-    /**
-     * Build form upload request for Cloudinary API with base64 image
-     * Cloudinary accepts base64 as data URI in the 'file' form field
-     */
+    // Build base64 upload request
     private fun buildBase64UploadRequest(base64Image: String, fileName: String?): Request {
         val uploadUrl = "https://api.cloudinary.com/v1_1/${BuildConfig.CLDNR_CLOUD_NAME}/image/upload"
 

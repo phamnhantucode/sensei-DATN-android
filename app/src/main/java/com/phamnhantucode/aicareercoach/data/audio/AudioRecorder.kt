@@ -22,12 +22,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
 
-/**
- * AudioRecorder handles audio recording for live interviews using push-to-talk functionality.
- * Uses AudioRecord API to record directly to WAV format optimized for Vosk speech recognition.
- *
- * Recording format: 16kHz mono PCM WAV (matches Vosk requirements exactly)
- */
+// Records audio using AudioRecord
 class AudioRecorder(private val context: Context) {
 
     private var audioRecord: AudioRecord? = null
@@ -51,10 +46,7 @@ class AudioRecorder(private val context: Context) {
         private const val AUDIO_FILE_EXTENSION = ".wav"
     }
 
-    /**
-     * Starts recording audio. Creates a new WAV file in cache directory.
-     * @return The output file where audio is being recorded, or null if failed to start
-     */
+    // Starts recording to WAV
     fun startRecording(): File? {
         if (_recordingState.value == RecordingState.RECORDING) {
             Log.w(TAG, "Already recording, ignoring start request")
@@ -112,10 +104,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Stops recording and returns the recorded audio file.
-     * @return The file containing the recorded audio, or null if no recording was in progress
-     */
+    // Stops and returns file
     suspend fun stopRecording(): File? = withContext(Dispatchers.IO) {
         recordingMutex.withLock {
             if (_recordingState.value != RecordingState.RECORDING) {
@@ -171,9 +160,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Records audio data and writes as WAV file with proper RIFF headers.
-     */
+    // Records to WAV
     private suspend fun recordToWav(
         recorder: AudioRecord,
         outputFile: File,
@@ -219,9 +206,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Writes WAV file header (RIFF format).
-     */
+    // Writes WAV header
     private fun writeWavHeader(out: FileOutputStream, dataSize: Int) {
         val channels = 1 // Mono
         val byteRate = SAMPLE_RATE * channels * 2 // 16-bit = 2 bytes per sample
@@ -247,9 +232,7 @@ class AudioRecorder(private val context: Context) {
         out.write(intToLittleEndianBytes(dataSize)) // Subchunk2Size
     }
 
-    /**
-     * Updates WAV header with actual data size after recording completes.
-     */
+    // Updates header with size
     private fun updateWavHeader(file: File, dataSize: Int) {
         try {
             val raf = RandomAccessFile(file, "rw")
@@ -270,9 +253,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Validates that an audio file is properly formed WAV file.
-     */
+    // Validates WAV
     private fun isValidAudioFile(file: File): Boolean {
         return try {
             file.inputStream().use { stream ->
@@ -306,9 +287,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Converts an integer to 4-byte little-endian byte array.
-     */
+    // Int to Little Endian
     private fun intToLittleEndianBytes(value: Int): ByteArray {
         return byteArrayOf(
             (value and 0xFF).toByte(),
@@ -318,9 +297,7 @@ class AudioRecorder(private val context: Context) {
         )
     }
 
-    /**
-     * Converts a short to 2-byte little-endian byte array.
-     */
+    // Short to Little Endian
     private fun shortToLittleEndianBytes(value: Short): ByteArray {
         return byteArrayOf(
             (value.toInt() and 0xFF).toByte(),
@@ -328,9 +305,7 @@ class AudioRecorder(private val context: Context) {
         )
     }
 
-    /**
-     * Cancels the current recording and deletes the file.
-     */
+    // Cancels recording
     suspend fun cancelRecording() = withContext(Dispatchers.IO) {
         recordingMutex.withLock {
             try {
@@ -356,9 +331,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Releases resources. Call this when done with the recorder.
-     */
+    // Releases resources
     fun release() {
         try {
             audioRecord?.stop()
@@ -374,10 +347,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Cleans up old audio files from cache directory to free up space.
-     * @param olderThanMillis Delete files older than this duration in milliseconds (default: 1 hour)
-     */
+    // Cleans old files
     fun cleanupOldFiles(olderThanMillis: Long = 3600000) {
         try {
             val cacheDir = context.cacheDir
@@ -397,9 +367,7 @@ class AudioRecorder(private val context: Context) {
         }
     }
 
-    /**
-     * Resets the recorder to idle state without releasing resources.
-     */
+    // Reset state
     suspend fun reset() {
         if (_recordingState.value == RecordingState.RECORDING) {
             stopRecording()

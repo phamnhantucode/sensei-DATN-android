@@ -24,10 +24,7 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
-/**
- * Repository for managing live mock interviews with speech-to-text functionality.
- * Coordinates audio recording, transcription (via Vosk), AI feedback (via Gemini), and persistence.
- */
+// Manages live mock interviews
 class LiveInterviewRepository(
     private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -46,9 +43,7 @@ class LiveInterviewRepository(
         private const val TAG = "LiveInterviewRepository"
     }
 
-    /**
-     * Starts a new live interview session with batch question generation.
-     */
+    // Starts batch interview
     suspend fun startBatchInterview(request: StartLiveInterviewRequest): Result<BatchStartInterviewResult> =
         withContext(Dispatchers.IO) {
             try {
@@ -167,9 +162,7 @@ class LiveInterviewRepository(
             }
         }
 
-    /**
-     * Starts a new live interview session and generates the first question.
-     */
+    // Starts live interview
     suspend fun startLiveInterview(request: StartLiveInterviewRequest): Result<StartInterviewResult> =
         withContext(Dispatchers.IO) {
             try {
@@ -271,9 +264,7 @@ class LiveInterviewRepository(
             }
         }
 
-    /**
-     * Processes a recorded audio answer: transcribes it using Vosk and gets AI feedback from Gemini.
-     */
+    // Processes answer
     suspend fun processAnswer(
         audioFile: File,
         question: LiveQuestion,
@@ -393,9 +384,7 @@ class LiveInterviewRepository(
         }
     }
 
-    /**
-     * Completes the interview and generates a comprehensive summary.
-     */
+    // Completes interview
     suspend fun completeInterview(
         sessionId: String,
         questions: List<LiveQuestion>
@@ -466,9 +455,7 @@ class LiveInterviewRepository(
         }
     }
 
-    /**
-     * Retrieves interview history for a user.
-     */
+    // Retrieves interview history
     suspend fun getInterviewHistory(userId: String): Result<List<LiveMockInterviewSession>> =
         withContext(Dispatchers.IO) {
             try {
@@ -505,9 +492,7 @@ class LiveInterviewRepository(
             }
         }
 
-    /**
-     * Processes all answers at once and generates batch feedback.
-     */
+    // Processes batch answers
     suspend fun processBatchAnswers(
         sessionId: String,
         questionsAndAnswers: List<Triple<LiveQuestion, String, String>> // (question, transcription, category)
@@ -559,9 +544,7 @@ class LiveInterviewRepository(
         }
     }
 
-    /**
-     * Saves user answer without feedback (for answer collection phase).
-     */
+    // Saves user answer
     suspend fun saveUserAnswer(
         questionId: String,
         sessionId: String,

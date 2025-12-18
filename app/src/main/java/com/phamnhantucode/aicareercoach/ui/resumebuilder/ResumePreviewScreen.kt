@@ -74,7 +74,7 @@ fun ResumePreviewScreen(
             )
         }
     ) { padding ->
-        // Resume content with theme applied
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -84,7 +84,7 @@ fun ResumePreviewScreen(
                 .padding(theme.layout.spacing.dp),
             verticalArrangement = Arrangement.spacedBy(theme.layout.sectionSpacing.dp)
         ) {
-            // Get visible sections in order
+
             val visibleSections = resume.sectionConfig
                 .filter { it.isVisible }
                 .sortedBy { it.order }
@@ -184,7 +184,7 @@ fun ResumePreviewScreen(
                 }
             }
 
-            // Bottom spacing
+
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
@@ -201,7 +201,7 @@ private fun ThemedPersonalInfoSection(info: PersonalInfo, theme: ResumeTheme) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Name
+
         ThemedText(
             text = info.fullName,
             color = primaryColor,
@@ -209,7 +209,7 @@ private fun ThemedPersonalInfoSection(info: PersonalInfo, theme: ResumeTheme) {
             fontWeight = FontWeight(theme.typography.headerWeight)
         )
 
-        // Profession
+
         if (info.profession.isNotBlank()) {
             ThemedText(
                 text = info.profession.uppercase(),
@@ -219,7 +219,7 @@ private fun ThemedPersonalInfoSection(info: PersonalInfo, theme: ResumeTheme) {
             )
         }
 
-        // Contact Info
+
         ThemedText(
             text = "${info.email} • ${info.phone}",
             color = secondaryTextColor,
@@ -232,7 +232,7 @@ private fun ThemedPersonalInfoSection(info: PersonalInfo, theme: ResumeTheme) {
             fontSize = theme.typography.captionSize.sp
         )
 
-        // Optional links
+
         if (info.linkedIn.isNotBlank() || info.portfolio.isNotBlank() || info.github.isNotBlank()) {
             val links = listOfNotNull(
                 info.linkedIn.takeIf { it.isNotBlank() },
@@ -261,7 +261,7 @@ private fun ThemedSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Section Title
+
         ThemedText(
             text = title.uppercase(),
             color = sectionHeaderColor,
@@ -269,7 +269,7 @@ private fun ThemedSection(
             fontWeight = FontWeight(theme.typography.headerWeight)
         )
 
-        // Section divider/style
+
         when (theme.layout.sectionStyle) {
             SectionStyle.DIVIDER -> {
                 Divider(color = sectionHeaderColor, thickness = 2.dp)
@@ -280,7 +280,7 @@ private fun ThemedSection(
             else -> { /* Minimal or Card - no divider */ }
         }
 
-        // Content
+
         content()
     }
 }
@@ -292,7 +292,7 @@ private fun ThemedWorkExperience(experience: WorkExperience, theme: ResumeTheme)
     val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Job Title & Company
+
         ThemedText(
             text = experience.jobTitle,
             color = textColor,
@@ -306,7 +306,7 @@ private fun ThemedWorkExperience(experience: WorkExperience, theme: ResumeTheme)
             fontSize = theme.typography.bodySize.sp
         )
 
-        // Dates
+
         val dateRange = if (experience.isCurrentRole) {
             "${experience.startDate?.format(dateFormatter) ?: ""} - Present"
         } else {
@@ -318,7 +318,7 @@ private fun ThemedWorkExperience(experience: WorkExperience, theme: ResumeTheme)
             fontSize = theme.typography.captionSize.sp
         )
 
-        // Responsibilities
+
         if (experience.responsibilities.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             experience.responsibilities.forEach { resp ->

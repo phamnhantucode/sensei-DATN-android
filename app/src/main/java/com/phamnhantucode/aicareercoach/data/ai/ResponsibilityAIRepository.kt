@@ -7,21 +7,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.IOException
 
-/**
- * Repository for AI-powered improvement of resume responsibility bullet points using OpenRouter AI.
- */
+// Improves resume bullets with AI
 class ResponsibilityAIRepository {
 
-    /**
-     * Improves a responsibility bullet point using AI
-     * @param currentText The current responsibility text
-     * @param jobTitle The job title for context
-     * @param company The company name for context
-     * @param options The improvement options selected by the user
-     * @param userContext Optional user profile information
-     * @param otherResponsibilities Other responsibilities in the same job to avoid duplication
-     * @return ResponsibilityImprovementResult containing 3 improved variations
-     */
+    // Improves a bullet point
     suspend fun improveResponsibility(
         currentText: String,
         jobTitle: String,
@@ -49,25 +38,25 @@ class ResponsibilityAIRepository {
 
         val rawSuggestions = callOpenRouterApi(prompt)
 
-        // Detect bullet format from original text
+        // Check bullet style
         val bulletInfo = detectBulletFormat(currentText)
 
         // Normalize suggestions based on user preference
         val normalizedSuggestions = when {
-            // User wants bullet format
+            // Bullet format
             options.formatAsBullets -> {
                 val bulletChar = if (bulletInfo.hasBullets) bulletInfo.bulletChar else "•"
                 rawSuggestions.map { suggestion ->
                     normalizeBullets(suggestion, bulletChar)
                 }
             }
-            // User wants plain text (strip bullets if AI added them)
+            // Plain text
             !options.formatAsBullets -> {
                 rawSuggestions.map { suggestion ->
                     stripBullets(suggestion)
                 }
             }
-            // Default behavior
+            // Default
             else -> rawSuggestions
         }
 
@@ -77,9 +66,7 @@ class ResponsibilityAIRepository {
         )
     }
 
-    /**
-     * Builds the AI prompt for responsibility improvement
-     */
+    // Build prompt
     private fun buildPrompt(
         currentText: String,
         jobTitle: String,
@@ -112,12 +99,12 @@ class ResponsibilityAIRepository {
             """.trimIndent()
         } else ""
 
-        // Detect bullet format from input
+        // Check bullet info
         val bulletInfo = detectBulletFormat(currentText)
 
-        // Determine formatting based on user option and input
+        // Set usage rules
         val formattingInstructions = when {
-            // User explicitly wants bullet format
+            // Bullets
             options.formatAsBullets -> {
                 val bulletChar = if (bulletInfo.hasBullets) bulletInfo.bulletChar else "•"
                 """
@@ -129,7 +116,7 @@ class ResponsibilityAIRepository {
                 - Preserve the bullet structure: each line should be a separate bullet point
                 """
             }
-            // User wants plain text (no bullets)
+            // No bullets
             !options.formatAsBullets -> {
                 """
 
@@ -140,7 +127,7 @@ class ResponsibilityAIRepository {
                 - If multiple responsibilities, separate them with newlines but without bullets
                 """
             }
-            // Fallback (preserve input format)
+            // Keep existing format
             else -> {
                 if (bulletInfo.hasBullets) {
                     """
@@ -183,15 +170,12 @@ class ResponsibilityAIRepository {
         """.trimIndent()
     }
 
-    /**
-     * Calls the OpenRouter Service and extracts the suggestions
-     */
+    // Call AI and get suggestions
     private suspend fun callOpenRouterApi(prompt: String): List<String> {
         val messages = listOf(
             OpenRouterService.Message(role = "user", content = prompt)
         )
-        // Request JSON object for easier parsing if model supports it, but since we ask for array, we rely on prompt instructions primarily
-        // We can pass null or specific format if we switch to models that support strict schema
+        // Use JSON if possible, else prompt
         val rawText = OpenRouterService.chatCompletion(
             messages = messages,
             temperature = 0.7
@@ -200,14 +184,11 @@ class ResponsibilityAIRepository {
         return parseSuggestions(rawText)
     }
 
-    /**
-     * Parses the AI response to extract the 3 suggestions
-     * Handles both JSON array format and fallback text parsing
-     */
+    // Extract 3 suggestions
     private fun parseSuggestions(rawText: String): List<String> {
-        // Try to parse as JSON array first
+        // Try JSON first
         try {
-            // Clean up potential markdown code blocks
+            // Remove markdown
             val cleaned = rawText
                 .trim()
                 .removePrefix("```json")
@@ -228,16 +209,16 @@ class ResponsibilityAIRepository {
                 return suggestions.take(3)
             }
         } catch (e: Exception) {
-            // If JSON parsing fails, try to extract suggestions from text
+            // Ignore JSON errors
         }
 
-        // Fallback: try to split by numbered list or newlines
+        // Fallback: split text
         val lines = rawText.lines()
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .filter { !it.startsWith("#") && !it.startsWith("```") }
             .map { line ->
-                // Remove leading numbers or quotes, but preserve bullets
+                // Clean strings
                 line.replace(Regex("^[0-9]+[.)]\\s*"), "")
                     .trim('"', '\'', ' ')
             }
@@ -250,13 +231,11 @@ class ResponsibilityAIRepository {
         throw IOException("Failed to parse 3 suggestions from AI response. Got: ${lines.size} suggestions")
     }
 
-    /**
-     * Detects bullet format from input text
-     */
+    // Check for bullets
     private fun detectBulletFormat(text: String): BulletFormatInfo {
         val lines = text.lines().filter { it.isNotBlank() }
 
-        // Common bullet patterns
+        // Bullet patterns
         val bulletPatterns = listOf(
             "•" to Regex("^\\s*•\\s+"),
             "-" to Regex("^\\s*-\\s+"),
@@ -293,9 +272,7 @@ class ResponsibilityAIRepository {
         return BulletFormatInfo(hasBullets = false, bulletChar = "", bulletCount = 0)
     }
 
-    /**
-     * Normalizes bullet formatting in text
-     */
+    // Prepare bullet text
     private fun normalizeBullets(text: String, bulletChar: String): String {
         if (bulletChar.isEmpty()) return text
 
@@ -303,7 +280,7 @@ class ResponsibilityAIRepository {
         return lines.joinToString("\n") { line ->
             val trimmed = line.trim()
             if (trimmed.isNotBlank() && !trimmed.startsWith(bulletChar)) {
-                // Remove any existing bullet and add the correct one
+                // Fix bullet char
                 val withoutBullet = trimmed
                     .replace(Regex("^[•\\-*–—→›]\\s+"), "")
                     .replace(Regex("^[0-9]+[.)]\\s+"), "")
@@ -314,15 +291,13 @@ class ResponsibilityAIRepository {
         }
     }
 
-    /**
-     * Strips all bullet formatting from text
-     */
+    // Remove bullets
     private fun stripBullets(text: String): String {
         val lines = text.lines()
         return lines.joinToString("\n") { line ->
             val trimmed = line.trim()
             if (trimmed.isNotBlank()) {
-                // Remove all bullet types
+                // Remove bullets
                 trimmed
                     .replace(Regex("^[•\\-*–—→›]\\s+"), "")
                     .replace(Regex("^[0-9]+[.)]\\s+"), "")
@@ -332,18 +307,14 @@ class ResponsibilityAIRepository {
         }
     }
 
-    /**
-     * Information about bullet formatting in text
-     */
+    // Bullet info
     private data class BulletFormatInfo(
         val hasBullets: Boolean,
         val bulletChar: String,
         val bulletCount: Int
     )
 
-    /**
-     * User context for improving responsibilities
-     */
+    // User context
     data class UserContext(
         val industry: String = "",
         val skills: List<String> = emptyList(),

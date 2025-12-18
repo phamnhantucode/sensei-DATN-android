@@ -15,12 +15,7 @@ import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
-/**
- * VoskSpeechRecognizer provides offline speech-to-text using Vosk library.
- * This is more accurate for real speech transcription compared to Gemini's audio processing.
- * 
- * The model is downloaded on first use (~40MB) and cached locally.
- */
+// Offline speech recognition with Vosk
 class VoskSpeechRecognizer(private val context: Context) {
 
     private var model: Model? = null
@@ -38,9 +33,7 @@ class VoskSpeechRecognizer(private val context: Context) {
         private const val SAMPLE_RATE = 16000f
     }
 
-    /**
-     * Initialize the Vosk model. Downloads if not present.
-     */
+    // Initialize model
     suspend fun initModel(): Boolean = withContext(Dispatchers.IO) {
         if (isModelLoaded && model != null) {
             return@withContext true
@@ -70,9 +63,7 @@ class VoskSpeechRecognizer(private val context: Context) {
         }
     }
 
-    /**
-     * Download and extract the Vosk model.
-     */
+    // Download model
     private fun downloadAndExtractModel(destDir: File): Boolean {
         return try {
             val zipFile = File(context.cacheDir, "$MODEL_NAME.zip")
@@ -127,11 +118,7 @@ class VoskSpeechRecognizer(private val context: Context) {
         }
     }
 
-    /**
-     * Transcribe audio file to text using Vosk.
-     * @param audioFile The audio file (WAV format, 16kHz mono PCM)
-     * @return Transcribed text or error
-     */
+    // Transcribe with Vosk
     suspend fun transcribeAudio(audioFile: File): Result<String> = withContext(Dispatchers.IO) {
         try {
             if (!isModelLoaded || model == null) {
@@ -203,9 +190,7 @@ class VoskSpeechRecognizer(private val context: Context) {
         }
     }
 
-    /**
-     * Validates that a file is a properly formed WAV file.
-     */
+    // Validate WAV
     private fun isValidWavFile(file: File): Boolean {
         return try {
             file.inputStream().use { stream ->

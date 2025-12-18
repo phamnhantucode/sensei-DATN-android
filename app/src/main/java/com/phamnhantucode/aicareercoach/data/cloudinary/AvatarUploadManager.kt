@@ -9,10 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
-/**
- * Manages avatar image uploads with caching and state tracking
- * Orchestrates the flow between cache checking, upload, and state management
- */
+// Manages avatar uploads
 class AvatarUploadManager private constructor(private val context: Context) {
 
     private val cache = ImageUrlCache.getInstance(context)
@@ -32,19 +29,11 @@ class AvatarUploadManager private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Upload state flow for observing upload progress
-     */
+    // Upload state
     private val _uploadState = MutableStateFlow<ImageUploadState>(ImageUploadState.Idle)
     val uploadState: StateFlow<ImageUploadState> = _uploadState.asStateFlow()
 
-    /**
-     * Uploads avatar image to Cloudinary
-     * First checks cache, then uploads if not cached
-     *
-     * @param localUri Content URI from photo picker
-     * @return Result with remote URL (either cached or newly uploaded)
-     */
+    // Uploads avatar
     suspend fun uploadAvatar(localUri: Uri): Result<String> = withContext(Dispatchers.IO) {
         try {
             val uriString = localUri.toString()
@@ -90,13 +79,7 @@ class AvatarUploadManager private constructor(private val context: Context) {
         }
     }
 
-    /**
-     * Retries a failed upload
-     * Used when user clicks retry button after error
-     *
-     * @param localUri Content URI from photo picker
-     * @return Result with remote URL
-     */
+    // Retries upload
     suspend fun retryUpload(localUri: Uri): Result<String> {
         Log.d(TAG, "Retrying upload for: $localUri")
         // Reset state and re-upload (bypassing cache for retry)
@@ -104,20 +87,12 @@ class AvatarUploadManager private constructor(private val context: Context) {
         return uploadAvatar(localUri)
     }
 
-    /**
-     * Gets cached URL without uploading
-     *
-     * @param localUri Content URI to check
-     * @return Cached URL if exists, null otherwise
-     */
+    // Get cached URL
     suspend fun getCachedUrl(localUri: Uri): String? {
         return cache.getCachedUrl(localUri.toString())
     }
 
-    /**
-     * Resets upload state to idle
-     * Call when user navigates away or cancels upload
-     */
+    // Reset state
     fun resetState() {
         _uploadState.value = ImageUploadState.Idle
         Log.d(TAG, "Upload state reset to idle")

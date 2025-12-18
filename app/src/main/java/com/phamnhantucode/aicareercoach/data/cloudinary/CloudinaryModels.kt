@@ -1,17 +1,13 @@
 package com.phamnhantucode.aicareercoach.data.cloudinary
 
-/**
- * Response from Cloudinary upload API
- */
+// Response from Cloudinary upload
 data class CloudinaryUploadResponse(
     val data: CloudinaryImageData,
     val success: Boolean,
     val status: Int
 )
 
-/**
- * Image data returned from Cloudinary API
- */
+// Image data from Cloudinary
 data class CloudinaryImageData(
     val publicId: String,
     val url: String,
@@ -23,9 +19,7 @@ data class CloudinaryImageData(
     val createdAt: String
 )
 
-/**
- * Upload state for UI feedback
- */
+// Upload state for UI
 sealed class ImageUploadState {
     data object Idle : ImageUploadState()
     data object Uploading : ImageUploadState()

@@ -13,10 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Repository responsible for managing grid-based resume designs.
- * Now operates in Neon-only mode (local caching disabled to fix sync corruption issues).
- */
+// Manages grid resume designs
 class GridResumeRepository private constructor(context: Context) {
 
     // Keep DAO reference for potential future use, but don't use it for now
@@ -37,9 +34,7 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Gets the current user's Clerk ID for local storage
-     */
+    // Get local user ID
     private fun getLocalUserId(): String {
         val clerkUser = Clerk.user
             ?: throw IllegalStateException("User not logged in")
@@ -51,11 +46,7 @@ class GridResumeRepository private constructor(context: Context) {
      * If the user doesn't exist in Neon yet, creates them first.
      * This is used for remote sync to Neon database.
      */
-    /**
-     * Gets the current user's Neon ID (the auto-generated hex ID, not Clerk ID).
-     * If the user doesn't exist in Neon yet, creates them first.
-     * This is used for remote sync to Neon database.
-     */
+    // Get Neon user ID
     private suspend fun getNeonUserId(): String {
         val clerkUser = Clerk.user
             ?: throw IllegalStateException("User not logged in")
@@ -75,9 +66,7 @@ class GridResumeRepository private constructor(context: Context) {
         return neonUser?.id ?: throw IllegalStateException("Failed to get Neon user ID")
     }
 
-    /**
-     * Saves a grid resume design directly to Neon (local caching disabled)
-     */
+    // Save design
     suspend fun saveDesign(
         gridResume: GridResume,
         thumbnail: String = "",
@@ -119,9 +108,7 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Updates an existing grid resume design directly in Neon (local caching disabled)
-     */
+    // Update design
     suspend fun updateDesign(
         gridResume: GridResume,
         thumbnail: String? = null,
@@ -157,9 +144,7 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Gets a design by ID directly from Neon (local caching disabled)
-     */
+    // Get design
     suspend fun getDesign(designId: String): Result<GridResume?> =
         withContext(Dispatchers.IO) {
             try {
@@ -182,10 +167,7 @@ class GridResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets all designs for the current user directly from Neon (local caching disabled)
-     * Returns GridResumeEntity list for compatibility with existing code
-     */
+    // Get all designs
     suspend fun getAllDesigns(): Result<List<GridResumeEntity>> =
         withContext(Dispatchers.IO) {
             try {
@@ -221,9 +203,7 @@ class GridResumeRepository private constructor(context: Context) {
             }
         }
 
-    /**
-     * Gets the most recently updated design from Neon
-     */
+    // Get latest design
     suspend fun getLatestDesign(): Result<GridResume?> = withContext(Dispatchers.IO) {
         try {
             val allDesigns = getAllDesigns()
@@ -237,9 +217,7 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Deletes a design from Neon (local caching disabled)
-     */
+    // Delete design
     suspend fun deleteDesign(
         designId: String,
         syncToRemote: Boolean = true
@@ -266,9 +244,7 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Gets the count of designs for the current user (from Neon)
-     */
+    // Get design count
     suspend fun getDesignCount(): Int = withContext(Dispatchers.IO) {
         try {
             val allDesigns = getAllDesigns()
@@ -279,18 +255,14 @@ class GridResumeRepository private constructor(context: Context) {
         }
     }
 
-    /**
-     * Clears all designs for the current user (no-op in Neon-only mode)
-     */
+    // Clear all designs
     suspend fun clearAllDesigns(): Result<Unit> = withContext(Dispatchers.IO) {
         // No-op in Neon-only mode
         Log.d(TAG, "[GridResumeRepository] clearAllDesigns called but local caching is disabled")
         Result.success(Unit)
     }
 
-    /**
-     * Generates auto-incremented design name like "Resume Design 1", "Resume Design 2", etc.
-     */
+    // Generate design name
     private suspend fun generateDesignName(userId: String, authToken: String?): String {
         val count = try {
             val result = NeonGridResumeService.getAllGridResumesForUser(userId, authToken)
@@ -301,9 +273,7 @@ class GridResumeRepository private constructor(context: Context) {
         return "Resume Design ${count + 1}"
     }
 
-    /**
-     * Syncs all local grid resumes to remote Neon database (no-op in Neon-only mode)
-     */
+    // Sync all to remote
     suspend fun syncAllToRemote(): Result<Int> = withContext(Dispatchers.IO) {
         // No-op in Neon-only mode - data is already in Neon
         Log.d(TAG, "[GridResumeRepository] syncAllToRemote called but local caching is disabled")

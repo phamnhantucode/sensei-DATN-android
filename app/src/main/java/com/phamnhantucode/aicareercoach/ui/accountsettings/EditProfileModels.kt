@@ -2,9 +2,7 @@ package com.phamnhantucode.aicareercoach.ui.accountsettings
 
 import android.net.Uri
 
-/**
- * Form data for editing user profile
- */
+// Profile edit form data
 data class EditProfileFormData(
     val firstName: String = "",
     val lastName: String = "",
@@ -14,9 +12,7 @@ data class EditProfileFormData(
     val skills: String = "", // Comma-separated list
     val bio: String? = null
 ) {
-    /**
-     * Check if form has any changes compared to original data
-     */
+    // Checks for changes vs original
     fun hasChanges(original: EditProfileFormData): Boolean {
         return firstName != original.firstName ||
                 lastName != original.lastName ||
@@ -27,9 +23,7 @@ data class EditProfileFormData(
                 bio != original.bio
     }
 
-    /**
-     * Validate form data
-     */
+    // Validates form data
     fun validate(): ValidationResult {
         val errors = mutableListOf<String>()
 
@@ -55,34 +49,26 @@ data class EditProfileFormData(
         }
     }
 
-    /**
-     * Convert to skills list
-     */
+    // Converts to skills list
     fun getSkillsList(): List<String> {
         return skills.split(",")
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }
 
-    /**
-     * Get experience years as Int
-     */
+    // Gets experience years as Int
     fun getExperienceYearsInt(): Int? {
         return experienceYears.toIntOrNull()
     }
 }
 
-/**
- * Validation result for form data
- */
+// Form validation result
 sealed class ValidationResult {
     data object Valid : ValidationResult()
     data class Invalid(val errors: List<String>) : ValidationResult()
 }
 
-/**
- * State for profile editing UI
- */
+// Profile editing UI state
 data class EditProfileUiState(
     val isOpen: Boolean = false,
     val formData: EditProfileFormData = EditProfileFormData(),

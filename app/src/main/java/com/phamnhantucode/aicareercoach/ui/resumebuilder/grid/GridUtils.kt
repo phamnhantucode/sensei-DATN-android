@@ -60,15 +60,15 @@ object GridUtils {
         val thresholdDistance = threshold
 
         return when {
-            // Close to the grid line on the left/top
+
             remainder < thresholdDistance -> {
                 gridPosition.toInt() * cellSizePx
             }
-            // Close to the grid line on the right/bottom
+
             remainder > (1 - thresholdDistance) -> {
                 (gridPosition.toInt() + 1) * cellSizePx
             }
-            // Not close enough - don't snap
+
             else -> offsetPx
         }
     }
@@ -129,11 +129,11 @@ object GridUtils {
      * @return Clamped position
      */
     fun clampPosition(position: GridPosition, gridConfig: GridConfig): GridPosition {
-        // Ensure rowSpan and colSpan don't exceed grid size
+
         val safeRowSpan = position.rowSpan.coerceIn(1, gridConfig.rows)
         val safeColSpan = position.colSpan.coerceIn(1, gridConfig.columns)
 
-        // Calculate maximum valid positions
+
         val maxRow = (gridConfig.rows - safeRowSpan).coerceAtLeast(0)
         val maxCol = (gridConfig.columns - safeColSpan).coerceAtLeast(0)
 
@@ -157,12 +157,12 @@ object GridUtils {
         excludeId: String? = null,
         layoutMode: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode? = null
     ): Boolean {
-        // In FREE layout mode, elements can overlap freely
+
         if (layoutMode == com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.LayoutMode.FREE) {
             return false
         }
         
-        // In GRID mode (or default), check for collisions
+
         return elements.any { element ->
             element.id != excludeId && element.position.overlaps(position)
         }
@@ -183,18 +183,18 @@ object GridUtils {
         excludeId: String? = null,
         maxAttempts: Int = 50
     ): GridPosition? {
-        // First try the desired position
+
         if (!hasCollision(desiredPosition, elements, excludeId) &&
             isValidPosition(desiredPosition, gridConfig)) {
             return desiredPosition
         }
 
-        // Try positions in a spiral pattern outward
+
         var distance = 1
         while (distance < maxAttempts) {
             for (rowOffset in -distance..distance) {
                 for (colOffset in -distance..distance) {
-                    // Skip positions not on the perimeter of current distance
+
                     if (rowOffset != -distance && rowOffset != distance &&
                         colOffset != -distance && colOffset != distance) {
                         continue
@@ -250,7 +250,7 @@ object GridUtils {
     ): GridPosition? {
         val (rowSpan, colSpan) = elementSize
 
-        // Try to place from top-left, moving right then down
+
         for (row in 0..(gridConfig.rows - rowSpan)) {
             for (col in 0..(gridConfig.columns - colSpan)) {
                 val testPosition = GridPosition(row, col, rowSpan, colSpan)
@@ -379,14 +379,14 @@ object GridUtils {
     ): Float {
         val (pageWidthPx, pageHeightPx) = getGridSizePx(gridConfig, cellSizePx)
 
-        // Calculate zoom needed to fit width and height
+
         val zoomToFitWidth = (availableWidthPx * padding) / pageWidthPx
         val zoomToFitHeight = (availableHeightPx * padding) / pageHeightPx
 
-        // Use the smaller zoom to ensure both dimensions fit
+
         val optimalZoom = minOf(zoomToFitWidth, zoomToFitHeight)
 
-        // Clamp to reasonable zoom range
+
         return optimalZoom.coerceIn(0.25f, 2f)
     }
 }

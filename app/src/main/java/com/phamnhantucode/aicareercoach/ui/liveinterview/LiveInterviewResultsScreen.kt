@@ -16,9 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.phamnhantucode.aicareercoach.data.interview.InterviewSummary
 import com.phamnhantucode.aicareercoach.data.interview.LiveQuestion
 
-/**
- * Results screen showing interview summary and detailed feedback.
- */
+// Interview results screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveInterviewResultsScreen(

@@ -59,7 +59,7 @@ class ResumeMarkdownViewModel(private val context: Context) : ViewModel() {
             _uiState.value = MarkdownUiState.Loading
 
             try {
-                // Load resume from local storage
+
                 val result = repository.getLatestResume()
                 var resume = result.getOrNull()
 
@@ -68,21 +68,21 @@ class ResumeMarkdownViewModel(private val context: Context) : ViewModel() {
                     Log.d(TAG, "No resume found, creating default resume for new user")
                     resume = Resume() // Create empty resume with default values
 
-                    // Save to local and remote database
+
                     repository.saveResume(resume, syncToRemote = true)
                     Log.d(TAG, "Default resume created and saved with ID: ${resume.id}")
                 }
 
                 currentResume = resume
 
-                // Generate markdown
+
                 val markdownContent = ResumeFormatter.toMarkdown(resume)
                 _markdown.value = markdownContent
 
                 // Show success state first
                 _uiState.value = MarkdownUiState.Syncing
 
-                // Sync to Neon database
+
                 syncToNeon(resume)
 
             } catch (e: Exception) {

@@ -33,7 +33,7 @@ fun GridBackground(
 
         val (gridWidth, gridHeight) = GridUtils.getGridSizePx(gridConfig, cellSizePx)
 
-        // Draw vertical lines
+
         for (col in 0..gridConfig.columns) {
             val x = col * cellSizePx
             val isMajorLine = showMajorLines && col % majorLineInterval == 0
@@ -50,7 +50,7 @@ fun GridBackground(
             )
         }
 
-        // Draw horizontal lines
+
         for (row in 0..gridConfig.rows) {
             val y = row * cellSizePx
             val isMajorLine = showMajorLines && row % majorLineInterval == 0
@@ -83,7 +83,7 @@ fun GridLabels(
     val cellSizePx = gridConfig.cellSizeDp * density
 
     Canvas(modifier = modifier.fillMaxSize()) {
-        // Draw column labels
+
         if (showColumnLabels) {
             for (col in 0 until gridConfig.columns) {
                 val x = col * cellSizePx + cellSizePx / 2
@@ -96,7 +96,7 @@ fun GridLabels(
             }
         }
 
-        // Draw row labels
+
         if (showRowLabels) {
             for (row in 0 until gridConfig.rows) {
                 val y = row * cellSizePx + cellSizePx / 2
@@ -146,14 +146,14 @@ fun GridHighlight(
         val width = position.colSpan * cellSizePx
         val height = position.rowSpan * cellSizePx
 
-        // Draw fill
+
         drawRect(
             color = highlightColor,
             topLeft = Offset(x, y),
             size = androidx.compose.ui.geometry.Size(width, height)
         )
 
-        // Draw border
+
         drawRect(
             color = borderColor,
             topLeft = Offset(x, y),

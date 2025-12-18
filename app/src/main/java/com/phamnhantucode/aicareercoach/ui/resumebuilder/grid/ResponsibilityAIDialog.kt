@@ -45,7 +45,7 @@ fun ResponsibilityAIDialog(
     val uiState by viewModel.uiState.collectAsState()
     val options by viewModel.options.collectAsState()
 
-    // Reset when dialog opens
+
     LaunchedEffect(Unit) {
         viewModel.reset()
     }
@@ -68,7 +68,7 @@ fun ResponsibilityAIDialog(
                     .fillMaxSize()
                     .padding(20.dp)
             ) {
-                // Header
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -89,7 +89,7 @@ fun ResponsibilityAIDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Context info
+
                 Text(
                     text = "$jobTitle at $company",
                     style = MaterialTheme.typography.bodyMedium,
@@ -98,7 +98,7 @@ fun ResponsibilityAIDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Content area
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -143,7 +143,7 @@ fun ResponsibilityAIDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Action buttons
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -155,7 +155,7 @@ fun ResponsibilityAIDialog(
                         Text("Cancel")
                     }
 
-                    // Show Generate button only in Initial state
+
                     AnimatedVisibility(
                         visible = uiState is ResponsibilityAIState.Initial,
                         enter = fadeIn(),
@@ -202,7 +202,7 @@ private fun InitialOptionsView(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            // Original text display
+
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -469,7 +469,7 @@ private fun SuggestionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Number badge
+
             Box(
                 modifier = Modifier
                     .size(32.dp)

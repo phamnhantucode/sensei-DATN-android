@@ -54,33 +54,33 @@ class GridEditorViewModel(
         .registerTypeAdapter(ResumeElement::class.java, ResumeElementTypeAdapter())
         .create()
 
-    // Main state
+
     private val _gridResume = MutableStateFlow(GridResume())
     val gridResume: StateFlow<GridResume> = _gridResume.asStateFlow()
 
-    // Selected element
+
     private val _selectedElement = MutableStateFlow<ResumeElement?>(null)
     val selectedElement: StateFlow<ResumeElement?> = _selectedElement.asStateFlow()
 
-    // Drag state
+
     private val _draggedElement = MutableStateFlow<DragState?>(null)
     val draggedElement: StateFlow<DragState?> = _draggedElement.asStateFlow()
 
-    // Hover timer for auto-add to container
+
     private var hoverTimerJob: Job? = null
 
-    // Loading states
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
-    // PDF Export state
+
     private val _pdfExportState = MutableStateFlow<PdfExportState>(PdfExportState.Idle)
     val pdfExportState: StateFlow<PdfExportState> = _pdfExportState.asStateFlow()
 
-    // Image Export state
+
     private val _imageExportState = MutableStateFlow<ImageExportState>(ImageExportState.Idle)
     val imageExportState: StateFlow<ImageExportState> = _imageExportState.asStateFlow()
 
@@ -92,30 +92,28 @@ class GridEditorViewModel(
     private val _isMoveMode = MutableStateFlow(false)
     val isMoveMode: StateFlow<Boolean> = _isMoveMode.asStateFlow()
 
-    // ============================================================================
-    // Multi-Page Support
-    // ============================================================================
+
     
-    // Current page index for editing
+
     private val _currentPageIndex = MutableStateFlow(0)
     val currentPageIndex: StateFlow<Int> = _currentPageIndex.asStateFlow()
 
-    // Auto-pagination enabled state
+
     private val _autoPaginationEnabled = MutableStateFlow(true)
     val autoPaginationEnabled: StateFlow<Boolean> = _autoPaginationEnabled.asStateFlow()
 
-    // Page thumbnails for UI display
+
     private val _pageThumbnails = MutableStateFlow<Map<String, String>>(emptyMap())
     val pageThumbnails: StateFlow<Map<String, String>> = _pageThumbnails.asStateFlow()
 
-    // Thumbnail generation job tracker
+
     private var thumbnailGenerationJob: Job? = null
     
-    // Overflow detection state for visual indicators
+
     private val _overflowInfo = MutableStateFlow<OverflowInfo?>(null)
     val overflowInfo: StateFlow<OverflowInfo?> = _overflowInfo.asStateFlow()
     
-    // Pagination engine (lazy initialized)
+
     private val heightCalculator by lazy { 
         ElementHeightCalculator(context, _gridResume.value.gridConfig) 
     }
@@ -123,21 +121,21 @@ class GridEditorViewModel(
         PaginationEngine(_gridResume.value.gridConfig, heightCalculator) 
     }
 
-    // Undo/Redo stacks
+
     private val undoStack = mutableListOf<GridResume>()
     private val redoStack = mutableListOf<GridResume>()
     private val maxHistorySize = 50
 
-    // Auto-save
+
     private var autoSaveJob: Job? = null
     private var isAutoSaveEnabled = true
 
-    // Events
+
     private val _events = MutableSharedFlow<GridEditorEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<GridEditorEvent> = _events.asSharedFlow()
 
     init {
-        // Load or create default resume
+
         loadOrCreateResume()
     }
 
@@ -161,9 +159,7 @@ class GridEditorViewModel(
         }
     }
 
-    // ============================================================================
-    // Loading & Saving
-    // ============================================================================
+
 
     /**
      * Loads the latest resume or creates a new one with default template
@@ -176,13 +172,13 @@ class GridEditorViewModel(
             _isLoading.value = true
             try {
                 when {
-                    // Case 0: Create new blank design (takes priority over all other cases)
+
                     isNewDesign -> {
                         _gridResume.value = createDefaultResume()
                         android.util.Log.d("GridEditorViewModel", "Created new blank design")
                     }
 
-                    // Case 1: Load specific design by ID
+
                     designId != null -> {
                         val result = gridResumeRepository.getDesign(designId)
                         val gridResume = result.getOrNull()
@@ -249,9 +245,9 @@ class GridEditorViewModel(
                         android.util.Log.d("GridEditorViewModel", "Applied template: $templateName")
                     }
 
-                    // Case 3: Default - load latest from SharedPreferences or GridResumeRepository
+
                     else -> {
-                        // Try to load the GridResume from SharedPreferences
+
                         val savedGridResumeJson = sharedPreferences.getString("latest_grid_resume", null)
 
                         if (savedGridResumeJson != null) {
@@ -511,9 +507,7 @@ class GridEditorViewModel(
         }
     }
 
-    // ============================================================================
-    // Element Management
-    // ============================================================================
+
 
     /**
      * Adds a new element to the canvas
@@ -523,7 +517,7 @@ class GridEditorViewModel(
 
         val currentPage = getCurrentPage()
 
-        // Find next available position
+
         val elementSize = getDefaultElementSize(elementType)
         val position = GridUtils.findNextAvailablePosition(
             elementSize = elementSize,
@@ -535,23 +529,23 @@ class GridEditorViewModel(
         val maxZIndex = currentPage.elements.maxOfOrNull { it.zIndex } ?: -1
         val newZIndex = maxZIndex + 1
 
-        // Create new element based on type
+
         val newElement = createElementOfType(elementType, position)
             .update(zIndex = newZIndex)
 
-        // Add to page
+
         val updatedPage = currentPage.addElement(newElement)
         updatePage(updatedPage)
 
-        // Select the new element
+
         _selectedElement.value = newElement
 
-        // Regenerate thumbnail for current page
+
         regenerateCurrentPageThumbnail()
 
         triggerAutoSave()
 
-        // Check for overflow after adding element
+
         if (_autoPaginationEnabled.value) {
             detectOverflow()
         }

@@ -18,9 +18,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlin.text.Charsets.UTF_8
 
-/**
- * Client for Neon REST SQL API to manage resume data
- */
+// Client for Neon Resume data
 object NeonResumeService {
 
     private const val TAG = "NeonResumeService"
@@ -31,11 +29,7 @@ object NeonResumeService {
         .build()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    /**
-     * Creates or updates a resume in Neon database (all tables)
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, preserve existing 'json' field value when gridResume is null
-     */
+    // Creates or updates a resume
     suspend fun saveResume(
         resume: Resume,
         userId: String,
@@ -110,9 +104,7 @@ object NeonResumeService {
         }
     }
 
-    /**
-     * Saves data to related tables (PersonalInfo, Education, Experience, Project)
-     */
+    // Saves related data (PersonalInfo, etc.)
     private suspend fun saveRelatedTables(
         resume: Resume,
         authorizationHeader: String,
@@ -266,11 +258,7 @@ object NeonResumeService {
         Log.d(TAG, "[NeonSync] [$operationId] Saved $successCount/${resume.projects.size} Project entries")
     }
 
-    /**
-     * Updates an existing resume in Neon database
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, preserve existing 'json' field value when gridResume is null
-     */
+    // Updates an existing resume
     suspend fun updateResume(
         resume: Resume,
         authToken: String? = null,
@@ -323,9 +311,7 @@ object NeonResumeService {
         }
     }
 
-    /**
-     * Deletes related table entries for a resume
-     */
+    // Deletes related table entries
     private suspend fun deleteRelatedTables(
         resumeId: String,
         authorizationHeader: String,
@@ -355,9 +341,7 @@ object NeonResumeService {
         Log.d(TAG, "[NeonSync] [$operationId] Cleared related tables")
     }
 
-    /**
-     * Gets a specific resume by ID from Neon database
-     */
+    // Gets a specific resume
     suspend fun getResume(
         resumeId: String,
         authToken: String? = null
@@ -410,9 +394,7 @@ object NeonResumeService {
         }
     }
 
-    /**
-     * Gets all resumes for a user from Neon database
-     */
+    // Gets all resumes for a user
     suspend fun getAllResumesForUser(
         userId: String,
         authToken: String? = null
@@ -467,9 +449,7 @@ object NeonResumeService {
         }
     }
 
-    /**
-     * Deletes a resume from Neon database (including related tables)
-     */
+    // Deletes a resume
     suspend fun deleteResume(
         resumeId: String,
         authToken: String? = null

@@ -122,7 +122,7 @@ private fun TemplateCard(
                     .fillMaxSize()
                     .padding(12.dp)
             ) {
-                // Template preview (simplified visualization)
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -140,7 +140,7 @@ private fun TemplateCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Template name and description
+
                 Text(
                     text = templateInfo.name,
                     fontSize = 14.sp,
@@ -164,7 +164,7 @@ private fun TemplateCard(
                 )
             }
 
-            // Selection indicator
+
             if (isSelected) {
                 Surface(
                     modifier = Modifier
@@ -201,14 +201,14 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
     ) {
         when (template) {
             GridTemplateType.PROFESSIONAL -> {
-                // Header
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(16.dp)
                         .background(Color(0xFF2196F3), RoundedCornerShape(2.dp))
                 )
-                // Two columns
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -243,7 +243,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
             }
 
             GridTemplateType.MODERN -> {
-                // Side accent bar
+
                 Row {
                     Box(
                         modifier = Modifier
@@ -270,7 +270,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
             }
 
             GridTemplateType.MINIMAL -> {
-                // Simple stacked sections
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -286,7 +286,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
             }
 
             GridTemplateType.CREATIVE -> {
-                // Asymmetric layout
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -318,7 +318,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
             }
 
             GridTemplateType.ACADEMIC -> {
-                // Traditional layout
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -340,7 +340,7 @@ private fun BoxScope.TemplatePreview(template: GridTemplateType) {
             }
 
             GridTemplateType.TECHNICAL -> {
-                // Grid-based layout
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -441,10 +441,10 @@ fun createResumeFromTemplate(template: GridTemplateType): GridResume {
     )
 }
 
-// Template creators (simplified for MVP)
+
 private fun createProfessionalTemplate(): List<ResumeElement> {
     return listOf(
-        // Header
+
         ResumeElement.TextElement(
             position = GridPosition(0, 0, 2, 12),
             content = "Your Name",
@@ -461,7 +461,7 @@ private fun createProfessionalTemplate(): List<ResumeElement> {
             textStyle = TextStyle(fontSize = 12f, color = 0xFF666666),
             alignment = TextAlignment.CENTER
         ),
-        // Divider
+
         ResumeElement.ShapeElement(
             position = GridPosition(3, 0, 1, 12),
             shapeType = ShapeType.DIVIDER,

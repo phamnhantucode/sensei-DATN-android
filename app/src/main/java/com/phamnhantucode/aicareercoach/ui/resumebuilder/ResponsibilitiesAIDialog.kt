@@ -33,8 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * AI dialog for form-based resume editor (multi-line responsibilities)
- * Improves all responsibilities at once
+ * Dialog for improving responsibilities using AI.
  */
 @Composable
 fun ResponsibilitiesAIDialog(
@@ -49,7 +48,7 @@ fun ResponsibilitiesAIDialog(
     val uiState by viewModel.uiState.collectAsState()
     val options by viewModel.options.collectAsState()
 
-    // Reset when dialog opens
+
     LaunchedEffect(Unit) {
         viewModel.reset()
     }
@@ -72,7 +71,7 @@ fun ResponsibilitiesAIDialog(
                     .fillMaxSize()
                     .padding(20.dp)
             ) {
-                // Header
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -93,7 +92,7 @@ fun ResponsibilitiesAIDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Context info
+
                 Text(
                     text = "$jobTitle at $company",
                     style = MaterialTheme.typography.bodyMedium,
@@ -102,7 +101,7 @@ fun ResponsibilitiesAIDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Content area
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -146,7 +145,7 @@ fun ResponsibilitiesAIDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Action buttons
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End

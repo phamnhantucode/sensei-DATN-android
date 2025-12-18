@@ -10,16 +10,7 @@ import org.json.JSONObject
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/**
- * Mapper for converting between app Resume models and Neon database schema.
- * 
- * Database Tables:
- * - Resume: id, userId, content, atsScore, feedback, createdAt, updatedAt, json, skills, template, title, professional_summary, accentColor
- * - ResumePersonalInfo: id, resumeId, image, fullName, profession, phone, email, location, linkedin, website
- * - ResumeExperience: id, resumeId, title, organization, description, startDate, endDate, isCurrent
- * - ResumeEducation: id, resumeId, graduationDate, institution, degree, field, gpa
- * - ResumeProject: id, resumeId, name, description, type
- */
+// Maps between app Resume models and Neon DB schema
 object NeonResumeMapper {
 
     // Gson instance for GridResume serialization
@@ -30,11 +21,7 @@ object NeonResumeMapper {
 
     // ==================== Resume Table ====================
 
-    /**
-     * Convert app Resume to Neon Resume table payload
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, omit 'json' field entirely to preserve existing DB value
-     */
+    // Convert Resume to Neon payload
     fun toNeonResumePayload(resume: Resume, userId: String, gridResume: GridResume? = null, preserveExistingJson: Boolean = false): JSONObject {
         return JSONObject().apply {
             put("id", resume.id)
@@ -57,11 +44,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Convert app Resume to Neon Resume table update payload (without id/userId)
-     * @param gridResume Optional GridResume to store in the 'json' field instead of form data
-     * @param preserveExistingJson If true, omit 'json' field entirely to preserve existing DB value
-     */
+    // Convert Resume to update payload
     fun toNeonResumeUpdatePayload(resume: Resume, gridResume: GridResume? = null, preserveExistingJson: Boolean = false): JSONObject {
         return JSONObject().apply {
             put("content", ResumeFormatter.toMarkdown(resume))
@@ -82,16 +65,12 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Serialize GridResume to JSON string for 'json' field storage
-     */
+    // Serialize GridResume to JSON
     private fun toGridResumeJson(gridResume: GridResume): String {
         return gson.toJson(gridResume)
     }
 
-    /**
-     * Parse Neon Resume row to app Resume
-     */
+    // Parse Neon row to Resume
     fun fromNeonResumeRow(json: JSONObject): Resume {
         // 1. Try to parse from 'json' field first (GridResume or legacy full JSON)
         // If 'json' exists and is not null, it might be a GridResume or a legacy save
@@ -204,9 +183,7 @@ object NeonResumeMapper {
         )
     }
 
-    /**
-     * Helper to parse skills from JSON, handling both JSONArray (PostgREST default) and Postgres text array format.
-     */
+    // Parse skills from JSON
     private fun parseSkills(json: JSONObject): List<String> {
         // 1. Try to parse as standard JSON Array (PostgREST behavior for text[])
         val jsonArray = json.optJSONArray("skills")
@@ -221,9 +198,7 @@ object NeonResumeMapper {
 
     // ==================== ResumePersonalInfo Table ====================
 
-    /**
-     * Convert app PersonalInfo to Neon ResumePersonalInfo table payload
-     */
+    // Convert PersonalInfo to Neon payload
     fun toNeonPersonalInfoPayload(resumeId: String, info: PersonalInfo): JSONObject {
         return JSONObject().apply {
             put("id", java.util.UUID.randomUUID().toString())
@@ -239,9 +214,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Parse Neon ResumePersonalInfo row to app PersonalInfo
-     */
+    // Parse Neon PersonalInfo row
     fun fromNeonPersonalInfoRow(json: JSONObject): PersonalInfo {
         return PersonalInfo(
             fullName = optStringSafe(json, "fullName", ""),
@@ -258,9 +231,7 @@ object NeonResumeMapper {
 
     // ==================== ResumeExperience Table ====================
 
-    /**
-     * Convert app WorkExperience to Neon ResumeExperience table payload
-     */
+    // Convert WorkExperience to Neon payload
     fun toNeonExperiencePayload(resumeId: String, exp: WorkExperience): JSONObject {
         return JSONObject().apply {
             put("id", exp.id)
@@ -274,9 +245,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Parse Neon ResumeExperience row to app WorkExperience
-     */
+    // Parse Neon Experience row
     fun fromNeonExperienceRow(json: JSONObject): WorkExperience {
         val description = optStringSafe(json, "description", "")
         val responsibilities = description
@@ -298,9 +267,7 @@ object NeonResumeMapper {
 
     // ==================== ResumeEducation Table ====================
 
-    /**
-     * Convert app Education to Neon ResumeEducation table payload
-     */
+    // Convert Education to Neon payload
     fun toNeonEducationPayload(resumeId: String, edu: Education): JSONObject {
         return JSONObject().apply {
             put("id", edu.id)
@@ -313,9 +280,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Parse Neon ResumeEducation row to app Education
-     */
+    // Parse Neon Education row
     fun fromNeonEducationRow(json: JSONObject): Education {
         val graduationDate = parseDate(optStringSafe(json, "graduationDate", ""))
         return Education(
@@ -332,9 +297,7 @@ object NeonResumeMapper {
 
     // ==================== ResumeProject Table ====================
 
-    /**
-     * Convert app Project to Neon ResumeProject table payload
-     */
+    // Convert Project to Neon payload
     fun toNeonProjectPayload(resumeId: String, project: Project): JSONObject {
         val typeStr = project.technologies.joinToString(",")
         android.util.Log.d("NeonMapper", "Mapping Project: ${project.title}, Techs: ${project.technologies}, ResultType: $typeStr")
@@ -347,9 +310,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Parse Neon ResumeProject row to app Project
-     */
+    // Parse Neon Project row
     fun fromNeonProjectRow(json: JSONObject): Project {
         val projectType = optStringSafe(json, "type", "")
         return Project(
@@ -365,17 +326,13 @@ object NeonResumeMapper {
 
     // ==================== Helper Functions ====================
 
-    /**
-     * Convert List<String> to PostgreSQL TEXT[] format
-     */
+    // Convert List to Postgres TEXT[]
     private fun toPostgresTextArray(list: List<String>): String {
         if (list.isEmpty()) return "{}"
         return list.joinToString(",", prefix = "{", postfix = "}") { "\"${it.replace("\"", "\\\"")}\"" }
     }
 
-    /**
-     * Parse PostgreSQL TEXT[] to List<String>
-     */
+    // Parse Postgres TEXT[] to List
     private fun fromPostgresTextArray(pgArray: String): List<String> {
         if (pgArray.isEmpty() || pgArray == "{}" || pgArray == "null") return emptyList()
         return pgArray
@@ -385,18 +342,14 @@ object NeonResumeMapper {
             .filter { it.isNotEmpty() && it != "null" }
     }
 
-    /**
-     * Helper to safely get string from JSONObject, handling "null" string and JSONObject.NULL
-     */
+    // Safely get string from JSON
     private fun optStringSafe(json: JSONObject, key: String, fallback: String): String {
         if (json.isNull(key)) return fallback
         val value = json.optString(key, fallback)
         return if (value == "null") fallback else value
     }
 
-    /**
-     * Parse date string to LocalDate
-     */
+    // Parse date string
     private fun parseDate(dateStr: String): LocalDate? {
         if (dateStr.isEmpty() || dateStr == "null") return null
         return try {
@@ -411,9 +364,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Convert accent color Long to color name for DB
-     */
+    // Convert color to name
     private fun getAccentColorName(colorValue: Long): String {
         return when (colorValue) {
             0xFF1976D2L -> "blue"
@@ -427,9 +378,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Convert color name from DB to accent color Long
-     */
+    // Convert name to color
     private fun getAccentColorValue(colorName: String): Long {
         return when (colorName.lowercase()) {
             "blue" -> 0xFF1976D2L
@@ -443,9 +392,7 @@ object NeonResumeMapper {
         }
     }
 
-    /**
-     * Serialize full Resume to JSON string for 'json' field storage
-     */
+    // Serialize Resume to JSON
     private fun toResumeJson(resume: Resume): String {
         return JSONObject().apply {
             put("id", resume.id)
@@ -561,9 +508,7 @@ object NeonResumeMapper {
         }.toString()
     }
 
-    /**
-     * Deserialize Resume from JSON string
-     */
+    // Deserialize Resume from JSON
     private fun fromResumeJson(json: JSONObject): Resume {
         val personalInfoJson = json.getJSONObject("personalInfo")
         val themeJson = json.optJSONObject("theme")

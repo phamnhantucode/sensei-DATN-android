@@ -8,12 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 
-/**
- * A reusable shimmer loading effect component.
- *
- * @param modifier The modifier to apply to the shimmer box
- * @param shimmerProgress The animation progress value (0f to 1f) from an infinite transition
- */
+// Reusable shimmer loading effect
 @Composable
 fun ShimmerBox(
     modifier: Modifier = Modifier,

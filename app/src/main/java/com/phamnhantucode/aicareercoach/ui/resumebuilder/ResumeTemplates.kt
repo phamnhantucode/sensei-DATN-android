@@ -3,7 +3,7 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder
 import androidx.compose.ui.graphics.Color
 
 /**
- * Pre-defined resume templates with different styles and themes
+ * Pre-defined resume themes.
  */
 object ResumeTemplates {
 
@@ -170,7 +170,7 @@ object ResumeTemplates {
     )
 
     /**
-     * Get all available templates
+     * Get all available templates.
      */
     fun getAllTemplates(): List<TemplateInfo> = listOf(
         TemplateInfo(
@@ -212,7 +212,7 @@ object ResumeTemplates {
     )
 
     /**
-     * Get a template by ID
+     * Get a template by ID.
      */
     fun getTemplateById(id: String): ResumeTheme? {
         return when (id) {
@@ -228,7 +228,7 @@ object ResumeTemplates {
 }
 
 /**
- * Template information for displaying in UI
+ * Template UI model.
  */
 data class TemplateInfo(
     val id: String,

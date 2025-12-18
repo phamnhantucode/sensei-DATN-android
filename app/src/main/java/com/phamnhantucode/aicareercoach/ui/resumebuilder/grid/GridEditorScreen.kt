@@ -150,7 +150,7 @@ fun GridEditorScreen(
     val zoomLevel by viewModel.zoomLevel.collectAsState()
     val isMoveMode by viewModel.isMoveMode.collectAsState()
     
-    // Multi-page state
+
     val currentPageIndex by viewModel.currentPageIndex.collectAsState()
     val overflowInfo by viewModel.overflowInfo.collectAsState()
     val autoPaginationEnabled by viewModel.autoPaginationEnabled.collectAsState()
@@ -166,7 +166,7 @@ fun GridEditorScreen(
     var applyingTemplateData by remember { mutableStateOf(false) }
     var showPageSelector by remember { mutableStateOf(true) } // Show page selector by default
 
-    // Load resume data for template application
+
     val scope = rememberCoroutineScope()
     val repository = remember { ResumeRepository.getInstance(context) }
 
@@ -251,7 +251,7 @@ fun GridEditorScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Page selector (when multiple pages or always shown)
+
             if (showPageSelector && (gridResume.pages.size > 1 || true)) {
                 com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.components.PageSelector(
                     pages = gridResume.pages,
@@ -268,7 +268,7 @@ fun GridEditorScreen(
                 )
             }
             
-            // Overflow indicator
+
             com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.components.OverflowIndicator(
                 overflowInfo = overflowInfo,
                 onAutoSplit = { viewModel.triggerPagination() },
@@ -276,13 +276,13 @@ fun GridEditorScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             
-            // Main content area
+
             Row(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                // Main canvas area
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -376,7 +376,7 @@ fun GridEditorScreen(
                     onExitMoveMode = { viewModel.toggleMoveMode() }
                 )
 
-                // Floating action button to add elements
+
                 FloatingActionButton(
                     onClick = { showElementPicker = true },
                     modifier = Modifier
@@ -387,14 +387,14 @@ fun GridEditorScreen(
                 }
             }
 
-            // Right side panels (Layers and Properties)
+
             if (showLayersPanel || (showPropertyPanel && selectedElement != null)) {
                 Box(
                     modifier = Modifier
                         .width(300.dp)
                         .fillMaxHeight()
                 ) {
-                    // Layers Panel
+
                     if (showLayersPanel) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
@@ -420,7 +420,7 @@ fun GridEditorScreen(
                         }
                     }
 
-                    // Property panel - overlays layers if both are open
+
                     if (showPropertyPanel && selectedElement != null) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
@@ -456,7 +456,7 @@ fun GridEditorScreen(
     } // Close Column
 }
 
-    // Element picker dialog
+
     if (showElementPicker) {
         ElementPickerDialog(
             onDismiss = { showElementPicker = false },
@@ -467,7 +467,7 @@ fun GridEditorScreen(
         )
     }
 
-    // Template picker dialog
+
     if (showTemplateDialog) {
         TemplatePickerDialog(
             onDismiss = { showTemplateDialog = false },
@@ -478,7 +478,7 @@ fun GridEditorScreen(
         )
     }
 
-    // PDF Export dialog
+
     if (showExportDialog) {
         PdfExportDialog(
             exportState = pdfExportState,
@@ -514,7 +514,7 @@ fun GridEditorScreen(
         )
     }
 
-    // Image Export dialog
+
     if (showImageExportDialog) {
         ImageExportDialog(
             exportState = imageExportState,
@@ -550,7 +550,7 @@ fun GridEditorScreen(
         )
     }
 
-    // Settings dialog
+
     if (showSettingsDialog) {
         GridEditorSettingsDialog(
             autoPaginationEnabled = autoPaginationEnabled,
@@ -567,7 +567,7 @@ fun GridEditorScreen(
         )
     }
 
-    // Close property panel when element is deselected
+
     LaunchedEffect(selectedElement) {
         if (selectedElement == null) {
             showPropertyPanel = false
@@ -607,7 +607,7 @@ private fun GridEditorTopBar(
             }
         },
         actions = {
-            // Save indicator (shows status, manual save on click)
+
             IconButton(
                 onClick = onSave,
                 enabled = !isSaving
@@ -622,12 +622,12 @@ private fun GridEditorTopBar(
                 }
             }
 
-            // Settings
+
             IconButton(onClick = onSettings) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings")
             }
 
-            // More options menu
+
             var showMenu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { showMenu = true }) {
@@ -729,12 +729,12 @@ private fun GridEditorBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left side - Grid controls
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Show/Hide Grid
+
                 FilterChip(
                     selected = gridConfig.showGrid,
                     onClick = onToggleGrid,
@@ -748,7 +748,7 @@ private fun GridEditorBottomBar(
                     }
                 )
 
-                // Move Mode (Pan & Zoom)
+
                 FilterChip(
                     selected = isMoveMode,
                     onClick = onToggleMoveMode,
@@ -762,7 +762,7 @@ private fun GridEditorBottomBar(
                     }
                 )
 
-                // Layers Toggle
+
                 FilterChip(
                     selected = showLayersPanel,
                     onClick = onToggleLayers,
@@ -777,7 +777,7 @@ private fun GridEditorBottomBar(
                 )
             }
 
-            // Center - Zoom controls
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -791,7 +791,7 @@ private fun GridEditorBottomBar(
                 }
             }
 
-            // Right side - Undo/Redo
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {

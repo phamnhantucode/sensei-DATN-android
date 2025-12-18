@@ -21,7 +21,7 @@ class ResumeDesignViewModel(context: Context) : ViewModel() {
     private val repository = GridResumeRepository.getInstance(context)
     private val templateLoader = TemplateLoader.getInstance(context)
 
-    // State flows
+
     private val _designs = MutableStateFlow<List<GridResumeEntity>>(emptyList())
     val designs: StateFlow<List<GridResumeEntity>> = _designs.asStateFlow()
 
@@ -31,7 +31,7 @@ class ResumeDesignViewModel(context: Context) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Templates loaded from assets
+
     private val _templates = MutableStateFlow<List<ResumeTemplate>>(emptyList())
     val templates: StateFlow<List<ResumeTemplate>> = _templates.asStateFlow()
 
@@ -100,7 +100,7 @@ class ResumeDesignViewModel(context: Context) : ViewModel() {
                 currentList.filter { it.id != designId }
             }
 
-            // Perform database deletion
+
             val result = repository.deleteDesign(designId)
             result.fold(
                 onSuccess = {

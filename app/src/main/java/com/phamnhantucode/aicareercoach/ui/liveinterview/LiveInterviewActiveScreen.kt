@@ -17,9 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.phamnhantucode.aicareercoach.data.audio.RecordingState
 
-/**
- * Main screen for active live interview with push-to-talk and real-time feedback.
- */
+// Active interview screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveInterviewActiveScreen(

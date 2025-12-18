@@ -6,16 +6,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/**
- * Repository for AI-powered resume enhancement
- */
+// Enhance resume with AI
 class ResumeEnhancementRepository {
 
     private val gson = Gson()
 
-    /**
-     * Enhances resume content using AI with optional job description context
-     */
+    // Enhance resume content
     suspend fun enhanceResume(
         resume: Resume,
         jobDescription: String? = null
