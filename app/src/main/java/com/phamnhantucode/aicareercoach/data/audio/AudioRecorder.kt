@@ -44,7 +44,11 @@ class AudioRecorder(private val context: Context) {
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         private const val AUDIO_FILE_PREFIX = "live_interview_audio_"
         private const val AUDIO_FILE_EXTENSION = ".wav"
+        private const val MAX_AMPLITUDE = 32767f // 16-bit PCM max value
     }
+
+    private val _maxAmplitude = MutableStateFlow(0f)
+    val maxAmplitude: StateFlow<Float> = _maxAmplitude.asStateFlow()
 
     // Starts recording to WAV
     fun startRecording(): File? {
@@ -117,6 +121,7 @@ class AudioRecorder(private val context: Context) {
 
             // Change state FIRST so recording loop exits
             _recordingState.value = RecordingState.STOPPED
+            _maxAmplitude.value = 0f
 
             return@withContext try {
                 // Stop recording
@@ -182,6 +187,23 @@ class AudioRecorder(private val context: Context) {
                 if (bytesRead > 0) {
                     outputStream.write(buffer, 0, bytesRead)
                     totalBytesWritten += bytesRead
+                    
+                    // Calculate amplitude
+                    // Since it's 16-bit, we need to look at every 2 bytes
+                    var maxVal = 0
+                    for (i in 0 until bytesRead step 2) {
+                        if (i + 1 < bytesRead) {
+                            val sample = (buffer[i].toInt() and 0xFF) or (buffer[i + 1].toInt() shl 8)
+                            val shortSample = sample.toShort()
+                            val absSample = if (shortSample < 0) -shortSample else shortSample
+                            if (absSample > maxVal) {
+                                maxVal = absSample.toInt()
+                            }
+                        }
+                    }
+                    // Normalize to 0..1
+                    _maxAmplitude.value = maxVal / MAX_AMPLITUDE
+
                 } else if (bytesRead == AudioRecord.ERROR_INVALID_OPERATION) {
                     Log.e(TAG, "AudioRecord invalid operation")
                     break
@@ -323,6 +345,7 @@ class AudioRecorder(private val context: Context) {
                 currentOutputFile = null
 
                 _recordingState.value = RecordingState.IDLE
+                _maxAmplitude.value = 0f
                 Log.d(TAG, "Recording cancelled")
             } catch (e: Exception) {
                 Log.e(TAG, "Error cancelling recording", e)
@@ -341,6 +364,7 @@ class AudioRecorder(private val context: Context) {
             recordingJob = null
             coroutineScope.cancel()
             _recordingState.value = RecordingState.IDLE
+            _maxAmplitude.value = 0f
             Log.d(TAG, "AudioRecorder released")
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing AudioRecorder", e)
@@ -374,6 +398,7 @@ class AudioRecorder(private val context: Context) {
         }
         currentOutputFile = null
         _recordingState.value = RecordingState.IDLE
+        _maxAmplitude.value = 0f
     }
 }
 

@@ -15,6 +15,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import com.phamnhantucode.aicareercoach.data.audio.RecordingState
 
 // Active interview screen
@@ -29,6 +39,7 @@ fun LiveInterviewActiveScreen(
     val currentQuestion by viewModel.currentQuestion.collectAsState()
     val currentFeedback by viewModel.currentFeedback.collectAsState()
     val recordingState by viewModel.recordingState.collectAsState()
+    val audioAmplitude by viewModel.audioAmplitude.collectAsState()
     val interviewDuration by viewModel.interviewDuration.collectAsState()
     val interviewSession by viewModel.interviewSession.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -222,10 +233,28 @@ private fun QuestionView(
     questionNumber: Int,
     totalQuestions: Int,
     recordingState: RecordingState,
+    amplitude: Float,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        hasPermission = isGranted
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -249,7 +278,7 @@ private fun QuestionView(
             totalQuestions = totalQuestions
         )
 
-        // Recording hint
+        // Recording hint or Visualizer
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -257,16 +286,26 @@ private fun QuestionView(
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text(
-                text = if (recordingState == RecordingState.RECORDING) {
-                    "🎤 Recording... Speak clearly and release when done"
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (recordingState == RecordingState.RECORDING) {
+                    Text(
+                        text = "🎤 Recording...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AudioVisualizer(amplitude = amplitude)
                 } else {
-                    "💡 Tip: Think about your answer, then hold the microphone button to speak"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
-            )
+                    Text(
+                        text = "💡 Tip: Think about your answer, then hold the microphone button to speak",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -278,8 +317,18 @@ private fun QuestionView(
         ) {
             PushToTalkButton(
                 isRecording = recordingState == RecordingState.RECORDING,
-                onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
+                onStartRecording = {
+                    if (hasPermission) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStartRecording()
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onStopRecording = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onStopRecording()
+                },
                 enabled = recordingState == RecordingState.IDLE || recordingState == RecordingState.RECORDING
             )
         }
@@ -398,10 +447,28 @@ private fun BatchQuestionView(
     questionNumber: Int,
     totalQuestions: Int,
     recordingState: RecordingState,
+    amplitude: Float,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        hasPermission = isGranted
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -425,7 +492,7 @@ private fun BatchQuestionView(
             totalQuestions = totalQuestions
         )
 
-        // Batch mode hint
+        // Batch mode hint or Visualizer
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -433,16 +500,26 @@ private fun BatchQuestionView(
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text(
-                text = if (recordingState == RecordingState.RECORDING) {
-                    "🎤 Recording... Speak clearly and release when done"
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (recordingState == RecordingState.RECORDING) {
+                    Text(
+                        text = "🎤 Recording...",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AudioVisualizer(amplitude = amplitude)
                 } else {
-                    "📝 Answer Collection Mode: No immediate feedback - answer all questions first, then get comprehensive feedback for everything!"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
-            )
+                    Text(
+                        text = "📝 Answer Collection Mode: No immediate feedback - answer all questions first, then get comprehensive feedback for everything!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -454,8 +531,18 @@ private fun BatchQuestionView(
         ) {
             PushToTalkButton(
                 isRecording = recordingState == RecordingState.RECORDING,
-                onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
+                onStartRecording = {
+                    if (hasPermission) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onStartRecording()
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onStopRecording = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onStopRecording()
+                },
                 enabled = recordingState == RecordingState.IDLE || recordingState == RecordingState.RECORDING
             )
         }
@@ -639,5 +726,57 @@ private fun LoadingView(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+@Composable
+private fun AudioVisualizer(
+    amplitude: Float,
+    modifier: Modifier = Modifier
+) {
+    val barCount = 30
+    val animAmplitudes = remember { mutableStateListOf<Float>().apply { repeat(barCount) { add(0f) } } }
+
+    // Shift values and add new amplitude
+    LaunchedEffect(amplitude) {
+        // Simple smoothing
+        val effectiveAmp = amplitude.coerceIn(0f, 1f)
+        
+        // Shift left
+        for (i in 0 until barCount - 1) {
+            animAmplitudes[i] = animAmplitudes[i+1]
+        }
+        // Add new value with some random variation for visual interest if sound is present
+        animAmplitudes[barCount - 1] = if (effectiveAmp > 0.01f) {
+            effectiveAmp * (0.8f + Math.random().toFloat() * 0.4f)
+        } else {
+            0f
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        animAmplitudes.forEachIndexed { index, value ->
+            // Animated bar height
+            val animatedHeight by animateFloatAsState(
+                targetValue = value.coerceIn(0.1f, 1f),
+                animationSpec = tween(100), label = "barHeight"
+            )
+
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 1.dp)
+                    .width(4.dp)
+                    .fillMaxHeight(animatedHeight)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(2.dp)
+                    )
+            )
+        }
     }
 }

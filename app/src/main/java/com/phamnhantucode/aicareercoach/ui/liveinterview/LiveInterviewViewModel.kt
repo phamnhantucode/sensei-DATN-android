@@ -35,6 +35,7 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
 
     private val _recordingState = MutableStateFlow(RecordingState.IDLE)
     val recordingState: StateFlow<RecordingState> = audioRecorder.recordingState
+    val audioAmplitude: StateFlow<Float> = audioRecorder.maxAmplitude
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
