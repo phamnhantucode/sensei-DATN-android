@@ -39,6 +39,7 @@ class CoverLetterRepository(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
+        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
     ): GeneratedCoverLetter = withContext(Dispatchers.IO) {
         val user = Clerk.user
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
@@ -51,7 +52,8 @@ class CoverLetterRepository(
             companyName = companyName,
             jobTitle = jobTitle,
             jobDescription = jobDescription,
-            userProfile = userProfile
+            userProfile = userProfile,
+            resume = resume
         )
 
         try {
@@ -196,22 +198,40 @@ class CoverLetterRepository(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
-        userProfile: UserProfile
+        userProfile: UserProfile,
+        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
     ): String {
         val industryContext = if (userProfile.industry.isNotBlank()) {
             "The candidate works in the ${userProfile.industry} industry."
         } else ""
 
-        val skillsContext = if (userProfile.skills.isNotEmpty()) {
-            "Key skills: ${userProfile.skills.joinToString(", ")}."
+        val skillsList = mutableListOf<String>()
+        skillsList.addAll(userProfile.skills)
+        resume?.skills?.let { skillsList.addAll(it) }
+        val skillsContext = if (skillsList.isNotEmpty()) {
+            "Key skills: ${skillsList.distinct().joinToString(", ")}."
         } else ""
 
-        val experienceContext = if (userProfile.experience != null) {
+        // Prioritize resume data if available
+        val experienceContext = if (resume != null && resume.workExperiences.isNotEmpty()) {
+            "Work History:\n" + resume.workExperiences.joinToString("\n") { exp ->
+                "- ${exp.jobTitle} at ${exp.company}: ${exp.responsibilities.take(2).joinToString("; ")}"
+            }
+        } else if (userProfile.experience != null) {
             "Years of experience: ${userProfile.experience}."
         } else ""
 
-        val bioContext = if (userProfile.bio.isNotBlank()) {
+        // Prioritize resume bio/summary
+        val bioContext = if (resume != null && resume.professionalSummary.isNotBlank()) {
+             "Professional Summary: ${resume.professionalSummary}"
+        } else if (userProfile.bio.isNotBlank()) {
             "About the candidate: ${userProfile.bio}"
+        } else ""
+
+        val educationContext = if (resume != null && resume.education.isNotEmpty()) {
+            "Education:\n" + resume.education.joinToString("\n") { edu ->
+                "- ${edu.degree} from ${edu.institution}"
+            }
         } else ""
 
         return """
@@ -225,11 +245,12 @@ class CoverLetterRepository(
             $industryContext
             $skillsContext
             $experienceContext
+            $educationContext
             $bioContext
             
             Requirements:
             - Write in a professional, confident, and personable tone
-            - Highlight relevant skills and experience from the candidate's profile that match the job description
+            - Highlight relevant skills and experience from the candidate's profile/resume that match the job description
             - Include specific examples of how the candidate's background aligns with the role
             - Show enthusiasm for the company and position
             - Keep it concise (3-4 paragraphs)

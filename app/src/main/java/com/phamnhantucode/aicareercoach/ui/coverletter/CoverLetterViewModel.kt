@@ -1,9 +1,12 @@
 package com.phamnhantucode.aicareercoach.ui.coverletter
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.phamnhantucode.aicareercoach.data.coverletter.CoverLetterRepository
+import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
+import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,8 +37,11 @@ sealed interface GenerationState {
 }
 
 class CoverLetterViewModel(
-    private val repository: CoverLetterRepository = CoverLetterRepository()
-) : ViewModel() {
+    application: Application
+) : AndroidViewModel(application) {
+
+    private val repository = CoverLetterRepository()
+    private val resumeRepository = ResumeRepository.getInstance(application)
 
     private val _uiState = MutableStateFlow<CoverLetterUiState>(CoverLetterUiState.Loading)
     val uiState: StateFlow<CoverLetterUiState> = _uiState.asStateFlow()
@@ -43,8 +49,28 @@ class CoverLetterViewModel(
     private val _generationState = MutableStateFlow<GenerationState>(GenerationState.Idle)
     val generationState: StateFlow<GenerationState> = _generationState.asStateFlow()
 
+    private val _resumes = MutableStateFlow<List<Resume>>(emptyList())
+    val resumes: StateFlow<List<Resume>> = _resumes.asStateFlow()
+
     init {
         loadCoverLetters()
+        loadResumes()
+    }
+
+    private fun loadResumes() {
+        viewModelScope.launch {
+            try {
+                // Fetch from remote to ensure fresh data, similar to ResumeListViewModel
+                val result = resumeRepository.getAllResumes(forceRemote = true)
+                if (result.isSuccess) {
+                    _resumes.value = result.getOrNull() ?: emptyList()
+                } else {
+                    Log.e(TAG, "Failed to load resumes: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading resumes", e)
+            }
+        }
     }
 
     fun loadCoverLetters() {
@@ -76,6 +102,7 @@ class CoverLetterViewModel(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
+        resume: Resume? = null,
         onSuccess: (CoverLetterEntry) -> Unit
     ) {
         viewModelScope.launch {
@@ -85,7 +112,8 @@ class CoverLetterViewModel(
                 val generated = repository.generateCoverLetter(
                     companyName = companyName,
                     jobTitle = jobTitle,
-                    jobDescription = jobDescription
+                    jobDescription = jobDescription,
+                    resume = resume
                 )
 
                 // Save to database

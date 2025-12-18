@@ -370,6 +370,12 @@ private fun MarkdownWebView(
     modifier: Modifier = Modifier
 ) {
     // Memoized hex colors
+    val colorScheme = MaterialTheme.colorScheme
+    val backgroundColor = colorScheme.background.toArgb()
+    val textColor = colorScheme.onBackground.toArgb()
+    val linkColor = colorScheme.primary.toArgb()
+    val codeBackgroundColor = colorScheme.surfaceVariant.toArgb()
+
     val bgHex = remember(backgroundColor) {
         String.format("#%06X", 0xFFFFFF and backgroundColor)
     }

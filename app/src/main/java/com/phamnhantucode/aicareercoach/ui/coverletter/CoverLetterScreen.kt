@@ -82,6 +82,7 @@ fun CoverLetterScreen(
     val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     val generationState by viewModel.generationState.collectAsState()
+    val resumes by viewModel.resumes.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
 
     val hasExistingLetters = when (val state = uiState) {
@@ -256,13 +257,15 @@ fun CoverLetterScreen(
             if (showCreateDialog) {
                 CreateCoverLetterDialog(
                     isGenerating = generationState is GenerationState.Generating,
+                    resumes = resumes,
                     onDismiss = { showCreateDialog = false },
-                    onCreate = { companyName, jobTitle, jobDescription ->
+                    onCreate = { companyName, jobTitle, jobDescription, resume ->
                         showCreateDialog = false
                         viewModel.generateCoverLetter(
                             companyName = companyName,
                             jobTitle = jobTitle,
                             jobDescription = jobDescription,
+                            resume = resume,
                             onSuccess = { entry ->
                                 onOpenEditor(entry)
                                 coroutineScope.launch {
@@ -447,12 +450,18 @@ private fun formatTimestamp(instant: Instant): String {
 @Composable
 private fun CreateCoverLetterDialog(
     isGenerating: Boolean = false,
+    resumes: List<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume>,
     onDismiss: () -> Unit,
-    onCreate: (companyName: String, jobTitle: String, jobDescription: String) -> Unit
+    onCreate: (companyName: String, jobTitle: String, jobDescription: String, resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume?) -> Unit
 ) {
     var companyName by rememberSaveable { mutableStateOf("") }
     var jobTitle by rememberSaveable { mutableStateOf("") }
     var jobDescription by rememberSaveable { mutableStateOf("") }
+    var selectedResume by remember { mutableStateOf<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume?>(null) }
+    var showResumeDropdown by remember { mutableStateOf(false) }
+
+    // If there's only one resume, select it automatically? No, keep it optional but perhaps suggest it if wanted. 
+    // User requested "Use existing resume (optional)". So default to null is correct.
 
     val isCreateEnabled = !isGenerating && companyName.isNotBlank() && jobTitle.isNotBlank() && jobDescription.isNotBlank()
 
@@ -466,6 +475,68 @@ private fun CreateCoverLetterDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                
+                // Resume Selection
+                if (resumes.isNotEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = selectedResume?.personalInfo?.fullName?.let { "$it (Resume)" } ?: "No resume selected (Default)",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Use Resume Data (Optional)") },
+                            trailingIcon = {
+                                androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = showResumeDropdown
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showResumeDropdown = !showResumeDropdown },
+                            colors = androidx.compose.material3.ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                        )
+                        // Invisible overlay to capture clicks
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showResumeDropdown = !showResumeDropdown }
+                        )
+
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showResumeDropdown,
+                            onDismissRequest = { showResumeDropdown = false },
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("No resume selected") },
+                                onClick = {
+                                    selectedResume = null
+                                    showResumeDropdown = false
+                                }
+                            )
+                            resumes.forEach { resume ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { 
+                                        Column {
+                                            Text(resume.personalInfo.fullName.ifBlank { "Untitled Resume" })
+                                            if (resume.workExperiences.isNotEmpty()) {
+                                                Text(
+                                                    text = "${resume.workExperiences.first().jobTitle} at ${resume.workExperiences.first().company}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedResume = resume
+                                        showResumeDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = companyName,
                     onValueChange = { companyName = it },
@@ -492,7 +563,8 @@ private fun CreateCoverLetterDialog(
                     onCreate(
                         companyName.trim(),
                         jobTitle.trim(),
-                        jobDescription.trim()
+                        jobDescription.trim(),
+                        selectedResume
                     )
                 },
                 enabled = isCreateEnabled
@@ -527,7 +599,8 @@ private fun CreateCoverLetterDialogPreview() {
     AppTheme {
         CreateCoverLetterDialog(
             onDismiss = {},
-            onCreate = { _, _, _ -> }
+            resumes = emptyList(),
+            onCreate = { _, _, _, _ -> }
         )
     }
 }
