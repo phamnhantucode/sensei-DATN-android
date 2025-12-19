@@ -17,7 +17,7 @@ val localProperties = Properties().also { properties ->
 val neonApiUrl =
     localProperties.getProperty(
         "NEON_API_URL",
-        "https://ep-calm-star-a8i9nyct.apirest.eastus2.azure.neon.tech/4sensei/rest/v1"
+        "https://ep-hidden-fire-a17d8p5n.apirest.ap-southeast-1.aws.neon.tech/neondb/rest/v1"
     )
 val neonApiKey = localProperties.getProperty("NEON_API_KEY", "")
 val neonDbRole = localProperties.getProperty("NEON_DB_ROLE", "")

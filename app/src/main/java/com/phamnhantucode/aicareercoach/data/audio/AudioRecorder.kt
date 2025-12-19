@@ -195,9 +195,9 @@ class AudioRecorder(private val context: Context) {
                         if (i + 1 < bytesRead) {
                             val sample = (buffer[i].toInt() and 0xFF) or (buffer[i + 1].toInt() shl 8)
                             val shortSample = sample.toShort()
-                            val absSample = if (shortSample < 0) -shortSample else shortSample
+                            val absSample = if (shortSample < 0) -shortSample.toInt() else shortSample.toInt()
                             if (absSample > maxVal) {
-                                maxVal = absSample.toInt()
+                                maxVal = absSample
                             }
                         }
                     }

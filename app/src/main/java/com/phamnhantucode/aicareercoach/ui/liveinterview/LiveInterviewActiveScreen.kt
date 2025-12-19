@@ -104,6 +104,7 @@ fun LiveInterviewActiveScreen(
                                 questionNumber = session.currentQuestionIndex + 1,
                                 totalQuestions = session.targetQuestionCount,
                                 recordingState = recordingState,
+                                amplitude = audioAmplitude,
                                 onStartRecording = { viewModel.startRecording() },
                                 onStopRecording = { viewModel.stopRecordingAndProcess() }
                             )
@@ -118,6 +119,7 @@ fun LiveInterviewActiveScreen(
                                 questionNumber = session.currentQuestionIndex + 1,
                                 totalQuestions = session.targetQuestionCount,
                                 recordingState = recordingState,
+                                amplitude = audioAmplitude,
                                 onStartRecording = { viewModel.startRecording() },
                                 onStopRecording = { viewModel.stopRecordingAndProcess() }
                             )
