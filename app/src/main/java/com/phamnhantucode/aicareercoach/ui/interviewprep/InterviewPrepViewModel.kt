@@ -49,6 +49,18 @@ class InterviewPrepViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _showCreditDialog = MutableStateFlow(false)
+    val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
+    fun dismissCreditDialog() {
+        _showCreditDialog.value = false
+    }
+
+    fun openPurchaseScreen() {
+        // TODO: Navigation to purchase screen
+        _showCreditDialog.value = false
+    }
+
     private var quizBlueprint: List<RepositoryQuestionSnapshot> = emptyList()
     private var interviewBlueprint: List<RepositoryQuestionSnapshot> = emptyList()
     private var latestQuizQuestions: List<InterviewQuestion> = emptyList()
@@ -105,6 +117,11 @@ class InterviewPrepViewModel(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
+                if (error is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                     _showCreditDialog.value = true
+                     _loadingState.value = LoadingState(isLoading = false, progress = 0f, description = "Insufficient Credits")
+                     return@launch
+                }
                 Log.e(TAG, "Failed to load interview prep content.", error)
                 _errorMessage.value = error.localizedMessage
                 if (latestQuizQuestions.isEmpty()) {

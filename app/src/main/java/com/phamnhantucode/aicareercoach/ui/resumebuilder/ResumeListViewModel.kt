@@ -43,6 +43,18 @@ class ResumeListViewModel(context: Context) : ViewModel() {
     
     private val _isDeleting = MutableStateFlow(false)
     val isDeleting: StateFlow<Boolean> = _isDeleting.asStateFlow()
+
+    private val _showCreditDialog = MutableStateFlow(false)
+    val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
+    fun dismissCreditDialog() {
+        _showCreditDialog.value = false
+    }
+
+    fun openPurchaseScreen() {
+        // TODO: Navigation to purchase screen
+        _showCreditDialog.value = false
+    }
     
     // Stores deleted resume for undo
     private var pendingDeleteResume: ResumeWithThumbnail? = null
@@ -314,6 +326,11 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                 }
                 
             } catch (e: Exception) {
+                if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    _parsingStage.value = ParsingStage.IDLE
+                    return@launch
+                }
                 Log.e(TAG, "Error parsing resume from PDF", e)
                 _parsingStage.value = ParsingStage.ERROR
                 _parsingError.value = e.message ?: "An unknown error occurred"
@@ -376,6 +393,11 @@ class ResumeListViewModel(context: Context) : ViewModel() {
                 _enhancementSuggestions.value = suggestions
                 
             } catch (e: Exception) {
+                 if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    // Reset loading state
+                    return@launch
+                }
                 Log.e(TAG, "Error enhancing resume", e)
                 _enhancementError.value = e.message ?: "Failed to enhance resume"
             } finally {

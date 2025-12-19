@@ -438,8 +438,7 @@ class LoginViewModel(
                 val user = initialUser ?: awaitClerkUser() ?: return@launch
                 val userId = user.id
                 if (userId == lastSyncedUserId) return@launch
-                val authToken = NeonAuth.fetchNeonAuthToken() ?: return@launch
-                NeonUserService.upsertUser(user, authToken)
+                NeonUserService.syncUser(userId)
                 lastSyncedUserId = userId
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -473,10 +472,8 @@ class LoginViewModel(
                     _uiState.update { it.copy(isCheckingAutoLogin = false) }
                     return@launch
                 }
-                val neonUser = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.getUser(
-                    clerkUserId = user.id,
-                    authToken = NeonAuth.fetchNeonAuthToken()
-                )
+                val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+                val neonUser = result.getOrNull()
                 val industry = neonUser?.industry?.trim()
                 val needsOnboarding = industry.isNullOrBlank() || industry.equals("null", ignoreCase = true)
                 _uiState.update { state ->

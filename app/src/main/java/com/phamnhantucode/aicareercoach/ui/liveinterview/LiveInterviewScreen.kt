@@ -3,11 +3,13 @@ package com.phamnhantucode.aicareercoach.ui.liveinterview
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 
 // Live interview feature container
 @Composable
 fun LiveInterviewScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToPurchase: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: LiveInterviewViewModel = viewModel(
@@ -17,6 +19,7 @@ fun LiveInterviewScreen(
     )
 
     val uiState by viewModel.uiState.collectAsState()
+    val showCreditDialog by viewModel.showCreditDialog.collectAsState()
 
     when (val state = uiState) {
         is LiveInterviewUiState.Setup -> {
@@ -52,5 +55,15 @@ fun LiveInterviewScreen(
                 }
             )
         }
+    }
+
+    if (showCreditDialog) {
+        CreditExhaustedDialog(
+            onDismiss = { viewModel.dismissCreditDialog() },
+            onPurchase = { 
+                viewModel.dismissCreditDialog()
+                onNavigateToPurchase() 
+            }
+        )
     }
 }

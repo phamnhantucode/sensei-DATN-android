@@ -1,5 +1,8 @@
 package com.phamnhantucode.aicareercoach.data.ai
 
+import com.clerk.api.Clerk
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementOptions
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResponsibilityImprovementResult
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +28,20 @@ class ResponsibilityAIRepository {
 
         if (!options.hasAnySelected()) {
             throw IllegalArgumentException("At least one improvement option must be selected")
+        }
+        
+        val user = Clerk.user ?: throw IllegalStateException("User session unavailable")
+        val authToken = NeonAuth.fetchNeonAuthToken() ?: throw IllegalStateException("Authentication unavailable")
+        val authHeader = "Bearer $authToken"
+        
+        try {
+            val neonUserId = NeonUserService.fetchNeonUserId(user.id, authHeader)
+            NeonUserService.deductCredit(neonUserId, 1, "Responsibility Improvement", authToken)
+        } catch (e: Exception) {
+            // If it's InsufficientCreditException, let it bubble up.
+            // If fetching user ID fails, wrap or rethrow.
+             if (e is NeonUserService.InsufficientCreditException) throw e
+             throw IOException("Failed to process credit deduction: ${e.message}", e)
         }
 
         val prompt = buildPrompt(
@@ -93,7 +110,7 @@ class ResponsibilityAIRepository {
 
         val otherResponsibilitiesSection = if (otherResponsibilities.isNotEmpty()) {
             """
-
+            
             Other responsibilities for this role (avoid duplication):
             ${otherResponsibilities.joinToString("\n") { "- $it" }}
             """.trimIndent()
@@ -108,7 +125,7 @@ class ResponsibilityAIRepository {
             options.formatAsBullets -> {
                 val bulletChar = if (bulletInfo.hasBullets) bulletInfo.bulletChar else "•"
                 """
-
+                
                 CRITICAL FORMATTING REQUIREMENTS:
                 - ${options.getBulletFormatInstruction()}
                 - Each bullet point should start with "$bulletChar" followed by a space
@@ -119,7 +136,7 @@ class ResponsibilityAIRepository {
             // No bullets
             !options.formatAsBullets -> {
                 """
-
+                
                 CRITICAL FORMATTING REQUIREMENTS:
                 - ${options.getBulletFormatInstruction()}
                 - Do NOT include bullet points, dashes, or any special characters at the start of lines
@@ -131,7 +148,7 @@ class ResponsibilityAIRepository {
             else -> {
                 if (bulletInfo.hasBullets) {
                     """
-
+                    
                     FORMATTING: The input contains ${bulletInfo.bulletCount} bullet point(s) using "${bulletInfo.bulletChar}". Maintain this format.
                     """
                 } else ""
@@ -140,19 +157,19 @@ class ResponsibilityAIRepository {
 
         return """
             You are a professional resume writer helping improve a job responsibility bullet point.
-
+            
             Job Context:
             Position: $jobTitle
             Company: $company
             ${if (contextSection.isNotBlank()) "$contextSection" else ""}
-
+            
             Current Responsibility:
             "$currentText"
             $otherResponsibilitiesSection
-
+            
             Improvement Requirements:
             ${instructions.joinToString("\n") { "- $it" }}
-
+            
             Additional Guidelines:
             - Start with a strong action verb (e.g., Led, Developed, Implemented, Architected, Optimized)
             - Focus on impact and achievements, not just tasks
@@ -161,11 +178,11 @@ class ResponsibilityAIRepository {
             - Avoid buzzwords and clichés
             - Each variation should be meaningfully different
             $formattingInstructions
-
+            
             Generate exactly 3 distinct improved versions of this responsibility.
             Return ONLY a valid JSON array with 3 strings, no additional text or formatting:
             ["variation 1", "variation 2", "variation 3"]
-
+            
             Important: Return ONLY the JSON array, nothing else. Do not include markdown code blocks or explanations.
         """.trimIndent()
     }

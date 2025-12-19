@@ -13,6 +13,7 @@ import com.phamnhantucode.aicareercoach.data.local.QuestionPoolDao
 import com.phamnhantucode.aicareercoach.data.local.QuestionPoolEntity
 import com.phamnhantucode.aicareercoach.data.local.TipsCacheEntity
 import com.phamnhantucode.aicareercoach.data.local.UserProfileCacheEntity
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import java.io.IOException
 import java.net.URLEncoder
 import java.time.Instant
@@ -84,6 +85,9 @@ class InterviewPrepRepository(
 
         // Generate new questions in batch if pool is low
         if (quizPoolCount < MINIMUM_POOL_SIZE || interviewPoolCount < MINIMUM_POOL_SIZE) {
+            // Deduct Credit for Batch Generation
+            NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Batch Generation", authHeader)
+            
             val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
             val generated = generateInterviewContent(prompt)
 
@@ -102,6 +106,9 @@ class InterviewPrepRepository(
 
         // If pool is still empty (first time user), generate immediately
         val (finalQuizQuestions, finalInterviewQuestions, practiceTips, coachingNotes) = if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
+            // Deduct Credit for First Time Generation
+            NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Initial Generation", authHeader)
+
             val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
             val generated = generateInterviewContent(prompt)
 
@@ -115,6 +122,9 @@ class InterviewPrepRepository(
         } else {
             // Try to load cached tips first, otherwise generate new ones
             val tipsAndNotes = getCachedTips(neonUser.id) ?: run {
+                // Deduct Credit for Tips Generation
+                NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Tips Verification", authHeader)
+
                 val generated = loadTipsAndCoachingNotes(neonUser, assessments)
                 cacheTips(neonUser.id, generated.first, generated.second)
                 generated

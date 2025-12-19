@@ -58,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProgressIndicatorDefaults
@@ -79,6 +80,7 @@ private enum class InterviewPrepScreen {
 fun InterviewPrepScreen(
     onBack: () -> Unit = {},
     onNavigateToLiveInterview: () -> Unit = {},
+    onNavigateToPurchase: () -> Unit = {},
     viewModel: InterviewPrepViewModel = viewModel(
         factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
             LocalContext.current.applicationContext as android.app.Application
@@ -94,6 +96,7 @@ fun InterviewPrepScreen(
     val coachingNotes by viewModel.coachingNotes.collectAsStateWithLifecycle()
     val loadingState by viewModel.loadingState.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val showCreditDialog by viewModel.showCreditDialog.collectAsStateWithLifecycle()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -243,6 +246,16 @@ fun InterviewPrepScreen(
                         }
                     }
                 }
+            }
+
+            if (showCreditDialog) {
+                CreditExhaustedDialog(
+                    onDismiss = { viewModel.dismissCreditDialog() },
+                    onPurchase = { 
+                        viewModel.dismissCreditDialog()
+                        onNavigateToPurchase() 
+                    }
+                )
             }
         }
     }

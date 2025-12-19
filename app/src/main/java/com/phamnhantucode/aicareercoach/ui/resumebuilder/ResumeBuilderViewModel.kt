@@ -239,7 +239,8 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
 
             // Get Neon user profile for extended data
             val neonUser = try {
-                NeonUserService.getUser(clerkUser.id)
+                val result = NeonUserService.syncUser(clerkUser.id)
+                result.getOrNull()
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to get Neon user profile", e)
                 null

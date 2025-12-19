@@ -64,6 +64,7 @@ sealed class Screen(val route: String) {
     object LiveInterviewSetup : Screen("live_interview_setup")
     object LiveInterviewActive : Screen("live_interview_active")
     object LiveInterviewResults : Screen("live_interview_results")
+    object Purchase : Screen("purchase")
     object CoverLetterEditor : Screen("cover_letter_editor") {
         private const val IdArg = "id"
         private const val JobTitleArg = "jobTitle"

@@ -8,6 +8,7 @@ import com.phamnhantucode.aicareercoach.data.audio.GeminiAudioService
 import com.phamnhantucode.aicareercoach.data.audio.VoskSpeechRecognizer
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
 import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -82,6 +83,9 @@ class LiveInterviewRepository(
                     Log.e(TAG, "Failed to fetch user profile from Neon database for Clerk user: ${user.id}")
                     return@withContext Result.failure(Exception("Failed to fetch user profile"))
                 }
+
+                // Deduct Credit
+                com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
 
                 // Create new interview session in database
                 Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")
@@ -201,6 +205,9 @@ class LiveInterviewRepository(
                     Log.e(TAG, "Failed to fetch user profile from Neon database for Clerk user: ${user.id}")
                     return@withContext Result.failure(Exception("Failed to fetch user profile"))
                 }
+
+                // Deduct Credit
+                com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
 
                 // Create new interview session in database
                 Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")

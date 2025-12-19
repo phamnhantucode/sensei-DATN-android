@@ -1,6 +1,9 @@
 package com.phamnhantucode.aicareercoach.data.ai
 
+import com.clerk.api.Clerk
 import com.google.gson.Gson
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,6 +19,13 @@ class ResumeEnhancementRepository {
         resume: Resume,
         jobDescription: String? = null
     ): EnhancementSuggestions = withContext(Dispatchers.IO) {
+        val user = Clerk.user ?: throw IllegalStateException("User session unavailable")
+        val authToken = NeonAuth.fetchNeonAuthToken() ?: throw IllegalStateException("Authentication unavailable")
+        val authHeader = "Bearer $authToken" // Basic auth not handled here, assuming Token for simplicity or standard flow
+
+        val neonUserId = NeonUserService.fetchNeonUserId(user.id, authHeader)
+        NeonUserService.deductCredit(neonUserId, 1, "Resume Enhancement", authToken)
+
         val prompt = buildEnhancementPrompt(resume, jobDescription)
 
         try {
@@ -42,6 +52,8 @@ class ResumeEnhancementRepository {
             return@withContext suggestions
             
         } catch (e: Exception) {
+            // Rethrow InsufficientCreditException as is, wrap others
+            if (e is NeonUserService.InsufficientCreditException) throw e
             throw IOException("Failed to enhance resume with AI: ${e.message}", e)
         }
     }

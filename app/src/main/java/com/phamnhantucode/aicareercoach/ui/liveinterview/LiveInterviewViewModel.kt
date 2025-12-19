@@ -55,6 +55,18 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     private val _useBatchMode = MutableStateFlow(true) // Default to new batch mode
     val useBatchMode: StateFlow<Boolean> = _useBatchMode.asStateFlow()
 
+    private val _showCreditDialog = MutableStateFlow(false)
+    val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
+    fun dismissCreditDialog() {
+        _showCreditDialog.value = false
+    }
+
+    fun openPurchaseScreen() {
+        // TODO: Navigation to purchase screen
+        _showCreditDialog.value = false
+    }
+
     private var timerJob: Job? = null
     private var currentAudioFile: File? = null
     private val answeredQuestions = mutableListOf<LiveQuestion>()
@@ -131,6 +143,11 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                 }
 
             } catch (e: Exception) {
+                if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    _uiState.value = LiveInterviewUiState.Setup
+                    return@launch
+                }
                 Log.e(TAG, "Exception in startBatchInterview()", e)
                 _errorMessage.value = e.message ?: "An error occurred"
                 Log.d(TAG, "Setting UI state back to Setup due to exception")
@@ -205,6 +222,11 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                 }
 
             } catch (e: Exception) {
+                if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    _uiState.value = LiveInterviewUiState.Setup
+                    return@launch
+                }
                 Log.e(TAG, "Exception in startImmediateFeedbackInterview()", e)
                 _errorMessage.value = e.message ?: "An error occurred"
                 Log.d(TAG, "Setting UI state back to Setup due to exception")

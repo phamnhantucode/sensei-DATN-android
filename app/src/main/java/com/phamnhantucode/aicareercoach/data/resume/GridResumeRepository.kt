@@ -47,23 +47,15 @@ class GridResumeRepository private constructor(context: Context) {
      * This is used for remote sync to Neon database.
      */
     // Get Neon user ID
+    // Get Neon user ID
     private suspend fun getNeonUserId(): String {
         val clerkUser = Clerk.user
             ?: throw IllegalStateException("User not logged in")
         
-        val authToken = NeonAuth.fetchNeonAuthToken()
+        val result = NeonUserService.syncUser(clerkUser.id)
+        val neonUser = result.getOrNull()
         
-        // Get Neon user's internal ID (not the Clerk ID) for foreign key references
-        var neonUser = NeonUserService.getUser(clerkUser.id, authToken)
-        
-        // If user doesn't exist in Neon, create them
-        if (neonUser == null) {
-            Log.d(TAG, "[GridResumeRepository] User not found in Neon, creating...")
-            NeonUserService.upsertUser(clerkUser, authToken)
-            neonUser = NeonUserService.getUser(clerkUser.id, authToken)
-        }
-        
-        return neonUser?.id ?: throw IllegalStateException("Failed to get Neon user ID")
+        return neonUser?.id ?: throw IllegalStateException("Failed to sync Neon user: ${result.exceptionOrNull()?.message}")
     }
 
     // Save design

@@ -48,6 +48,7 @@ fun PropertyPanel(
     onUpdateContainerLayoutMode: ((ResumeElement.ContainerElement, LayoutMode) -> Unit)? = null,
     parentContainer: ResumeElement.ContainerElement? = null,
     gridConfig: GridConfig? = null,
+    onNavigateToPurchase: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -337,7 +338,8 @@ fun PropertyPanel(
                     WorkExperienceElementProperties(
                         element = element,
                         onUpdateElement = onUpdateElement,
-                        parentContainer = parentContainer
+                        parentContainer = parentContainer,
+                        onNavigateToPurchase = onNavigateToPurchase
                     )
                 }
                 is ResumeElement.EducationElement -> {
@@ -2107,7 +2109,8 @@ private fun ContactItemEditor(
 private fun WorkExperienceElementProperties(
     element: ResumeElement.WorkExperienceElement,
     onUpdateElement: (ResumeElement) -> Unit,
-    parentContainer: ResumeElement.ContainerElement? = null
+    parentContainer: ResumeElement.ContainerElement? = null,
+    onNavigateToPurchase: () -> Unit
 ) {
     PropertySection(title = "Work Experience Items") {
         // Work experience items list
@@ -2123,7 +2126,8 @@ private fun WorkExperienceElementProperties(
                     val updatedItems = element.items.toMutableList()
                     updatedItems.removeAt(index)
                     onUpdateElement(element.copy(items = updatedItems))
-                }
+                },
+                onNavigateToPurchase = onNavigateToPurchase
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -2469,7 +2473,8 @@ private fun WorkExperienceElementProperties(
 private fun WorkExperienceItemEditor(
     item: WorkExperienceItem,
     onUpdate: (WorkExperienceItem) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onNavigateToPurchase: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2587,7 +2592,8 @@ private fun WorkExperienceItemEditor(
                         val updatedResponsibilities = item.responsibilities.toMutableList()
                         updatedResponsibilities.removeAt(index)
                         onUpdate(item.copy(responsibilities = updatedResponsibilities))
-                    }
+                    },
+                    onNavigateToPurchase = onNavigateToPurchase
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -2621,7 +2627,8 @@ private fun ResponsibilityItemEditor(
     company: String = "",
     otherResponsibilities: List<String> = emptyList(),
     onUpdate: (ResponsibilityItem) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onNavigateToPurchase: () -> Unit
 ) {
     var showAIDialog by remember { mutableStateOf(false) }
 
@@ -2674,7 +2681,8 @@ private fun ResponsibilityItemEditor(
             onDismiss = { showAIDialog = false },
             onSelectSuggestion = { improvedText ->
                 onUpdate(responsibility.copy(text = improvedText))
-            }
+            },
+            onNavigateToPurchase = onNavigateToPurchase
         )
     }
 }

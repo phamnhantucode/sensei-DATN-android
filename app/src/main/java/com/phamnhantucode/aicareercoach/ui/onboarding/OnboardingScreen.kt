@@ -280,13 +280,9 @@ fun OnboardingScreen(
                                                             authorizationHeader = authorizationHeader,
                                                         )
 
-                                                        // Step 3: Create/update user with industry field
+                                                        // Step 3: Create/update user (ensure exists)
                                                         loadingMessage = "Creating your profile..."
-                                                        NeonUserService.upsertUserWithIndustry(
-                                                            user = user,
-                                                            industry = formattedIndustry,
-                                                            authToken = authToken
-                                                        )
+                                                        NeonUserService.syncUser(user.id)
 
                                                         // Step 4: Update additional user profile fields
                                                         loadingMessage = "Saving your details..."
@@ -303,8 +299,7 @@ fun OnboardingScreen(
 
                                                         NeonUserService.updateUserProfile(
                                                             clerkUserId = user.id,
-                                                            profile = profile,
-                                                            authToken = authToken,
+                                                            update = profile
                                                         )
                                                         onComplete()
                                                     }

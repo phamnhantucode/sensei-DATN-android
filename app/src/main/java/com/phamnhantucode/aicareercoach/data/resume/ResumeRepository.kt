@@ -44,17 +44,8 @@ class ResumeRepository private constructor(context: Context) {
         return try {
             val clerkUser = Clerk.user ?: return null
 
-            val authToken = NeonAuth.fetchNeonAuthToken()
-            
-            // Get Neon user's internal ID (not the Clerk ID) for foreign key references
-            var neonUser = NeonUserService.getUser(clerkUser.id, authToken)
-            
-            // If user doesn't exist in Neon, create them
-            if (neonUser == null) {
-                Log.d(TAG, "[ResumeRepository] User not found in Neon, creating...")
-                NeonUserService.upsertUser(clerkUser, authToken)
-                neonUser = NeonUserService.getUser(clerkUser.id, authToken)
-            }
+            val result = NeonUserService.syncUser(clerkUser.id)
+            val neonUser = result.getOrNull()
             
             neonUser?.id
         } catch (e: CancellationException) {
@@ -65,6 +56,7 @@ class ResumeRepository private constructor(context: Context) {
             null
         }
     }
+
     
     // Require current user ID
     private suspend fun requireCurrentUserId(): String {

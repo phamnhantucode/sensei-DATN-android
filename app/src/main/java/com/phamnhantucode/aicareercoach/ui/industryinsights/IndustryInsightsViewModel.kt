@@ -30,6 +30,7 @@ data class IndustryInsightsUiState(
     val selectedIndustryId: String? = null,
     val errorMessage: String? = null,
     val userProfileImageUrl: String? = null,
+    val creditBalance: Int? = null,
 ) {
     val selectedInsight: IndustryInsightUiModel?
         get() = selectedIndustryId?.let { id ->
@@ -141,7 +142,8 @@ class IndustryInsightsViewModel(
                     isRefreshing = loadResult.needsRefresh,
                     insights = listOf(insight),
                     selectedIndustryId = insight.id,
-                    errorMessage = null
+                    errorMessage = null,
+                    creditBalance = loadResult.creditBalance
                 )
             }
         } else {
@@ -151,7 +153,8 @@ class IndustryInsightsViewModel(
                     isRefreshing = false,
                     insights = emptyList(),
                     selectedIndustryId = null,
-                    errorMessage = null
+                    errorMessage = null,
+                    creditBalance = loadResult.creditBalance
                 )
             }
         }

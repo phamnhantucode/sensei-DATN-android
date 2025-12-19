@@ -71,6 +71,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -89,6 +90,7 @@ fun CoverLetterScreen(
     val uiState by viewModel.uiState.collectAsState()
     val generationState by viewModel.generationState.collectAsState()
     val resumes by viewModel.resumes.collectAsState()
+    val showCreditDialog by viewModel.showCreditDialog.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var letterToDelete by remember { mutableStateOf<CoverLetterEntry?>(null) }
 
@@ -284,6 +286,13 @@ fun CoverLetterScreen(
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
                 }
+            }
+
+            if (showCreditDialog) {
+                CreditExhaustedDialog(
+                    onDismiss = { viewModel.dismissCreditDialog() },
+                    onPurchase = { viewModel.openPurchaseScreen() }
+                )
             }
 
             if (showCreateDialog) {

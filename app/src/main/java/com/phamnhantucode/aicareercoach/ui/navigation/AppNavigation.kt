@@ -31,6 +31,7 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.ResumeMarkdownScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorScreen
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.GridEditorViewModel
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeDesignScreen
+import com.phamnhantucode.aicareercoach.ui.purchase.PurchaseScreen
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
 @Composable
@@ -217,7 +218,10 @@ fun AppNavigation() {
                     // Navigate back to resume builder with the current resume
                     navController.popBackStack()
                 },
-                viewModel = viewModel
+                viewModel = viewModel,
+                onNavigateToPurchase = {
+                    navController.navigate(Screen.Purchase.route)
+                }
             )
         }
 
@@ -226,7 +230,8 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() },
                 onNavigateToLiveInterview = {
                     navController.navigate(Screen.LiveInterviewSetup.route)
-                }
+                },
+                onNavigateToPurchase = { navController.navigate(Screen.Purchase.route) }
             )
         }
 
@@ -290,6 +295,13 @@ fun AppNavigation() {
 
         composable(Screen.LiveInterviewSetup.route) {
             LiveInterviewScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPurchase = { navController.navigate(Screen.Purchase.route) }
+            )
+        }
+
+        composable(Screen.Purchase.route) {
+            PurchaseScreen(
                 onBack = { navController.popBackStack() }
             )
         }

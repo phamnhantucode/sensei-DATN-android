@@ -52,6 +52,9 @@ class CoverLetterViewModel(
     private val _resumes = MutableStateFlow<List<Resume>>(emptyList())
     val resumes: StateFlow<List<Resume>> = _resumes.asStateFlow()
 
+    private val _showCreditDialog = MutableStateFlow(false)
+    val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
     init {
         loadCoverLetters()
         loadResumes()
@@ -149,6 +152,11 @@ class CoverLetterViewModel(
                 _generationState.update { GenerationState.Success(generated.content) }
                 onSuccess(entry)
             } catch (e: Exception) {
+                if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    _generationState.update { GenerationState.Idle }
+                    return@launch
+                }
                 Log.e(TAG, "Failed to generate cover letter", e)
                 val errorMessage = when {
                     e.message?.contains("User session unavailable") == true ->
@@ -191,6 +199,15 @@ class CoverLetterViewModel(
 
     fun resetGenerationState() {
         _generationState.update { GenerationState.Idle }
+    }
+
+    fun dismissCreditDialog() {
+        _showCreditDialog.value = false
+    }
+
+    fun openPurchaseScreen() {
+        // TODO: Navigation to purchase screen
+        _showCreditDialog.value = false
     }
 
     companion object {

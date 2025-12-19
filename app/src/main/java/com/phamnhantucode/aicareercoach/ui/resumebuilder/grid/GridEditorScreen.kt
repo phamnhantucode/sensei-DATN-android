@@ -136,6 +136,7 @@ fun GridEditorScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPreview: () -> Unit,
     onSwitchToFormEditor: () -> Unit,
+    onNavigateToPurchase: () -> Unit,
     viewModel: GridEditorViewModel = viewModel(),
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -446,7 +447,8 @@ fun GridEditorScreen(
                                 onUpdateContainerLayoutMode = { container, mode ->
                                     viewModel.updateContainerLayoutMode(container, mode)
                                 },
-                                gridConfig = gridResume.gridConfig
+                                gridConfig = gridResume.gridConfig,
+                                onNavigateToPurchase = onNavigateToPurchase
                             )
                         }
                     }

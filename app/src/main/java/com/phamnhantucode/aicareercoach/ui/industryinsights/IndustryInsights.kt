@@ -124,6 +124,10 @@ fun IndustryInsightsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.refreshInsights()
+    }
+
     IndustryInsightsLayout(
         uiState = uiState,
         onRefresh = { viewModel.refreshInsights(forceRefresh = true) },
@@ -132,7 +136,8 @@ fun IndustryInsightsScreen(
         onNavigateToResumeBuilder = onNavigateToResumeBuilder,
         onNavigateToInterviewPrep = onNavigateToInterviewPrep,
         onNavigateToCoverLetter = onNavigateToCoverLetter,
-        onNavigateToAccountSettings = onNavigateToAccountSettings
+        onNavigateToAccountSettings = onNavigateToAccountSettings,
+        creditBalance = uiState.creditBalance
     )
 }
 
@@ -146,6 +151,7 @@ private fun IndustryInsightsLayout(
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
+    creditBalance: Int?,
 ) {
     val selectedInsight = uiState.selectedInsight
 
@@ -177,7 +183,8 @@ private fun IndustryInsightsLayout(
                             onNavigateToResumeBuilder = onNavigateToResumeBuilder,
                             onNavigateToInterviewPrep = onNavigateToInterviewPrep,
                             onNavigateToCoverLetter = onNavigateToCoverLetter,
-                            onNavigateToAccountSettings = onNavigateToAccountSettings
+                            onNavigateToAccountSettings = onNavigateToAccountSettings,
+                            creditBalance = creditBalance
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -232,7 +239,8 @@ private fun HeaderSection(
     onNavigateToResumeBuilder: () -> Unit,
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
-    onNavigateToAccountSettings: () -> Unit
+    onNavigateToAccountSettings: () -> Unit,
+    creditBalance: Int?
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -303,7 +311,38 @@ private fun HeaderSection(
                     }
                 }
 
-                Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Credit Balance Display
+                    if (creditBalance != null) {
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AttachMoney, // Or another appropriate icon
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "$creditBalance Credits",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Box {
                     Surface(
                         onClick = { growthToolsExpanded = true },
                         modifier = Modifier.onGloballyPositioned { coordinates ->
@@ -386,8 +425,9 @@ private fun HeaderSection(
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2021,7 +2061,8 @@ private fun IndustryInsightsScreenPreview() {
             onNavigateToResumeBuilder = {},
             onNavigateToInterviewPrep = {},
             onNavigateToCoverLetter = {},
-            onNavigateToAccountSettings = {}
+            onNavigateToAccountSettings = {},
+            creditBalance = 10
         )
     }
 }

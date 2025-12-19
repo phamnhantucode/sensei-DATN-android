@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.*
+import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 
 /**
  * AI-powered responsibility improvement dialog
@@ -40,10 +41,12 @@ fun ResponsibilityAIDialog(
     onSelectSuggestion: (String) -> Unit,
     userContext: com.phamnhantucode.aicareercoach.data.ai.ResponsibilityAIRepository.UserContext? = null,
     otherResponsibilities: List<String> = emptyList(),
+    onNavigateToPurchase: () -> Unit = {},
     viewModel: ResponsibilityAIViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val options by viewModel.options.collectAsState()
+    val showCreditDialog by viewModel.showCreditDialog.collectAsState()
 
 
     LaunchedEffect(Unit) {
@@ -184,9 +187,20 @@ fun ResponsibilityAIDialog(
                     }
                 }
             }
+            }
         }
+
+    if (showCreditDialog) {
+        CreditExhaustedDialog(
+            onDismiss = { viewModel.dismissCreditDialog() },
+            onPurchase = { 
+                viewModel.dismissCreditDialog()
+                onNavigateToPurchase()
+            }
+        )
     }
 }
+
 
 /**
  * Initial view with options selection

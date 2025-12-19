@@ -185,20 +185,13 @@ class AccountSettingsViewModel(application: Application) : AndroidViewModel(appl
             } else {
                 // Fetch Neon profile data with auth token
                 val neonUser = try {
-                    val authToken = NeonAuth.fetchNeonAuthToken()
-                    if (authToken != null) {
-                        NeonUserService.getUser(
-                            clerkUserId = user.id,
-                            authToken = authToken
-                        )
-                    } else {
-                        Log.w(TAG, "No Neon auth token available")
-                        null
-                    }
+                    val result = NeonUserService.syncUser(user.id)
+                    result.getOrNull()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error fetching Neon user profile", e)
                     null
                 }
+
 
                 EditProfileFormData(
                     firstName = user.firstName.orEmpty(),
@@ -342,9 +335,8 @@ class AccountSettingsViewModel(application: Application) : AndroidViewModel(appl
                     Log.w(TAG, "No Neon auth token available, skipping Neon update")
                 } else {
                     NeonUserService.updateUserProfile(
-                        clerkUserId = user.id,
-                        profile = neonProfile,
-                        authToken = neonAuthToken
+                         clerkUserId = user.id,
+                         update = neonProfile
                     )
                 }
 

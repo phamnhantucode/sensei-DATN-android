@@ -30,8 +30,9 @@ class CoverLetterRepository(
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         return@withContext executeWithAuthRetry { authHeader ->
-            val userId = fetchNeonUserId(user.id, authHeader)
-            fetchCoverLettersForUser(userId, authHeader)
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
+            fetchCoverLettersForUser(neonUser.id, authHeader)
         }
     }
 
@@ -46,6 +47,12 @@ class CoverLetterRepository(
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         val userProfile = executeWithAuthRetry { authHeader ->
+            // Deduct Credit
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
+            
+            com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Cover Letter Generation", authHeader)
+
             fetchUserProfile(user.id, authHeader)
         }
 
@@ -92,7 +99,9 @@ class CoverLetterRepository(
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         return@withContext executeWithAuthRetry { authHeader ->
-            val userId = fetchNeonUserId(user.id, authHeader)
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
+            val userId = neonUser.id
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val payload = JSONObject().apply {

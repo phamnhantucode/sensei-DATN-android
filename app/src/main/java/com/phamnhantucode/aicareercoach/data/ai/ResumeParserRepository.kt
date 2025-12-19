@@ -1,10 +1,14 @@
 package com.phamnhantucode.aicareercoach.data.ai
 
+import com.clerk.api.Clerk
 import com.google.gson.Gson
 import com.phamnhantucode.aicareercoach.data.ai.OpenRouterService
+import com.phamnhantucode.aicareercoach.data.neon.NeonAuth
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -17,6 +21,19 @@ class ResumeParserRepository {
 
     // Parse resume text
     suspend fun parseResume(rawText: String): Resume = withContext(Dispatchers.IO) {
+        val user = Clerk.user ?: throw IllegalStateException("User session unavailable")
+        val authToken = NeonAuth.fetchNeonAuthToken() ?: throw IllegalStateException("Authentication unavailable")
+        val authHeader = "Bearer $authToken"
+
+        try {
+            val neonUserId = NeonUserService.fetchNeonUserId(user.id, authHeader)
+            NeonUserService.deductCredit(neonUserId, 1, "Resume Parsing", authToken)
+        } catch (e: Exception) {
+            if (e is NeonUserService.InsufficientCreditException) throw e
+            // If fetching ID fails or other error, wrap/rethrow
+             throw IOException("Failed to process credit deduction: ${e.message}", e)
+        }
+
         // Truncate to save tokens
         val truncatedText = rawText.take(20000) 
 

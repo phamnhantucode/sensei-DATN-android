@@ -67,6 +67,7 @@ class IndustryInsightsRepository(
                 authorizationHeader = authorizationHeader,
                 insight = existingInsight,
                 needsRefresh = needsRefresh,
+                creditBalance = neonUser.creditBalance
             )
         }
 
@@ -168,6 +169,7 @@ class IndustryInsightsRepository(
         val authorizationHeader: String,
         val insight: IndustryInsightRecord?,
         val needsRefresh: Boolean,
+        val creditBalance: Int?,
     )
 
     private suspend fun resolveAuthorizationHeader(): String? {
@@ -218,6 +220,7 @@ class IndustryInsightsRepository(
                 .get()
                 .build()
 
+        var neonUserId: String? = null
         val industry = client.newCall(userRequest).execute().use { response ->
             val bodyString = response.body?.string()
                 ?: throw IOException("Neon user fetch returned an empty body.")
@@ -231,6 +234,7 @@ class IndustryInsightsRepository(
             }
 
             val userJson = results.getJSONObject(0)
+            neonUserId = userJson.getString("id")
             userJson.optString("industry").takeIf { it.isNotBlank() }
         }
 
@@ -264,7 +268,37 @@ class IndustryInsightsRepository(
             null
         }
 
-        return NeonUserRecord(industry = industry, industryInsight = insight)
+        val creditBalance = if (neonUserId != null) {
+            fetchCreditBalance(neonUserId!!, authorizationHeader)
+        } else null
+
+        return NeonUserRecord(industry = industry, industryInsight = insight, creditBalance = creditBalance)
+    }
+
+    private fun fetchCreditBalance(userId: String, authorizationHeader: String): Int? {
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val requestUrl = "$apiUrl/UserCredit?userId=eq.$userId&select=balance&limit=1"
+        
+         val request = Request.Builder()
+            .url(requestUrl)
+            .addHeader("Authorization", authorizationHeader)
+            .get()
+            .build()
+            
+        return try {
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string()
+                if (response.isSuccessful && !body.isNullOrBlank()) {
+                    val json = JSONArray(body)
+                    if (json.length() > 0) {
+                        json.getJSONObject(0).optInt("balance")
+                    } else null
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch credit balance", e)
+            null
+        }
     }
 
     // Create default data
@@ -690,6 +724,7 @@ class IndustryInsightsRepository(
     data class NeonUserRecord(
         val industry: String?,
         val industryInsight: IndustryInsightRecord?,
+        val creditBalance: Int? = null,
     )
 
     data class IndustryInsightRecord(

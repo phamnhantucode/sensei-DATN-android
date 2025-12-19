@@ -22,6 +22,18 @@ class ResponsibilityAIViewModel(
     private val _options = MutableStateFlow(ResponsibilityImprovementOptions())
     val options: StateFlow<ResponsibilityImprovementOptions> = _options.asStateFlow()
 
+    private val _showCreditDialog = MutableStateFlow(false)
+    val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
+    fun dismissCreditDialog() {
+        _showCreditDialog.value = false
+    }
+
+    fun openPurchaseScreen() {
+        // TODO: Navigation to purchase screen
+        _showCreditDialog.value = false
+    }
+
 
     fun updateOptions(newOptions: ResponsibilityImprovementOptions) {
         _options.value = newOptions
@@ -69,6 +81,11 @@ class ResponsibilityAIViewModel(
                 )
                 _uiState.value = ResponsibilityAIState.Success(result)
             } catch (e: Exception) {
+                if (e is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+                    _showCreditDialog.value = true
+                    _uiState.value = ResponsibilityAIState.Initial
+                    return@launch
+                }
                 _uiState.value = ResponsibilityAIState.Error(
                     e.message ?: "Failed to generate suggestions. Please try again."
                 )

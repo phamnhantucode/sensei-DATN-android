@@ -59,6 +59,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
@@ -115,6 +116,8 @@ fun ResumeListScreen(
             viewModel.parseResumeFromPdf(context, it)
         }
     }
+
+    val showCreditDialog by viewModel.showCreditDialog.collectAsState()
 
     // Handle deletion with undo snackbar
     fun handleDelete(resumeId: String, resumeName: String) {
@@ -355,6 +358,13 @@ fun ResumeListScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showCreditDialog) {
+        CreditExhaustedDialog(
+            onDismiss = { viewModel.dismissCreditDialog() },
+            onPurchase = { viewModel.openPurchaseScreen() }
         )
     }
 }
