@@ -139,4 +139,7 @@ dependencies {
 
     // PDFBox for PDF text extraction
     implementation(libs.pdfbox)
+
+    // Google Play Billing
+    implementation("com.android.billingclient:billing-ktx:6.2.1")
 }
