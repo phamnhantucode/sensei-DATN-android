@@ -52,7 +52,10 @@ fun LiveInterviewScreen(
                 onNewInterview = {
                     // Reset to setup
                     viewModel.abandonInterview()
-                }
+                },
+                onRetryInterview = if (viewModel.canRetry()) {
+                    { viewModel.retryInterview() }
+                } else null
             )
         }
     }

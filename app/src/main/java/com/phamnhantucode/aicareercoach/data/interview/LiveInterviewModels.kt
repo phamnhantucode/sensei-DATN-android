@@ -8,12 +8,14 @@ data class LiveMockInterviewSession(
     val userId: String,
     val interviewType: InterviewType = InterviewType.GENERAL,
     val status: InterviewStatus = InterviewStatus.NOT_STARTED,
-    val targetQuestionCount: Int = 10,
+    val targetQuestionCount: Int = 5,
     val currentQuestionIndex: Int = 0,
     val questions: List<LiveQuestion> = emptyList(),
     val startedAt: Long? = null,
     val completedAt: Long? = null,
-    val overallScore: Float? = null
+    val overallScore: Float? = null,
+    val jobTitle: String = "",
+    val jobDescription: String = ""
 )
 
 // Single question in live interview
@@ -93,7 +95,10 @@ data class StartLiveInterviewRequest(
     val questionCount: Int,
     val industry: String? = null,
     val experienceLevel: Int? = null,
-    val skills: List<String> = emptyList()
+    val skills: List<String> = emptyList(),
+    val jobTitle: String = "",
+    val jobDescription: String = "",
+    val resumeContent: String? = null
 )
 
 // Network models

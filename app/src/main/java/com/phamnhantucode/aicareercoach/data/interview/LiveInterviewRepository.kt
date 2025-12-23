@@ -806,11 +806,24 @@ class LiveInterviewRepository(
     private fun buildUserProfileContext(request: StartLiveInterviewRequest): String {
         val parts = mutableListOf<String>()
 
+        // Add job context first (most important)
+        if (request.jobTitle.isNotBlank()) {
+            parts.add("Target Job Title: ${request.jobTitle}")
+        }
+        if (request.jobDescription.isNotBlank()) {
+            parts.add("Job Description: ${request.jobDescription}")
+        }
+
         request.industry?.let { parts.add("Industry: $it") }
         request.experienceLevel?.let { parts.add("Experience: $it years") }
 
         if (request.skills.isNotEmpty()) {
             parts.add("Skills: ${request.skills.joinToString(", ")}")
+        }
+
+        // Add resume context if available
+        if (!request.resumeContent.isNullOrBlank()) {
+            parts.add("Candidate Resume Summary: ${request.resumeContent}")
         }
 
         return parts.joinToString(" | ")

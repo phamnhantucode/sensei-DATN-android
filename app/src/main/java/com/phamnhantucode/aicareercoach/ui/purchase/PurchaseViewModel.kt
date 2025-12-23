@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
-import com.clerk.clerk_sdk.Clerk
+import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.billing.BillingManager
 import com.phamnhantucode.aicareercoach.data.neon.CreditPack
 import com.phamnhantucode.aicareercoach.data.neon.NeonBillingService
@@ -87,7 +87,7 @@ class PurchaseViewModel(
             // For now, let's assume we can get it from Clerk or passed in dependency
             // But ViewModel doesn't have easy access to Clerk userId without context or repo
             // I'll grab it from Clerk global instance if possible or assume logic needs it passed
-             val userId = Clerk.getInstance().client.lastKnownSession?.user?.id ?: return
+        val userId = Clerk.user?.id ?: return
              // NeonBillingService needs Neon User ID, not Clerk ID. 
              // We need to fetch Neon User ID first or assume we have it.
              // Best way: Use NeonUserService to exchange/fetch.

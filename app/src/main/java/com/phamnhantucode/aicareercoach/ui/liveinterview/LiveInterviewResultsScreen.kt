@@ -7,6 +7,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ fun LiveInterviewResultsScreen(
     summary: InterviewSummary,
     onBack: () -> Unit,
     onNewInterview: () -> Unit,
+    onRetryInterview: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -155,6 +157,12 @@ fun LiveInterviewResultsScreen(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+            
+            Text(
+                text = "Tap each question to view your answer and AI feedback",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             summary.questions.forEachIndexed { index, question ->
                 QuestionReviewCard(
@@ -164,6 +172,27 @@ fun LiveInterviewResultsScreen(
             }
 
             // Action buttons
+            if (onRetryInterview != null) {
+                OutlinedButton(
+                    onClick = onRetryInterview,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Retry Same Interview",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+            
             Button(
                 onClick = onNewInterview,
                 modifier = Modifier
@@ -340,6 +369,30 @@ private fun QuestionReviewCard(
                             text = feedback,
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                }
+                
+                // Ideal answer hint
+                if (question.correctAnswer.isNotBlank()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Sample Strong Answer:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                        ) {
+                            Text(
+                                text = question.correctAnswer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
                     }
                 }
             }

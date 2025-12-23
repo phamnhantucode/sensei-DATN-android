@@ -57,6 +57,9 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
 
     private val _showCreditDialog = MutableStateFlow(false)
     val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+    
+    // Store the last interview config for retry
+    private var lastInterviewConfig: InterviewConfig? = null
 
     fun dismissCreditDialog() {
         _showCreditDialog.value = false
@@ -99,7 +102,10 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     questionCount = config.questionCount,
                     industry = config.industry,
                     experienceLevel = config.experienceLevel,
-                    skills = config.skills
+                    skills = config.skills,
+                    jobTitle = config.jobTitle,
+                    jobDescription = config.jobDescription,
+                    resumeContent = config.resumeContent
                 )
                 Log.d(TAG, "Created StartLiveInterviewRequest: $request")
 
@@ -160,11 +166,44 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     fun startInterview(config: InterviewConfig) {
         Log.d(TAG, "startInterview() called with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}, batchMode=${config.useBatchMode}")
         
+        // Save config for retry
+        lastInterviewConfig = config
+        
         if (config.useBatchMode) {
             startBatchInterview(config)
         } else {
             startImmediateFeedbackInterview(config)
         }
+    }
+    
+    // Retries the last interview with same settings
+    fun retryInterview() {
+        val config = lastInterviewConfig
+        if (config != null) {
+            Log.d(TAG, "Retrying interview with saved config")
+            // Reset state first
+            resetInterviewState()
+            // Start new interview with same config
+            startInterview(config)
+        } else {
+            Log.w(TAG, "No saved config for retry, going back to setup")
+            _uiState.value = LiveInterviewUiState.Setup
+        }
+    }
+    
+    // Checks if retry is available
+    fun canRetry(): Boolean = lastInterviewConfig != null
+    
+    private fun resetInterviewState() {
+        stopTimer()
+        _interviewDuration.value = 0
+        _interviewSession.value = null
+        _currentQuestion.value = null
+        _currentFeedback.value = null
+        _allQuestions.value = emptyList()
+        _currentQuestionIndex.value = 0
+        answeredQuestions.clear()
+        userAnswers.clear()
     }
 
     // Starts immediate feedback interview
@@ -182,7 +221,10 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     questionCount = config.questionCount,
                     industry = config.industry,
                     experienceLevel = config.experienceLevel,
-                    skills = config.skills
+                    skills = config.skills,
+                    jobTitle = config.jobTitle,
+                    jobDescription = config.jobDescription,
+                    resumeContent = config.resumeContent
                 )
                 Log.d(TAG, "Created StartLiveInterviewRequest: $request")
 
@@ -601,12 +643,16 @@ sealed class LiveInterviewUiState {
 // Interview configuration
 data class InterviewConfig(
     val userId: String,
-    val interviewType: InterviewType,
-    val questionCount: Int,
+    val interviewType: InterviewType = InterviewType.GENERAL,
+    val questionCount: Int = 5,
     val industry: String? = null,
     val experienceLevel: Int? = null,
     val skills: List<String> = emptyList(),
-    val useBatchMode: Boolean = true
+    val useBatchMode: Boolean = true,
+    val jobTitle: String = "",
+    val jobDescription: String = "",
+    val resumeId: String? = null,
+    val resumeContent: String? = null
 )
 
 // Question feedback

@@ -1,17 +1,23 @@
 package com.phamnhantucode.aicareercoach.ui.liveinterview
 
 import android.Manifest
+import android.app.Application
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,8 +26,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.data.interview.InterviewType
+import com.phamnhantucode.aicareercoach.data.local.GridResumeEntity
+import com.phamnhantucode.aicareercoach.data.resume.GridResumeRepository
+import kotlinx.coroutines.launch
 
 private const val TAG = "LiveInterviewSetupScreen"
 
@@ -34,6 +44,8 @@ fun LiveInterviewSetupScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
     var hasAudioPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -49,9 +61,35 @@ fun LiveInterviewSetupScreen(
         hasAudioPermission = isGranted
     }
 
-    var selectedType by remember { mutableStateOf(InterviewType.GENERAL) }
-    var questionCount by remember { mutableIntStateOf(10) }
+    // New fields for job-based interview
+    var jobTitle by remember { mutableStateOf("") }
+    var jobDescription by remember { mutableStateOf("") }
+    var selectedResume by remember { mutableStateOf<GridResumeEntity?>(null) }
+    var resumes by remember { mutableStateOf<List<GridResumeEntity>>(emptyList()) }
+    var showResumeDropdown by remember { mutableStateOf(false) }
+    var isLoadingResumes by remember { mutableStateOf(true) }
+    
+    // Hidden but preserved fields (fixed values)
+    val selectedType = InterviewType.GENERAL
+    val questionCount = 5
+    var useBatchMode by remember { mutableStateOf(true) }
+    
     var showPermissionDialog by remember { mutableStateOf(false) }
+
+    // Load user's resumes
+    LaunchedEffect(Unit) {
+        try {
+            val repository = GridResumeRepository.getInstance(context)
+            val result = repository.getAllDesigns()
+            if (result.isSuccess) {
+                resumes = result.getOrNull() ?: emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load resumes", e)
+        } finally {
+            isLoadingResumes = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -74,7 +112,7 @@ fun LiveInterviewSetupScreen(
                 .padding(padding)
                 .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -95,7 +133,7 @@ fun LiveInterviewSetupScreen(
                         imageVector = Icons.Filled.Mic,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Column(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -115,33 +153,157 @@ fun LiveInterviewSetupScreen(
                 }
             }
 
-            // Interview type selection
+            // Job Title Input
             Text(
-                text = "Interview Type",
+                text = "Job Title *",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-
-            InterviewTypeSelector(
-                selectedType = selectedType,
-                onTypeSelected = { selectedType = it }
+            
+            OutlinedTextField(
+                value = jobTitle,
+                onValueChange = { jobTitle = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("e.g., Senior Software Engineer") },
+                leadingIcon = {
+                    Icon(Icons.Filled.Work, contentDescription = null)
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
 
-            // Question count
+            // Job Description Input
             Text(
-                text = "Number of Questions",
+                text = "Job Description *",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-
-            QuestionCountSelector(
-                count = questionCount,
-                onCountChanged = { questionCount = it }
+            
+            OutlinedTextField(
+                value = jobDescription,
+                onValueChange = { jobDescription = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
+                placeholder = { Text("Paste the job description here...") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Description, 
+                        contentDescription = null,
+                        modifier = Modifier.padding(bottom = 80.dp)
+                    )
+                },
+                shape = RoundedCornerShape(12.dp),
+                maxLines = 6
             )
+
+            // Resume Selection (Optional)
+            Text(
+                text = "Select Resume (Optional)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            ExposedDropdownMenuBox(
+                expanded = showResumeDropdown,
+                onExpandedChange = { showResumeDropdown = it }
+            ) {
+                // Build display text for selected resume
+                val displayText = selectedResume?.let { resume ->
+                    val workExp = resume.designData.pages
+                        .flatMap { it.elements }
+                        .filterIsInstance<com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.WorkExperienceElement>()
+                        .firstOrNull()
+                        ?.items
+                        ?.firstOrNull()
+                    if (workExp != null && workExp.jobTitle.isNotBlank()) {
+                        "${resume.name} (${workExp.jobTitle})"
+                    } else {
+                        resume.name
+                    }
+                } ?: "No resume selected"
+                
+                OutlinedTextField(
+                    value = displayText,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = showResumeDropdown)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                )
+                
+                ExposedDropdownMenu(
+                    expanded = showResumeDropdown,
+                    onDismissRequest = { showResumeDropdown = false }
+                ) {
+                    // Option to clear selection
+                    DropdownMenuItem(
+                        text = { Text("No resume selected") },
+                        onClick = {
+                            selectedResume = null
+                            showResumeDropdown = false
+                        }
+                    )
+                    
+                    if (isLoadingResumes) {
+                        DropdownMenuItem(
+                            text = { 
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                    Text("Loading resumes...")
+                                }
+                            },
+                            onClick = {}
+                        )
+                    } else if (resumes.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("No resumes available") },
+                            onClick = { showResumeDropdown = false }
+                        )
+                    } else {
+                        resumes.forEach { resume ->
+                            DropdownMenuItem(
+                                text = { 
+                                    Column {
+                                        Text(
+                                            text = resume.name,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        // Show first work experience if available
+                                        val workExp = resume.designData.pages
+                                            .flatMap { it.elements }
+                                            .filterIsInstance<com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.WorkExperienceElement>()
+                                            .firstOrNull()
+                                            ?.items
+                                            ?.firstOrNull()
+                                        if (workExp != null && workExp.jobTitle.isNotBlank()) {
+                                            Text(
+                                                text = "${workExp.jobTitle} at ${workExp.company}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    selectedResume = resume
+                                    showResumeDropdown = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             // Interview mode selection
-            var useBatchMode by remember { mutableStateOf(true) }
-            
             Text(
                 text = "Interview Mode",
                 style = MaterialTheme.typography.titleMedium,
@@ -193,6 +355,8 @@ fun LiveInterviewSetupScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             // Start button
+            val canStart = hasAudioPermission && jobTitle.isNotBlank() && jobDescription.isNotBlank()
+            
             Button(
                 onClick = {
                     Log.d(TAG, "Start Interview button clicked")
@@ -203,13 +367,22 @@ fun LiveInterviewSetupScreen(
                         Log.d(TAG, "Clerk.user=${if (user != null) "ID:${user.id}" else "NULL"}")
 
                         if (user != null) {
+                            // Extract resume content if selected
+                            val resumeContent = selectedResume?.let { resume ->
+                                extractResumeContent(resume)
+                            }
+                            
                             val config = InterviewConfig(
                                 userId = user.id,
                                 interviewType = selectedType,
                                 questionCount = questionCount,
-                                useBatchMode = useBatchMode
+                                useBatchMode = useBatchMode,
+                                jobTitle = jobTitle,
+                                jobDescription = jobDescription,
+                                resumeId = selectedResume?.id,
+                                resumeContent = resumeContent
                             )
-                            Log.d(TAG, "Calling onStartInterview with config: userId=${config.userId}, type=${config.interviewType}, count=${config.questionCount}, batchMode=${config.useBatchMode}")
+                            Log.d(TAG, "Calling onStartInterview with config: userId=${config.userId}, jobTitle=${config.jobTitle}, hasResume=${config.resumeId != null}")
                             onStartInterview(config)
                             Log.d(TAG, "onStartInterview callback invoked")
                         } else {
@@ -224,12 +397,21 @@ fun LiveInterviewSetupScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
-                enabled = hasAudioPermission
+                enabled = canStart
             ) {
                 Text(
                     text = "Start Interview",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
+                )
+            }
+            
+            if (!canStart && hasAudioPermission) {
+                Text(
+                    text = "Please enter job title and job description to continue",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
 
@@ -262,133 +444,61 @@ fun LiveInterviewSetupScreen(
     }
 }
 
-@Composable
-private fun InterviewTypeSelector(
-    selectedType: InterviewType,
-    onTypeSelected: (InterviewType) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        InterviewType.entries.forEach { type ->
-            InterviewTypeCard(
-                type = type,
-                isSelected = selectedType == type,
-                onClick = { onTypeSelected(type) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun InterviewTypeCard(
-    type: InterviewType,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val (title, description) = when (type) {
-        InterviewType.TECHNICAL -> "Technical" to "Focus on technical skills and problem-solving"
-        InterviewType.BEHAVIORAL -> "Behavioral" to "Focus on past experiences and soft skills"
-        InterviewType.GENERAL -> "General" to "Mix of technical and behavioral questions"
-    }
-
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-        ),
-        border = if (isSelected)
-            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        else
-            null
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(
-                selected = isSelected,
-                onClick = onClick
-            )
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+/**
+ * Extracts relevant content from a resume for interview context.
+ */
+private fun extractResumeContent(resume: GridResumeEntity): String {
+    val parts = mutableListOf<String>()
+    
+    try {
+        val designData = resume.designData
+        
+        // Extract text from all pages
+        designData.pages.forEach { page ->
+            page.elements.forEach { element ->
+                when (element) {
+                    is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.TextElement -> {
+                        if (element.content.isNotBlank()) {
+                            parts.add(element.content)
+                        }
+                    }
+                    is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.WorkExperienceElement -> {
+                        element.items.forEach { item ->
+                            val exp = buildString {
+                                append("Work: ${item.jobTitle} at ${item.company}")
+                                val responsibilities = item.responsibilities.map { it.text }.filter { it.isNotBlank() }
+                                if (responsibilities.isNotEmpty()) {
+                                    append(" - ${responsibilities.joinToString("; ")}")
+                                }
+                            }
+                            parts.add(exp)
+                        }
+                    }
+                    is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.EducationElement -> {
+                        element.items.forEach { item ->
+                            parts.add("Education: ${item.degree} from ${item.institution}")
+                        }
+                    }
+                    is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.SkillElement -> {
+                        val skills = element.items.map { it.name }.filter { it.isNotBlank() }
+                        if (skills.isNotEmpty()) {
+                            parts.add("Skills: ${skills.joinToString(", ")}")
+                        }
+                    }
+                    is com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement.ProjectElement -> {
+                        element.items.forEach { item ->
+                            parts.add("Project: ${item.name} - ${item.description}")
+                        }
+                    }
+                    else -> { /* Skip other element types */ }
+                }
             }
         }
+    } catch (e: Exception) {
+        Log.e(TAG, "Error extracting resume content", e)
     }
-}
-
-@Composable
-private fun QuestionCountSelector(
-    count: Int,
-    onCountChanged: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "$count questions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "~${count * 2}-${count * 3} min",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Slider(
-                value = count.toFloat(),
-                onValueChange = { onCountChanged(it.toInt()) },
-                valueRange = 5f..20f,
-                steps = 14,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary
-                )
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("5", style = MaterialTheme.typography.bodySmall)
-                Text("20", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
+    
+    return parts.joinToString(" | ").take(2000) // Limit to 2000 chars
 }
 
 @Composable
@@ -413,7 +523,7 @@ private fun InterviewModeSelector(
                     MaterialTheme.colorScheme.surfaceVariant
             ),
             border = if (useBatchMode)
-                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             else
                 null
         ) {
@@ -455,7 +565,7 @@ private fun InterviewModeSelector(
                     MaterialTheme.colorScheme.surfaceVariant
             ),
             border = if (!useBatchMode)
-                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
             else
                 null
         ) {
