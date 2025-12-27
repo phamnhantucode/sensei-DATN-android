@@ -60,6 +60,7 @@ import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 fun AccountSettingsScreen(
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    onNavigateToPayment: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = viewModel()
 ) {
@@ -81,6 +82,7 @@ fun AccountSettingsScreen(
         onEditProfileFormDataChange = viewModel::updateEditProfileFormData,
         onSaveProfile = viewModel::saveProfileChanges,
         onCancelEditProfile = viewModel::cancelEditProfile,
+        onUpgradeToPro = onNavigateToPayment,
         modifier = modifier
     )
 }
@@ -96,6 +98,7 @@ private fun AccountSettingsContent(
     onEditProfileFormDataChange: (EditProfileFormData) -> Unit,
     onSaveProfile: () -> Unit,
     onCancelEditProfile: () -> Unit,
+    onUpgradeToPro: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -143,7 +146,8 @@ private fun AccountSettingsContent(
                 ) {
                     ProfileSection(
                         uiState = uiState,
-                        onEditProfile = onEditProfile
+                        onEditProfile = onEditProfile,
+                        onUpgradeToPro = onUpgradeToPro
                     )
                     ConnectedAccountsSection(uiState.connectedAccounts)
                     AppSettingsSection(
@@ -204,7 +208,8 @@ private fun AccountSettingsSignedOutState(modifier: Modifier = Modifier) {
 @Composable
 private fun ProfileSection(
     uiState: AccountSettingsUiState,
-    onEditProfile: () -> Unit
+    onEditProfile: () -> Unit,
+    onUpgradeToPro: () -> Unit
 ) {
     val context = LocalContext.current
     val displayName = uiState.fullName?.takeUnless { it.isBlank() } ?: "Signed-in user"
@@ -280,6 +285,20 @@ private fun ProfileSection(
                 )
             ) {
                 Text("Edit Profile")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Upgrade to Pro Button
+            Button(
+                onClick = onUpgradeToPro,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            ) {
+                Text("Upgrade to Pro 🚀")
             }
         }
     }
@@ -561,7 +580,8 @@ private fun AccountSettingsScreenPreview() {
             onEditProfile = {},
             onEditProfileFormDataChange = {},
             onSaveProfile = {},
-            onCancelEditProfile = {}
+            onCancelEditProfile = {},
+            onUpgradeToPro = {}
         )
     }
 }

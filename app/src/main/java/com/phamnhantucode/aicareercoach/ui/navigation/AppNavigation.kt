@@ -125,6 +125,9 @@ fun AppNavigation() {
                         }
                         launchSingleTop = true
                     }
+                },
+                onNavigateToPayment = {
+                    navController.navigate(Screen.StripePayment.route)
                 }
             )
         }
@@ -302,6 +305,12 @@ fun AppNavigation() {
 
         composable(Screen.Purchase.route) {
             PurchaseScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        
+        composable(Screen.StripePayment.route) {
+            com.phamnhantucode.aicareercoach.ui.payment.PaymentScreen(
                 onBack = { navController.popBackStack() }
             )
         }

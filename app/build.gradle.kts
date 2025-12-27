@@ -142,4 +142,7 @@ dependencies {
 
     // Google Play Billing
     implementation("com.android.billingclient:billing-ktx:6.2.1")
+
+    // Stripe Android SDK
+    implementation("com.stripe:stripe-android:21.4.0")
 }
