@@ -138,7 +138,7 @@ private fun LoginCard(
     onBack: () -> Unit,
     uiState: LoginUiState,
     onSignIn: (String, String) -> Unit,
-    onSignUp: (String, String) -> Unit,
+    onSignUp: (String, String, String, String) -> Unit,
     onSignInWithGoogle: () -> Unit,
     onVerify: (String) -> Unit,
     onClearError: () -> Unit,
@@ -150,6 +150,8 @@ private fun LoginCard(
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var firstName by rememberSaveable { mutableStateOf("") }
+    var lastName by rememberSaveable { mutableStateOf("") }
     var verificationCode by rememberSaveable { mutableStateOf("") }
     var authMode by rememberSaveable { mutableStateOf(AuthMode.SignIn) } // Local UI state for Sign In vs Sign Up
 
@@ -290,6 +292,17 @@ private fun LoginCard(
                         password = it
                         if (uiState.errorMessage != null) onClearError()
                     },
+                    firstName = firstName,
+                    onFirstNameChange = {
+                        firstName = it
+                        if (uiState.errorMessage != null) onClearError()
+                    },
+                    lastName = lastName,
+                    onLastNameChange = {
+                        lastName = it
+                        if (uiState.errorMessage != null) onClearError()
+                    },
+                    isSignUp = authMode == AuthMode.SignUp,
                     onForgotPassword = startForgotPassword,
                     isProcessing = uiState.isProcessing,
                     isCheckingAutoLogin = uiState.isCheckingAutoLogin
@@ -324,7 +337,7 @@ private fun LoginCard(
                         }
                         uiState.requiresVerification -> onVerify(verificationCode)
                         authMode == AuthMode.SignIn -> onSignIn(email, password)
-                        else -> onSignUp(email, password)
+                        else -> onSignUp(email, password, firstName, lastName)
                     }
                 },
                 enabled = primaryEnabled
@@ -432,6 +445,11 @@ private fun CredentialsSection(
     onEmailChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
+    firstName: String,
+    onFirstNameChange: (String) -> Unit,
+    lastName: String,
+    onLastNameChange: (String) -> Unit,
+    isSignUp: Boolean,
     onForgotPassword: () -> Unit,
     isProcessing: Boolean,
     isCheckingAutoLogin: Boolean
@@ -440,6 +458,56 @@ private fun CredentialsSection(
     var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (isSignUp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "First name (optional)",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = firstName,
+                        onValueChange = onFirstNameChange,
+                        placeholder = { Text(text = "John") },
+                        singleLine = true,
+                        enabled = !isProcessing && !isCheckingAutoLogin,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Next
+                        )
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Last name (optional)",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = lastName,
+                        onValueChange = onLastNameChange,
+                        placeholder = { Text(text = "Doe") },
+                        singleLine = true,
+                        enabled = !isProcessing && !isCheckingAutoLogin,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Next
+                        )
+                    )
+                }
+            }
+        }
+        
         LabeledField(
             value = email,
             onValueChange = onEmailChange,
@@ -475,16 +543,18 @@ private fun CredentialsSection(
                 onDone = { focusManager.clearFocus() }
             )
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(
-                onClick = onForgotPassword,
-                enabled = !isProcessing && !isCheckingAutoLogin
+        if (!isSignUp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Forgot password?")
+                TextButton(
+                    onClick = onForgotPassword,
+                    enabled = !isProcessing && !isCheckingAutoLogin
+                ) {
+                    Text(text = "Forgot password?")
+                }
             }
         }
     }

@@ -129,8 +129,10 @@ class LoginViewModel(
         }
     }
 
-    fun signUp(email: String, password: String) {
+    fun signUp(email: String, password: String, firstName: String = "", lastName: String = "") {
         val trimmedEmail = email.trim()
+        val trimmedFirstName = firstName.trim()
+        val trimmedLastName = lastName.trim()
         if (trimmedEmail.isEmpty() || password.isEmpty()) {
             _uiState.update {
                 it.copy(errorMessage = "Please enter both your email and a password.")
@@ -148,7 +150,9 @@ class LoginViewModel(
                 .create(
                     SignUp.CreateParams.Standard(
                         emailAddress = trimmedEmail,
-                        password = password
+                        password = password,
+                        firstName = trimmedFirstName.ifBlank { null },
+                        lastName = trimmedLastName.ifBlank { null }
                     )
                 )
                 .onSuccess { signUp ->
