@@ -27,6 +27,8 @@ val cldnrApiKey = localProperties.getProperty("CLDNR_API_KEY", "")
 val cldnrApiSecret = localProperties.getProperty("CLDNR_API_SECRET", "")
 val cldnrCloudName = localProperties.getProperty("CLDNR_CLOUD_NAME", "")
 val cldnrUploadPreset = localProperties.getProperty("CLDNR_UPLOAD_PRESET", "")
+val clerkPublishableKey = localProperties.getProperty("CLERK_PUBLISHABLE_KEY", "")
+val clerkSecretKey = localProperties.getProperty("CLERK_SECRET_KEY", "")
 
 android {
     namespace = "com.phamnhantucode.aicareercoach"
@@ -43,12 +45,12 @@ android {
         buildConfigField(
             "String",
             "CLERK_PUBLISHABLE_KEY",
-            "\"pk_test_dG91Z2gtYWlyZWRhbGUtMTcuY2xlcmsuYWNjb3VudHMuZGV2JA\""
+            "\"$clerkPublishableKey\""
         )
         buildConfigField(
             "String",
             "CLERK_SECRET_KEY",
-            "\"sk_test_oSU3FT0LXbRIqLIxucUrSpU0brJg9HK5aco9xnMZWN\""
+            "\"$clerkSecretKey\""
         )
         buildConfigField("String", "NEON_API_URL", "\"$neonApiUrl\"")
         buildConfigField("String", "NEON_API_KEY", "\"$neonApiKey\"")
