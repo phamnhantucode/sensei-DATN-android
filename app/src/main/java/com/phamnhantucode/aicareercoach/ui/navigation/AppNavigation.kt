@@ -53,7 +53,7 @@ fun AppNavigation() {
         NetworkAwareContent {
             NavHost(
             navController = navController,
-            startDestination = Screen.Login.route
+            startDestination = Screen.Intro.route
         ) {
         composable(Screen.Intro.route) {
             IntroPage(
