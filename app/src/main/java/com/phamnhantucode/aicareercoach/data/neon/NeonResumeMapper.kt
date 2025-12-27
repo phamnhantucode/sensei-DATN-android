@@ -152,7 +152,8 @@ object NeonResumeMapper {
                 // TODO later: Add tables for Certifications/Languages if needed.
                 certifications = emptyList(), 
                 languages = emptyList(),
-                theme = theme
+                theme = theme,
+                lastModified = parseDateTime(optStringSafe(json, "updatedAt", ""))
             )
         }
 
@@ -179,7 +180,8 @@ object NeonResumeMapper {
                 colorScheme = ColorScheme(
                     accentColor = getAccentColorValue(optStringSafe(json, "accentColor", "neutral"))
                 )
-            )
+            ),
+            lastModified = parseDateTime(optStringSafe(json, "updatedAt", ""))
         )
     }
 
@@ -695,5 +697,21 @@ object NeonResumeMapper {
             list.add(jsonArray.getString(i))
         }
         return list
+    }
+
+    // Parse datetime string
+    private fun parseDateTime(dateTimeStr: String): java.time.LocalDateTime? {
+        if (dateTimeStr.isEmpty() || dateTimeStr == "null") return null
+        return try {
+            // Try ISO offset date time first (e.g. 2023-10-27T10:00:00+00:00)
+            java.time.ZonedDateTime.parse(dateTimeStr).toLocalDateTime()
+        } catch (e: Exception) {
+            try {
+                // Try local date time
+                java.time.LocalDateTime.parse(dateTimeStr)
+            } catch (e2: Exception) {
+                null
+            }
+        }
     }
 }

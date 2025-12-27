@@ -52,7 +52,8 @@ class GridResumeRepository private constructor(context: Context) {
         val clerkUser = Clerk.user
             ?: throw IllegalStateException("User not logged in")
         
-        val result = NeonUserService.syncUser(clerkUser.id)
+        val email = clerkUser.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+        val result = NeonUserService.syncUser(clerkUser.id, email)
         val neonUser = result.getOrNull()
         
         return neonUser?.id ?: throw IllegalStateException("Failed to sync Neon user: ${result.exceptionOrNull()?.message}")

@@ -3,8 +3,11 @@ package com.phamnhantucode.aicareercoach.ui.resumebuilder
 import androidx.compose.ui.graphics.Color
 import java.time.LocalDate
 
+import java.time.LocalDateTime
+
 data class Resume(
     val id: String = java.util.UUID.randomUUID().toString(),
+    val lastModified: LocalDateTime? = null,
     val personalInfo: PersonalInfo = PersonalInfo(),
     val professionalSummary: String = "",
     val workExperiences: List<WorkExperience> = emptyList(),

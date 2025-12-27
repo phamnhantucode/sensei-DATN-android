@@ -105,8 +105,6 @@ class CoverLetterViewModel(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
-        tone: String,
-        resume: Resume? = null,
         onSuccess: (CoverLetterEntry) -> Unit
     ) {
         viewModelScope.launch {
@@ -116,9 +114,7 @@ class CoverLetterViewModel(
                 val generated = repository.generateCoverLetter(
                     companyName = companyName,
                     jobTitle = jobTitle,
-                    jobDescription = jobDescription,
-                    tone = tone,
-                    resume = resume
+                    jobDescription = jobDescription
                 )
 
                 // Save to database

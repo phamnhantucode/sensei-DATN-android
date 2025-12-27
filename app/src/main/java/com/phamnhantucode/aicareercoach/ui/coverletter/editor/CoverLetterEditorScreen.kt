@@ -199,16 +199,9 @@ fun CoverLetterEditorScreen(
                 }
                 
                 Text(
-                    text = "Customize the email before you send it. Select any text to format it or drop in boilerplate snippets to speed things up.",
+                    text = "Customize the email before you send it. Select any text to format it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                BoilerplateSection(
-                    onInsertSnippet = { snippet ->
-                        editorState = editorState.insertSnippet(snippet)
-                        editorFocusRequester.requestFocus()
-                    }
                 )
 
                 OutlinedTextField(
@@ -252,42 +245,6 @@ fun CoverLetterEditorScreen(
                     }
                 )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun BoilerplateSection(
-    onInsertSnippet: (String) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "Boilerplate snippets",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            boilerplateSnippets.forEach { snippet ->
-                AssistChip(
-                    onClick = { onInsertSnippet(snippet.content) },
-                    label = { Text(snippet.label) }
-                )
-            }
-        }
-
-        TextButton(
-            onClick = { onInsertSnippet(customClosingSnippet) },
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp)
-        ) {
-            Text("Insert polished closing")
         }
     }
 }
@@ -457,29 +414,6 @@ private fun TextFieldValue.insertSnippet(snippet: String): TextFieldValue {
         selection = TextRange(cursor, cursor)
     )
 }
-
-private data class BoilerplateSnippet(
-    val label: String,
-    val content: String
-)
-
-private val boilerplateSnippets = listOf(
-    BoilerplateSnippet(
-        label = "Leadership impact",
-        content = "In my last role, I guided a cross-functional squad that launched an AI-powered analytics module two quarters ahead of schedule."
-    ),
-    BoilerplateSnippet(
-        label = "Metrics win",
-        content = "I focus on measurable outcomes — the latest campaign I owned increased qualified pipeline by 27% within the first 60 days."
-    ),
-    BoilerplateSnippet(
-        label = "Team collaboration",
-        content = "I enjoy translating between product, engineering, and GTM teams to keep everyone anchored on clear hypotheses and customer value."
-    )
-)
-
-private const val customClosingSnippet =
-    "Let me know if there's time next week to walk through the roadmap you have planned — I'd love to compare notes and share ideas."
 
 @Preview(showBackground = true)
 @Composable

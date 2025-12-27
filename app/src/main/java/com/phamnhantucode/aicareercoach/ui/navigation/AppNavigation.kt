@@ -57,7 +57,7 @@ fun AppNavigation() {
         ) {
         composable(Screen.Intro.route) {
             IntroPage(
-                onGetStarted = { navController.navigate(Screen.Onboarding.route) },
+                onGetStarted = { navController.navigate(Screen.IndustryInsights.route) },
                 onSignIn = { navController.navigate(Screen.Login.route) }
             )
         }
@@ -111,6 +111,9 @@ fun AppNavigation() {
                 },
                 onNavigateToAccountSettings = {
                     navController.navigate(Screen.AccountSettings.route)
+                },
+                onNavigateToPro = {
+                    navController.navigate(Screen.StripePayment.route)
                 }
             )
         }

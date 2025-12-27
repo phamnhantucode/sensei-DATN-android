@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,7 +41,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -107,6 +111,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
+import com.phamnhantucode.aicareercoach.ui.onboarding.FormData
+import com.phamnhantucode.aicareercoach.ui.onboarding.OnboardingContent
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -120,6 +126,7 @@ fun IndustryInsightsScreen(
     onNavigateToInterviewPrep: () -> Unit = {},
     onNavigateToCoverLetter: () -> Unit = {},
     onNavigateToAccountSettings: () -> Unit = {},
+    onNavigateToPro: () -> Unit = {},
     viewModel: IndustryInsightsViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -137,7 +144,9 @@ fun IndustryInsightsScreen(
         onNavigateToInterviewPrep = onNavigateToInterviewPrep,
         onNavigateToCoverLetter = onNavigateToCoverLetter,
         onNavigateToAccountSettings = onNavigateToAccountSettings,
-        creditBalance = uiState.creditBalance
+        creditBalance = uiState.creditBalance,
+        onNavigateToPro = onNavigateToPro,
+        onSubmitOnboarding = { viewModel.submitOnboarding(it) }
     )
 }
 
@@ -151,7 +160,9 @@ private fun IndustryInsightsLayout(
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
+    onNavigateToPro: () -> Unit,
     creditBalance: Int?,
+    onSubmitOnboarding: (FormData) -> Unit
 ) {
     val selectedInsight = uiState.selectedInsight
 
@@ -160,6 +171,47 @@ private fun IndustryInsightsLayout(
             color = MaterialTheme.colorScheme.background
         ) {
             when {
+                uiState.isOnboardingRequired -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars)
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            HeaderSection(
+                                userProfileImageUrl = uiState.userProfileImageUrl,
+                                onNavigateToResumeBuilder = onNavigateToResumeBuilder,
+                                onNavigateToInterviewPrep = onNavigateToInterviewPrep,
+                                onNavigateToCoverLetter = onNavigateToCoverLetter,
+                                onNavigateToAccountSettings = onNavigateToAccountSettings,
+                                creditBalance = creditBalance,
+                                onNavigateToPro = onNavigateToPro
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            IndustryInsightsTitle()
+                        }
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            OnboardingContent(
+                                isSubmitting = uiState.isSubmittingOnboarding,
+                                submitError = uiState.errorMessage,
+                                loadingMessage = if (uiState.isSubmittingOnboarding) "Setting up profile..." else null,
+                                onComplete = onSubmitOnboarding
+                            )
+                        }
+                    }
+                }
+
                 selectedInsight == null && uiState.isLoading -> {
                     IndustryInsightsLoading()
                 }
@@ -184,7 +236,8 @@ private fun IndustryInsightsLayout(
                             onNavigateToInterviewPrep = onNavigateToInterviewPrep,
                             onNavigateToCoverLetter = onNavigateToCoverLetter,
                             onNavigateToAccountSettings = onNavigateToAccountSettings,
-                            creditBalance = creditBalance
+                            creditBalance = creditBalance,
+                            onNavigateToPro = onNavigateToPro
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -240,7 +293,8 @@ private fun HeaderSection(
     onNavigateToInterviewPrep: () -> Unit,
     onNavigateToCoverLetter: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
-    creditBalance: Int?
+    creditBalance: Int?,
+    onNavigateToPro: () -> Unit
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -258,6 +312,18 @@ private fun HeaderSection(
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             shape = RoundedCornerShape(16.dp)
         ) {
+            var showUpgradeDialog by remember { mutableStateOf(false) }
+
+            if (showUpgradeDialog) {
+                UpgradeDialog(
+                    onDismiss = { showUpgradeDialog = false },
+                    onUpgrade = {
+                        showUpgradeDialog = false
+                        onNavigateToPro()
+                    }
+                )
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -315,6 +381,23 @@ private fun HeaderSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Upgrade Button
+                    Button(
+                        onClick = { showUpgradeDialog = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text(
+                            text = "Upgrade",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     // Credit Balance Display
                     if (creditBalance != null) {
                         Surface(
@@ -323,7 +406,9 @@ private fun HeaderSection(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .clickable { onNavigateToPro() }, // Make clickable to upgrade
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
@@ -427,28 +512,6 @@ private fun HeaderSection(
         }
     }
 
-    Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Industry Insights",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Stay on top of market outlooks, salary bands, and in-demand skills.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 
@@ -788,6 +851,73 @@ private fun IndustrySelector(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun UpgradeDialog(
+    onDismiss: () -> Unit,
+    onUpgrade: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Upgrade to Pro",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Unlock the full potential of your career journey with Pro features:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                ProFeatureItem(text = "Unlimited Resume Reviews")
+                ProFeatureItem(text = "Advanced Industry Insights")
+                ProFeatureItem(text = "Mock Interview Sessions")
+                ProFeatureItem(text = "Priority Support")
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onUpgrade,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("Upgrade Now")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Maybe Later")
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp
+    )
+}
+
+@Composable
+private fun ProFeatureItem(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Verified,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -2062,7 +2192,27 @@ private fun IndustryInsightsScreenPreview() {
             onNavigateToInterviewPrep = {},
             onNavigateToCoverLetter = {},
             onNavigateToAccountSettings = {},
-            creditBalance = 10
+            onNavigateToPro = {},
+            creditBalance = 10,
+            onSubmitOnboarding = {}
+        )
+    }
+}
+
+@Composable
+private fun IndustryInsightsTitle() {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Industry Insights",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Stay on top of market outlooks, salary bands, and in-demand skills.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

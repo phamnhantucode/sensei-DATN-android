@@ -125,7 +125,8 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                         targetQuestionCount = config.questionCount,
                         currentQuestionIndex = 0,
                         startedAt = System.currentTimeMillis(),
-                        questions = startResult.questions
+                        questions = startResult.questions,
+                        jobTitle = config.jobTitle
                     )
 
                     _interviewSession.value = session
@@ -243,7 +244,8 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                         status = InterviewStatus.IN_PROGRESS,
                         targetQuestionCount = config.questionCount,
                         currentQuestionIndex = 0,
-                        startedAt = System.currentTimeMillis()
+                        startedAt = System.currentTimeMillis(),
+                        jobTitle = config.jobTitle
                     )
 
                     _interviewSession.value = session

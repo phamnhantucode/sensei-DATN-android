@@ -38,15 +38,55 @@ class IndustryInsightsRepository(
                 throw IllegalStateException("Neon API URL is not configured.")
             }
 
+            // Sync user (fetch or create) to ensure record exists
+            val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+            val syncResult = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
+            val neonUser = syncResult.getOrNull()
+                ?: throw IllegalStateException("Failed to synchronize user profile: " + syncResult.exceptionOrNull()?.message)
+
             val authorizationHeader = resolveAuthorizationHeader()
                 ?: throw IllegalStateException("No Neon authentication method configured.")
 
-            val neonUser = fetchUserFromNeon(user.id, authorizationHeader)
-            val userIndustry =
-                neonUser.industry?.takeUnless { it.isBlank() }
-                    ?: throw IllegalStateException("Set your industry during onboarding to view insights.")
+            val userIndustry = neonUser.industry?.takeUnless { it.isBlank() }
+            
+            // If user has no industry, return empty result to trigger onboarding
+            if (userIndustry == null) {
+                 return@withContext IndustryInsightLoadResult(
+                    industry = "",
+                    authorizationHeader = authorizationHeader,
+                    insight = null,
+                    needsRefresh = false,
+                    creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader)
+                 )
+            }
 
-            val existingInsight = neonUser.industryInsight
+            // User has industry -> Fetch existing insights
+            val encodedIndustry = URLEncoder.encode(userIndustry, UTF_8.name())
+            val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+            val insightRequestUrl =
+                "$apiUrl/IndustryInsight?select=*&industry=eq.$encodedIndustry&limit=1"
+
+            val insightRequest =
+                Request.Builder()
+                    .url(insightRequestUrl)
+                    .addHeader("Authorization", authorizationHeader)
+                    .get()
+                    .build()
+
+            val existingInsight = client.newCall(insightRequest).execute().use { response ->
+                val bodyString = response.body?.string()
+                if (response.isSuccessful && bodyString?.isNotBlank() == true) {
+                    val results = JSONArray(bodyString)
+                    if (results.length() > 0) {
+                        parseIndustryInsight(results.getJSONObject(0))
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
+            
             val now = Instant.now()
             
             // Log the cache status for debugging
@@ -67,7 +107,7 @@ class IndustryInsightsRepository(
                 authorizationHeader = authorizationHeader,
                 insight = existingInsight,
                 needsRefresh = needsRefresh,
-                creditBalance = neonUser.creditBalance
+                creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader)
             )
         }
 
@@ -204,76 +244,6 @@ class IndustryInsightsRepository(
         }
     }
 
-    private fun fetchUserFromNeon(
-        clerkUserId: String,
-        authorizationHeader: String,
-    ): NeonUserRecord {
-        val encodedClerkId = URLEncoder.encode(clerkUserId, UTF_8.name())
-        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-        val userRequestUrl =
-            "$apiUrl/User?select=*&clerkUserId=eq.$encodedClerkId&limit=1"
-
-        val userRequest =
-            Request.Builder()
-                .url(userRequestUrl)
-                .addHeader("Authorization", authorizationHeader)
-                .get()
-                .build()
-
-        var neonUserId: String? = null
-        val industry = client.newCall(userRequest).execute().use { response ->
-            val bodyString = response.body?.string()
-                ?: throw IOException("Neon user fetch returned an empty body.")
-            if (!response.isSuccessful) {
-                throw IOException("Neon user fetch failed (${response.code}): $bodyString")
-            }
-
-            val results = JSONArray(bodyString)
-            if (results.length() == 0) {
-                throw IllegalStateException("No Neon user record found. Complete onboarding first.")
-            }
-
-            val userJson = results.getJSONObject(0)
-            neonUserId = userJson.getString("id")
-            userJson.optString("industry").takeIf { it.isNotBlank() }
-        }
-
-        // Fetch IndustryInsight separately if user has an industry
-        val insight = if (industry != null) {
-            val encodedIndustry = URLEncoder.encode(industry, UTF_8.name())
-            val insightRequestUrl =
-                "$apiUrl/IndustryInsight?select=*&industry=eq.$encodedIndustry&limit=1"
-
-            val insightRequest =
-                Request.Builder()
-                    .url(insightRequestUrl)
-                    .addHeader("Authorization", authorizationHeader)
-                    .get()
-                    .build()
-
-            client.newCall(insightRequest).execute().use { response ->
-                val bodyString = response.body?.string()
-                if (response.isSuccessful && bodyString?.isNotBlank() == true) {
-                    val results = JSONArray(bodyString)
-                    if (results.length() > 0) {
-                        parseIndustryInsight(results.getJSONObject(0))
-                    } else {
-                        null
-                    }
-                } else {
-                    null
-                }
-            }
-        } else {
-            null
-        }
-
-        val creditBalance = if (neonUserId != null) {
-            fetchCreditBalance(neonUserId!!, authorizationHeader)
-        } else null
-
-        return NeonUserRecord(industry = industry, industryInsight = insight, creditBalance = creditBalance)
-    }
 
     private fun fetchCreditBalance(userId: String, authorizationHeader: String): Int? {
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
@@ -721,11 +691,6 @@ class IndustryInsightsRepository(
         return withUnderscores.lowercase(Locale.US)
     }
 
-    data class NeonUserRecord(
-        val industry: String?,
-        val industryInsight: IndustryInsightRecord?,
-        val creditBalance: Int? = null,
-    )
 
     data class IndustryInsightRecord(
         val id: String,

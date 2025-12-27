@@ -29,7 +29,7 @@ object NeonUserService {
 
     // ... (Existing methods)
     
-    suspend fun syncUser(clerkUserId: String): Result<NeonUser> = withContext(Dispatchers.IO) {
+    suspend fun syncUser(clerkUserId: String, email: String): Result<NeonUser> = withContext(Dispatchers.IO) {
         val authHeader = resolveAuthorizationHeader()
         if (authHeader == null) {
             return@withContext Result.failure(Exception("Could not resolve specific auth token for Neon."))
@@ -44,7 +44,7 @@ object NeonUserService {
             }
 
             // 2. If not, create user
-            val newUser = createNeonUser(clerkUserId, authHeader)
+            val newUser = createNeonUser(clerkUserId, email, authHeader)
             if (newUser != null) {
                 // Initialize default credit for new user
                 createDefaultUserCredit(newUser.id, authHeader, BuildConfig.NEON_API_URL.trimEnd('/'))
@@ -135,16 +135,15 @@ object NeonUserService {
         }
     }
 
-    private fun createNeonUser(clerkUserId: String, authorizationHeader: String): NeonUser? {
+    private fun createNeonUser(clerkUserId: String, email: String, authorizationHeader: String): NeonUser? {
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-        val randomBytes = ByteArray(12)
-        java.security.SecureRandom().nextBytes(randomBytes)
-        val hexId = randomBytes.joinToString("") { "%02x".format(it) }
+        val userId = java.util.UUID.randomUUID().toString()
         val now = java.time.Instant.now().toString()
 
         val payload = JSONObject().apply {
-            put("id", hexId)
+            put("id", userId)
             put("clerkUserId", clerkUserId)
+            put("email", email)
             put("createdAt", now)
             put("updatedAt", now)
         }
@@ -183,9 +182,7 @@ object NeonUserService {
     }
 
     private fun generateRandomId(): String {
-        val randomBytes = ByteArray(12)
-        java.security.SecureRandom().nextBytes(randomBytes)
-        return randomBytes.joinToString("") { "%02x".format(it) }
+        return java.util.UUID.randomUUID().toString()
     }
 
     private fun createDefaultUserCredit(

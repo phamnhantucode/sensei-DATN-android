@@ -44,7 +44,8 @@ class ResumeRepository private constructor(context: Context) {
         return try {
             val clerkUser = Clerk.user ?: return null
 
-            val result = NeonUserService.syncUser(clerkUser.id)
+            val email = clerkUser.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+            val result = NeonUserService.syncUser(clerkUser.id, email)
             val neonUser = result.getOrNull()
             
             neonUser?.id

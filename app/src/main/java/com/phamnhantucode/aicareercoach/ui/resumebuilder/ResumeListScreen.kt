@@ -435,7 +435,7 @@ private fun ResumeListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
+            .height(260.dp)
             .clickable(
                 onClick = onClick,
                 indication = null,
@@ -674,11 +674,10 @@ private fun ResumeListItem(
                 }
             }
 
-            // Resume info section - fixed height
+            // Resume info section - auto height
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -686,41 +685,30 @@ private fun ResumeListItem(
                     text = resume.personalInfo.fullName.ifBlank { "Untitled Resume" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Show email if available
-                if (resume.personalInfo.email.isNotBlank()) {
-                    Text(
-                        text = resume.personalInfo.email,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                // Last Modified
+                val lastModifiedText = remember(resume.lastModified) {
+                    resume.lastModified?.let {
+                        val now = java.time.LocalDateTime.now()
+                        val diff = java.time.Duration.between(it, now)
+                        when {
+                            diff.toMinutes() < 1 -> "Just now"
+                            diff.toHours() < 1 -> "${diff.toMinutes()}m ago"
+                            diff.toHours() < 24 -> "${diff.toHours()}h ago"
+                            diff.toDays() < 7 -> "${diff.toDays()}d ago"
+                            else -> it.format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+                        }
+                    } ?: "Recently"
                 }
 
-                // Resume stats
-                val statsText = buildList {
-                    if (resume.workExperiences.isNotEmpty()) {
-                        add("${resume.workExperiences.size} experience${if (resume.workExperiences.size > 1) "s" else ""}")
-                    }
-                    if (resume.skills.isNotEmpty()) {
-                        add("${resume.skills.size} skill${if (resume.skills.size > 1) "s" else ""}")
-                    }
-                    if (resume.education.isNotEmpty()) {
-                        add("${resume.education.size} education")
-                    }
-                }.joinToString(" · ")
-
-                if (statsText.isNotEmpty()) {
-                    Text(
-                        text = statsText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Edited $lastModifiedText",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -757,7 +745,7 @@ private fun ResumeLoadingCard(shimmerProgress: Float) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp),
+            .height(260.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -776,11 +764,10 @@ private fun ResumeLoadingCard(shimmerProgress: Float) {
                 shimmerProgress = shimmerProgress
             )
 
-            // Resume info section placeholders - fixed height
+            // Resume info section placeholders - auto height
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -793,19 +780,10 @@ private fun ResumeLoadingCard(shimmerProgress: Float) {
                     shimmerProgress = shimmerProgress
                 )
 
-                // Email placeholder
+                // Last edited placeholder
                 ShimmerBox(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    shimmerProgress = shimmerProgress
-                )
-
-                // Stats placeholder
-                ShimmerBox(
-                    modifier = Modifier
-                        .width(120.dp)
+                        .width(100.dp)
                         .height(14.dp)
                         .clip(RoundedCornerShape(8.dp)),
                     shimmerProgress = shimmerProgress

@@ -185,7 +185,8 @@ class AccountSettingsViewModel(application: Application) : AndroidViewModel(appl
             } else {
                 // Fetch Neon profile data with auth token
                 val neonUser = try {
-                    val result = NeonUserService.syncUser(user.id)
+                    val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("Email required")
+                    val result = NeonUserService.syncUser(user.id, email)
                     result.getOrNull()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error fetching Neon user profile", e)

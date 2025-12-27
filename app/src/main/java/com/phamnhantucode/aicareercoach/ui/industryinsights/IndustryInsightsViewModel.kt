@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.phamnhantucode.aicareercoach.ui.onboarding.FormData
+import com.phamnhantucode.aicareercoach.data.neon.NeonUserService
 
 data class IndustryInsightsUiState(
     val isLoading: Boolean = true,
@@ -31,6 +33,8 @@ data class IndustryInsightsUiState(
     val errorMessage: String? = null,
     val userProfileImageUrl: String? = null,
     val creditBalance: Int? = null,
+    val isOnboardingRequired: Boolean = false,
+    val isSubmittingOnboarding: Boolean = false,
 ) {
     val selectedInsight: IndustryInsightUiModel?
         get() = selectedIndustryId?.let { id ->
@@ -132,6 +136,83 @@ class IndustryInsightsViewModel(
         _uiState.update { it.copy(errorMessage = null) }
     }
 
+    fun submitOnboarding(formData: FormData) {
+        if (_uiState.value.isSubmittingOnboarding) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSubmittingOnboarding = true, errorMessage = null) }
+            try {
+                val industries = IndustriesData.industries
+                val selectedIndustry = industries.find { it.id == formData.industryId }
+                val user = Clerk.user
+
+                if (selectedIndustry == null) {
+                    throw IllegalStateException("Please select an industry.")
+                } else if (user == null) {
+                    throw IllegalStateException("User session unavailable. Please sign in again.")
+                } else if (formData.subIndustry.isBlank()) {
+                    throw IllegalStateException("Please select a specialization.")
+                }
+
+                // Format industry data for API (industryId---sub-industry-kebab)
+                val formattedIndustry = IndustryFormatUtils.formatIndustryForApi(
+                    industryId = selectedIndustry!!.id,
+                    subIndustry = formData.subIndustry
+                )
+
+                // Step 1: Get auth token
+                val authToken = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
+                    ?: throw IllegalStateException("Unable to fetch authentication token.")
+
+                // Step 2: Ensure IndustryInsight exists BEFORE creating user
+                val authorizationHeader = "Bearer $authToken"
+                repository.ensureIndustryInsightExists(
+                    industry = formattedIndustry,
+                    authorizationHeader = authorizationHeader,
+                )
+
+                // Step 3: Create/update user (ensure exists)
+                val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+                NeonUserService.syncUser(user.id, email)
+
+                // Step 4: Update additional user profile fields
+                val skills = formData.skills.split(',')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                val experienceYears = formData.experienceYears.trim().toIntOrNull()
+                val profile = NeonUserService.UserProfileUpdate(
+                    industry = formattedIndustry,
+                    experienceYears = experienceYears,
+                    skills = skills,
+                    bio = formData.bio.takeIf { it.isNotBlank() },
+                )
+
+                NeonUserService.updateUserProfile(
+                    clerkUserId = user.id,
+                    update = profile
+                )
+
+                // On success, refresh the whole screen
+                refreshInsights(forceRefresh = true)
+
+            } catch (e: Exception) {
+               _uiState.update {
+                   it.copy(
+                       isSubmittingOnboarding = false,
+                       errorMessage = e.localizedMessage ?: "Failed to save profile. Please try again."
+                   )
+               }
+            } finally {
+                // We keep isSubmittingOnboarding true if successful, until refresh finishes? 
+                // Using refreshInsights will reset states.
+                // But refreshInsights logic sets isLoading = true etc.
+                // Let's ensure we reset isSubmittingOnboarding in case of success by the refresh call logic 
+                // or here if we want to be safe.
+                // If refresh started, it will update state.
+            }
+        }
+    }
+
     private fun handleLoadedInsights(loadResult: IndustryInsightLoadResult) {
         val existingRecord = loadResult.insight
         if (existingRecord != null) {
@@ -143,7 +224,9 @@ class IndustryInsightsViewModel(
                     insights = listOf(insight),
                     selectedIndustryId = insight.id,
                     errorMessage = null,
-                    creditBalance = loadResult.creditBalance
+                    creditBalance = loadResult.creditBalance,
+                    isOnboardingRequired = false,
+                    isSubmittingOnboarding = false
                 )
             }
         } else {
@@ -154,7 +237,8 @@ class IndustryInsightsViewModel(
                     insights = emptyList(),
                     selectedIndustryId = null,
                     errorMessage = null,
-                    creditBalance = loadResult.creditBalance
+                    creditBalance = loadResult.creditBalance,
+                    isOnboardingRequired = true // No insights found means potentially new user
                 )
             }
         }

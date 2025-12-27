@@ -61,7 +61,16 @@ fun LiveInterviewActiveScreen(
             TopAppBar(
                 title = {
                     interviewSession?.let { session ->
-                        Text("Live Interview (${session.interviewType.name})")
+                        val title = if (session.jobTitle.isNotBlank()) {
+                            "Live Interview (${session.jobTitle})"
+                        } else {
+                            "Live Interview (${session.interviewType.name})"
+                        }
+                        Text(
+                            text = title,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
                     }
                 },
                 actions = {

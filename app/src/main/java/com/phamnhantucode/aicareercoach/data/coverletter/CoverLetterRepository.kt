@@ -30,7 +30,8 @@ class CoverLetterRepository(
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         return@withContext executeWithAuthRetry { authHeader ->
-            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
             val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
             fetchCoverLettersForUser(neonUser.id, authHeader)
         }
@@ -39,16 +40,15 @@ class CoverLetterRepository(
     suspend fun generateCoverLetter(
         companyName: String,
         jobTitle: String,
-        jobDescription: String,
-        tone: String = "Professional",
-        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
+        jobDescription: String
     ): GeneratedCoverLetter = withContext(Dispatchers.IO) {
         val user = Clerk.user
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         val userProfile = executeWithAuthRetry { authHeader ->
             // Deduct Credit
-            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
             val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
             
             com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Cover Letter Generation", authHeader)
@@ -60,9 +60,7 @@ class CoverLetterRepository(
             companyName = companyName,
             jobTitle = jobTitle,
             jobDescription = jobDescription,
-            userProfile = userProfile,
-            tone = tone,
-            resume = resume
+            userProfile = userProfile
         )
 
         try {
@@ -99,7 +97,8 @@ class CoverLetterRepository(
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         return@withContext executeWithAuthRetry { authHeader ->
-            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+            val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
+            val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
             val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
             val userId = neonUser.id
 
@@ -209,69 +208,30 @@ class CoverLetterRepository(
         companyName: String,
         jobTitle: String,
         jobDescription: String,
-        userProfile: UserProfile,
-        tone: String,
-        resume: com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume? = null
+        userProfile: UserProfile
     ): String {
-        val industryContext = if (userProfile.industry.isNotBlank()) {
-            "The candidate works in the ${userProfile.industry} industry."
-        } else ""
-
-        val skillsList = mutableListOf<String>()
-        skillsList.addAll(userProfile.skills)
-        resume?.skills?.let { skillsList.addAll(it) }
-        val skillsContext = if (skillsList.isNotEmpty()) {
-            "Key skills: ${skillsList.distinct().joinToString(", ")}."
-        } else ""
-
-        // Prioritize resume data if available
-        val experienceContext = if (resume != null && resume.workExperiences.isNotEmpty()) {
-            "Work History:\n" + resume.workExperiences.joinToString("\n") { exp ->
-                "- ${exp.jobTitle} at ${exp.company}: ${exp.responsibilities.take(2).joinToString("; ")}"
-            }
-        } else if (userProfile.experience != null) {
-            "Years of experience: ${userProfile.experience}."
-        } else ""
-
-        // Prioritize resume bio/summary
-        val bioContext = if (resume != null && resume.professionalSummary.isNotBlank()) {
-             "Professional Summary: ${resume.professionalSummary}"
-        } else if (userProfile.bio.isNotBlank()) {
-            "About the candidate: ${userProfile.bio}"
-        } else ""
-
-        val educationContext = if (resume != null && resume.education.isNotEmpty()) {
-            "Education:\n" + resume.education.joinToString("\n") { edu ->
-                "- ${edu.degree} from ${edu.institution}"
-            }
-        } else ""
-
         return """
-            Write a professional cover letter for a job application with the following details:
-            
-            Job Title: $jobTitle
-            Company: $companyName
-            Job Description: $jobDescription
-            
-            Candidate Information:
-            $industryContext
-            $skillsContext
-            $experienceContext
-            $educationContext
-            $bioContext
-            
+            Write a professional cover letter for a $jobTitle position at $companyName.
+    
+            About the candidate:
+            - Industry: ${userProfile.industry}
+            - Years of Experience: ${userProfile.experience ?: "Not specified"}
+            - Skills: ${userProfile.skills.joinToString(", ")}
+            - Professional Background: ${userProfile.bio}
+    
+            Job Description:
+            $jobDescription
+    
             Requirements:
-            Requirements:
-            - Write in a $tone tone
-            - Highlight relevant skills and experience from the candidate's profile/resume that match the job description
-            - Include specific examples of how the candidate's background aligns with the role
-            - Show enthusiasm for the company and position
-            - Keep it concise (3-4 paragraphs)
-            - Start with "Dear Hiring Manager,"
-            - End with "Thank you for your consideration," followed by "[Your Name]"
-            - Format as a plain text email body (no special formatting)
-            
-            Return ONLY the cover letter text, no additional commentary or explanations.
+            1. Use a professional, enthusiastic tone
+            2. Highlight relevant skills and experience
+            3. Show understanding of the company's needs
+            4. Keep it concise (max 400 words)
+            5. Use proper business letter formatting in markdown
+            6. Include specific examples of achievements
+            7. Relate candidate's background to job requirements
+    
+            Format the letter in markdown.
         """.trimIndent()
     }
 

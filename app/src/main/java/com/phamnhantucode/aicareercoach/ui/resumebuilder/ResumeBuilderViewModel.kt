@@ -237,25 +237,25 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
                 return
             }
 
+            // Get primary email
+            val primaryEmailId = clerkUser.primaryEmailAddressId
+            val email = primaryEmailId?.let { id ->
+                clerkUser.emailAddresses.firstOrNull { it.id == id }?.emailAddress
+            } ?: clerkUser.emailAddresses.firstOrNull()?.emailAddress ?: ""
+
             // Get Neon user profile for extended data
             val neonUser = try {
-                val result = NeonUserService.syncUser(clerkUser.id)
+                // Pass email to syncUser to ensure creation if needed
+                val result = NeonUserService.syncUser(clerkUser.id, email)
                 result.getOrNull()
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to get Neon user profile", e)
                 null
             }
 
-            // Build personal info from Clerk user
             val firstName = clerkUser.firstName?.takeUnless { it.isBlank() } ?: ""
             val lastName = clerkUser.lastName?.takeUnless { it.isBlank() } ?: ""
             val fullName = "$firstName $lastName".trim()
-
-            // Get primary email
-            val primaryEmailId = clerkUser.primaryEmailAddressId
-            val email = primaryEmailId?.let { id ->
-                clerkUser.emailAddresses.firstOrNull { it.id == id }?.emailAddress
-            } ?: clerkUser.emailAddresses.firstOrNull()?.emailAddress ?: ""
 
             val avatar = clerkUser.imageUrl ?: ""
 

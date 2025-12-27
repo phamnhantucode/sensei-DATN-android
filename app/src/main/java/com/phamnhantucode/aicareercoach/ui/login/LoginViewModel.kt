@@ -161,7 +161,7 @@ class LoginViewModel(
                             state.copy(
                                 isProcessing = false,
                                 verificationEmail = null,
-                                navigationTarget = LoginNavigationTarget.Onboarding
+                                navigationTarget = LoginNavigationTarget.Industry
                             )
                         }
                         hasIssuedPostSignInNavigation = true
@@ -238,7 +238,7 @@ class LoginViewModel(
                         state.copy(
                             isProcessing = false,
                             verificationEmail = null,
-                            navigationTarget = LoginNavigationTarget.Onboarding
+                            navigationTarget = LoginNavigationTarget.Industry
                         )
                     }
                     hasIssuedPostSignInNavigation = true
@@ -442,7 +442,8 @@ class LoginViewModel(
                 val user = initialUser ?: awaitClerkUser() ?: return@launch
                 val userId = user.id
                 if (userId == lastSyncedUserId) return@launch
-                NeonUserService.syncUser(userId)
+                val email = user.emailAddresses.firstOrNull()?.emailAddress ?: return@launch
+                NeonUserService.syncUser(userId, email)
                 lastSyncedUserId = userId
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -476,13 +477,19 @@ class LoginViewModel(
                     _uiState.update { it.copy(isCheckingAutoLogin = false) }
                     return@launch
                 }
-                val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id)
+                val email = user.emailAddresses.firstOrNull()?.emailAddress
+                    ?: run {
+                        _uiState.update { it.copy(isCheckingAutoLogin = false) }
+                        return@launch
+                    }
+                val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
                 val neonUser = result.getOrNull()
                 val industry = neonUser?.industry?.trim()
                 val needsOnboarding = industry.isNullOrBlank() || industry.equals("null", ignoreCase = true)
                 _uiState.update { state ->
                     state.copy(
-                        navigationTarget = if (needsOnboarding) LoginNavigationTarget.Onboarding else LoginNavigationTarget.Industry,
+                        // Always navigate to Industry, let that screen handle the onboarding form display
+                        navigationTarget = LoginNavigationTarget.Industry,
                         isCheckingAutoLogin = false
                     )
                 }
@@ -498,7 +505,7 @@ class LoginViewModel(
                 // If profile fetch fails, default to onboarding to be safe
                 _uiState.update { state ->
                     state.copy(
-                        navigationTarget = LoginNavigationTarget.Onboarding,
+                        navigationTarget = LoginNavigationTarget.Industry,
                         isCheckingAutoLogin = false
                     )
                 }
