@@ -1,6 +1,5 @@
 package com.phamnhantucode.aicareercoach.ui.coverletter
 
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,15 +15,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
@@ -34,12 +39,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,8 +54,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,14 +65,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
+import com.phamnhantucode.aicareercoach.data.coverletter.EmailType
 import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
+import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -89,7 +93,6 @@ fun CoverLetterScreen(
     val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     val generationState by viewModel.generationState.collectAsState()
-    val resumes by viewModel.resumes.collectAsState()
     val showCreditDialog by viewModel.showCreditDialog.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var letterToDelete by remember { mutableStateOf<CoverLetterEntry?>(null) }
@@ -99,7 +102,7 @@ fun CoverLetterScreen(
         else -> false
     }
 
-    // Handle generation state
+
     LaunchedEffect(generationState) {
         when (generationState) {
             is GenerationState.Error -> {
@@ -117,7 +120,7 @@ fun CoverLetterScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with back button (Sticky)
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -150,13 +153,13 @@ fun CoverLetterScreen(
                         }
                         Column {
                             Text(
-                                text = "AI Cover Letters",
+                                text = "Job Search Emails",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = "Generate tailored cover letters",
+                                text = "Assistant for all your career emails",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -177,7 +180,7 @@ fun CoverLetterScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Add,
-                                contentDescription = "Create new cover letter"
+                                contentDescription = "Create new email"
                             )
                             Spacer(modifier = Modifier.size(4.dp))
                             Text(text = "Create")
@@ -206,7 +209,7 @@ fun CoverLetterScreen(
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     Text(
-                                        text = "Failed to load cover letters",
+                                        text = "Failed to load emails",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         textAlign = TextAlign.Center
@@ -246,7 +249,7 @@ fun CoverLetterScreen(
                     if (letterToDelete != null) {
                         AlertDialog(
                             onDismissRequest = { letterToDelete = null },
-                            title = { Text("Delete Cover Letter?") },
+                            title = { Text("Delete Email?") },
                             text = { Text("This action cannot be undone.") },
                             confirmButton = {
                                 TextButton(
@@ -254,7 +257,7 @@ fun CoverLetterScreen(
                                         letterToDelete?.let { entry ->
                                             viewModel.deleteCoverLetter(entry)
                                             coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("\"${entry.jobTitle}\" removed")
+                                                snackbarHostState.showSnackbar("Email removed")
                                             }
                                         }
                                         letterToDelete = null
@@ -271,7 +274,7 @@ fun CoverLetterScreen(
                         )
                     }
 
-                    // Show loading indicator at top when generating
+
                     if (generationState is GenerationState.Generating) {
                         LinearProgressIndicator(
                             modifier = Modifier
@@ -280,7 +283,7 @@ fun CoverLetterScreen(
                         )
                     }
 
-                    // Snackbar host
+
                     SnackbarHost(
                         hostState = snackbarHostState,
                         modifier = Modifier.align(Alignment.BottomCenter)
@@ -296,19 +299,18 @@ fun CoverLetterScreen(
             }
 
             if (showCreateDialog) {
-                CreateCoverLetterDialog(
+                CreateEmailDialog(
                     isGenerating = generationState is GenerationState.Generating,
                     onDismiss = { showCreateDialog = false },
-                    onCreate = { companyName, jobTitle, jobDescription ->
+                    onCreate = { type, inputs ->
                         showCreateDialog = false
-                        viewModel.generateCoverLetter(
-                            companyName = companyName,
-                            jobTitle = jobTitle,
-                            jobDescription = jobDescription,
+                        viewModel.generateEmail(
+                            type = type,
+                            inputs = inputs,
                             onSuccess = { entry ->
                                 onOpenEditor(entry)
                                 coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Cover letter generated!")
+                                    snackbarHostState.showSnackbar("${type.displayName} generated!")
                                 }
                             }
                         )
@@ -371,8 +373,21 @@ private fun CoverLetterCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = entry.type.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    
                     Text(
-                        text = entry.jobTitle,
+                        text = entry.jobTitle.takeIf { it.isNotBlank() } ?: "No Title",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -383,12 +398,14 @@ private fun CoverLetterCard(
                         contentDescription = "Company name",
                         maxLines = 1
                     )
-                    RowWithIconText(
-                        icon = Icons.Filled.Description,
-                        text = entry.jobDescription,
-                        contentDescription = "Job description",
-                        maxLines = 2
-                    )
+                    if (entry.jobDescription.isNotBlank()) {
+                         RowWithIconText(
+                            icon = Icons.Filled.Description,
+                            text = entry.jobDescription,
+                            contentDescription = "Details",
+                            maxLines = 2
+                        )
+                    }
                 }
                 FilledTonalIconButton(
                     onClick = onDelete,
@@ -398,7 +415,7 @@ private fun CoverLetterCard(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
-                        contentDescription = "Delete cover letter"
+                        contentDescription = "Delete email"
                     )
                 }
             }
@@ -417,7 +434,7 @@ private fun CoverLetterCard(
 
 @Composable
 private fun RowWithIconText(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     text: String,
     contentDescription: String,
     maxLines: Int = Int.MAX_VALUE
@@ -464,17 +481,18 @@ private fun EmptyCoverLetterState(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Create your first AI cover letter",
+                text = "Boost your job search communication",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Spin up tailored cover letters and track every role you apply for.",
+                text = "Create tailored Cover Letters, Connection Requests, and Thank You notes in seconds.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
             Button(onClick = onCreateNew) {
-                Text("Start drafting")
+                Text("Start Writing")
             }
         }
     }
@@ -487,67 +505,202 @@ private fun formatTimestamp(instant: Instant): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateCoverLetterDialog(
+private fun CreateEmailDialog(
     isGenerating: Boolean = false,
     onDismiss: () -> Unit,
-    onCreate: (companyName: String, jobTitle: String, jobDescription: String) -> Unit
+    onCreate: (type: EmailType, inputs: Map<String, String>) -> Unit
 ) {
+    var selectedType by rememberSaveable { mutableStateOf(EmailType.APPLICATION) }
+    
+
     var companyName by rememberSaveable { mutableStateOf("") }
+    var recipientName by rememberSaveable { mutableStateOf("") }
+    
+
     var jobTitle by rememberSaveable { mutableStateOf("") }
     var jobDescription by rememberSaveable { mutableStateOf("") }
+    var context by rememberSaveable { mutableStateOf("") }
+    var additionalInfo by rememberSaveable { mutableStateOf("") }
 
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
 
-    val isCreateEnabled = !isGenerating && companyName.isNotBlank() && jobTitle.isNotBlank() && jobDescription.isNotBlank()
+    val isCreateEnabled = !isGenerating && companyName.isNotBlank() && when(selectedType) {
+        EmailType.APPLICATION -> jobTitle.isNotBlank() && jobDescription.isNotBlank()
+        EmailType.PROSPECTING -> context.isNotBlank()
+        EmailType.REFERRAL -> recipientName.isNotBlank() && context.isNotBlank()
+        EmailType.THANK_YOU -> jobTitle.isNotBlank() && recipientName.isNotBlank()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create cover letter") },
+        title = { Text("Create Job Search Email") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 0.dp)
+                ) {
+                    items(EmailType.values()) { type ->
+                        FilterChip(
+                            selected = type == selectedType,
+                            onClick = { selectedType = type },
+                            label = { Text(type.displayName) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                }
+                
+                Divider()
+
+
                 Text(
-                    text = "Provide information about the position you're applying for",
+                    text = "Provide details for ${selectedType.displayName}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
 
                 OutlinedTextField(
                     value = companyName,
                     onValueChange = { companyName = it },
                     label = { Text("Company name") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
+
+
+                val recipientLabel = when(selectedType) {
+                    EmailType.APPLICATION -> "Hiring Manager (Optional)"
+                    EmailType.PROSPECTING -> "Recipient Name (Optional)"
+                    EmailType.REFERRAL -> "Contact Name (Required)"
+                    EmailType.THANK_YOU -> "Interviewer Name (Required)"
+                }
                 OutlinedTextField(
-                    value = jobTitle,
-                    onValueChange = { jobTitle = it },
-                    label = { Text("Job title") },
-                    singleLine = true
+                    value = recipientName,
+                    onValueChange = { recipientName = it },
+                    label = { Text(recipientLabel) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = if(selectedType == EmailType.REFERRAL || selectedType == EmailType.THANK_YOU) {
+                        { Icon(Icons.Default.Person, contentDescription = null) }
+                    } else null
                 )
-                OutlinedTextField(
-                    value = jobDescription,
-                    onValueChange = { jobDescription = it },
-                    label = { Text("Job description") },
-                    minLines = 3,
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            clipboardManager.getText()?.text?.let {
-                                jobDescription = it
+
+
+                when (selectedType) {
+                    EmailType.APPLICATION -> {
+                        OutlinedTextField(
+                            value = jobTitle,
+                            onValueChange = { jobTitle = it },
+                            label = { Text("Job Title") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = jobDescription,
+                            onValueChange = { jobDescription = it },
+                            label = { Text("Job Description") },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    clipboardManager.getText()?.text?.let { jobDescription = it }
+                                }) {
+                                    Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
+                                }
                             }
-                        }) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
-                        }
+                        )
                     }
-                )
+                    EmailType.PROSPECTING -> {
+                        OutlinedTextField(
+                            value = additionalInfo,
+                            onValueChange = { additionalInfo = it },
+                            label = { Text("Target Role (Optional)") },
+                            placeholder = { Text("e.g. Senior Android Dev") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = context,
+                            onValueChange = { context = it },
+                            label = { Text("Connection / Context") },
+                            placeholder = { Text("Why are you contacting them?") },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    EmailType.REFERRAL -> {
+                         OutlinedTextField(
+                            value = context,
+                            onValueChange = { context = it },
+                            label = { Text("Relationship") },
+                            placeholder = { Text("e.g. Ex-colleague, Alumni") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = additionalInfo,
+                            onValueChange = { additionalInfo = it },
+                            label = { Text("Target Job Link/ID (Optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    EmailType.THANK_YOU -> {
+                        OutlinedTextField(
+                            value = jobTitle,
+                            onValueChange = { jobTitle = it },
+                            label = { Text("Job Title") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = context,
+                            onValueChange = { context = it },
+                            label = { Text("Key Discussion Topic") },
+                            placeholder = { Text("Something memorable discussed...") },
+                            minLines = 2,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    onCreate(
-                        companyName.trim(),
-                        jobTitle.trim(),
-                        jobDescription.trim()
+                    val inputs = mutableMapOf(
+                        "companyName" to companyName.trim(),
+                        "recipientName" to recipientName.trim()
                     )
+                    when (selectedType) {
+                        EmailType.APPLICATION -> {
+                            inputs["jobTitle"] = jobTitle.trim()
+                            inputs["jobDescription"] = jobDescription.trim()
+                        }
+                        EmailType.PROSPECTING -> {
+                            inputs["targetRole"] = additionalInfo.trim()
+                            inputs["context"] = context.trim()
+                        }
+                        EmailType.REFERRAL -> {
+                            inputs["relationship"] = context.trim()
+                            inputs["targetJob"] = additionalInfo.trim()
+                        }
+                        EmailType.THANK_YOU -> {
+                            inputs["jobTitle"] = jobTitle.trim()
+                            inputs["topic"] = context.trim()
+                        }
+                    }
+                    onCreate(selectedType, inputs)
                 },
                 enabled = isCreateEnabled
             ) {
@@ -577,11 +730,11 @@ private fun CreateCoverLetterDialog(
 
 @Preview(showBackground = true)
 @Composable
-private fun CreateCoverLetterDialogPreview() {
+private fun CreateEmailDialogPreview() {
     AppTheme {
-        CreateCoverLetterDialog(
+        CreateEmailDialog(
             onDismiss = {},
-            onCreate = { _, _, _ -> }
+            onCreate = { _, _ -> }
         )
     }
 }

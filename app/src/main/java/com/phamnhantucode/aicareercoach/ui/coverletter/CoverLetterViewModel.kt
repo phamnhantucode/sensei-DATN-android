@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.phamnhantucode.aicareercoach.data.coverletter.CoverLetterRepository
+import com.phamnhantucode.aicareercoach.data.coverletter.EmailType
 import com.phamnhantucode.aicareercoach.data.resume.ResumeRepository
 import com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ import java.time.Instant
 
 data class CoverLetterEntry(
     val id: String,
+    val type: EmailType,
     val companyName: String,
     val jobTitle: String,
     val jobDescription: String,
@@ -55,6 +57,9 @@ class CoverLetterViewModel(
     private val _showCreditDialog = MutableStateFlow(false)
     val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
 
+    private val _selectedType = MutableStateFlow(EmailType.APPLICATION)
+    val selectedType: StateFlow<EmailType> = _selectedType.asStateFlow()
+
     init {
         loadCoverLetters()
         loadResumes()
@@ -63,7 +68,7 @@ class CoverLetterViewModel(
     private fun loadResumes() {
         viewModelScope.launch {
             try {
-                // Fetch from remote to ensure fresh data, similar to ResumeListViewModel
+
                 val result = resumeRepository.getAllResumes(forceRemote = true)
                 if (result.isSuccess) {
                     _resumes.value = result.getOrNull() ?: emptyList()
@@ -84,6 +89,7 @@ class CoverLetterViewModel(
                 val entries = records.map { record ->
                     CoverLetterEntry(
                         id = record.id,
+                        type = record.type,
                         companyName = record.companyName,
                         jobTitle = record.jobTitle,
                         jobDescription = record.jobDescription,
@@ -101,33 +107,54 @@ class CoverLetterViewModel(
         }
     }
 
-    fun generateCoverLetter(
-        companyName: String,
-        jobTitle: String,
-        jobDescription: String,
+    fun setEmailType(type: EmailType) {
+        _selectedType.value = type
+    }
+
+    fun generateEmail(
+        type: EmailType,
+        inputs: Map<String, String>,
         onSuccess: (CoverLetterEntry) -> Unit
     ) {
         viewModelScope.launch {
             _generationState.update { GenerationState.Generating }
             try {
-                // Generate the cover letter content using Gemini
-                val generated = repository.generateCoverLetter(
-                    companyName = companyName,
-                    jobTitle = jobTitle,
-                    jobDescription = jobDescription
+
+                val generated = repository.generateEmail(
+                    type = type,
+                    inputs = inputs
                 )
 
-                // Save to database
+
+                val companyName = inputs["companyName"] ?: ""
+                val savedJobTitle = when (type) {
+                    EmailType.APPLICATION -> inputs["jobTitle"] ?: ""
+                    EmailType.PROSPECTING -> inputs["targetRole"] ?: "Networking"
+                    EmailType.REFERRAL -> "Referral Request"
+                    EmailType.THANK_YOU -> inputs["jobTitle"] ?: "Interview Follow-up"
+                    else -> ""
+                }
+                val savedJobDescription = when (type) {
+                    EmailType.APPLICATION -> inputs["jobDescription"] ?: ""
+                    EmailType.PROSPECTING -> inputs["context"] ?: ""
+                    EmailType.REFERRAL -> inputs["relationship"] ?: ""
+                    EmailType.THANK_YOU -> inputs["topic"] ?: ""
+                    else -> ""
+                }
+
+
                 val saved = repository.saveCoverLetter(
+                    type = type,
                     companyName = companyName,
-                    jobTitle = jobTitle,
-                    jobDescription = jobDescription,
+                    jobTitle = savedJobTitle,
+                    jobDescription = savedJobDescription,
                     content = generated.content,
                     status = "draft"
                 )
 
                 val entry = CoverLetterEntry(
                     id = saved.id,
+                    type = saved.type,
                     companyName = saved.companyName,
                     jobTitle = saved.jobTitle,
                     jobDescription = saved.jobDescription,
@@ -135,7 +162,7 @@ class CoverLetterViewModel(
                     createdAt = saved.createdAt
                 )
 
-                // Update UI state with new entry
+
                 _uiState.update { currentState ->
                     when (currentState) {
                         is CoverLetterUiState.Success -> {
@@ -153,17 +180,17 @@ class CoverLetterViewModel(
                     _generationState.update { GenerationState.Idle }
                     return@launch
                 }
-                Log.e(TAG, "Failed to generate cover letter", e)
+                Log.e(TAG, "Failed to generate email", e)
                 val errorMessage = when {
                     e.message?.contains("User session unavailable") == true ->
-                        "Please sign in to generate cover letters"
+                        "Please sign in to generate emails"
                     e.message?.contains("Set your industry") == true ->
-                        "Please complete your profile to generate personalized cover letters"
+                        "Please complete your profile to generate personalized emails"
                     e.message?.contains("Gemini") == true ->
                         "AI generation failed. Please try again."
                     e.message?.contains("Neon") == true ->
                         "Database error. Please check your connection."
-                    else -> e.message ?: "Failed to generate cover letter"
+                    else -> e.message ?: "Failed to generate email"
                 }
                 _generationState.update { GenerationState.Error(errorMessage) }
             }
@@ -175,7 +202,7 @@ class CoverLetterViewModel(
             try {
                 repository.deleteCoverLetter(entry.id)
 
-                // Update UI state by removing the deleted entry
+
                 _uiState.update { currentState ->
                     when (currentState) {
                         is CoverLetterUiState.Success -> {
@@ -187,8 +214,8 @@ class CoverLetterViewModel(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete cover letter", e)
-                // Optionally show error to user
+                Log.e(TAG, "Failed to delete item", e)
+
             }
         }
     }
@@ -202,7 +229,7 @@ class CoverLetterViewModel(
     }
 
     fun openPurchaseScreen() {
-        // TODO: Navigation to purchase screen
+
         _showCreditDialog.value = false
     }
 

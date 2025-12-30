@@ -6,6 +6,7 @@ import com.clerk.api.Clerk
 import com.clerk.api.network.serialization.ClerkResult
 import com.clerk.api.session.fetchToken
 import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.coverletter.EmailType
 import java.io.IOException
 import java.net.URLEncoder
 import java.time.Instant
@@ -20,7 +21,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-// Manages cover letters using Gemini and Neon DB
+
 class CoverLetterRepository(
     private val client: OkHttpClient = OkHttpClient(),
 ) {
@@ -37,29 +38,28 @@ class CoverLetterRepository(
         }
     }
 
-    suspend fun generateCoverLetter(
-        companyName: String,
-        jobTitle: String,
-        jobDescription: String
+    suspend fun generateEmail(
+        type: EmailType,
+        inputs: Map<String, String>
     ): GeneratedCoverLetter = withContext(Dispatchers.IO) {
         val user = Clerk.user
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
 
         val userProfile = executeWithAuthRetry { authHeader ->
-            // Deduct Credit
+
             val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
             val result = com.phamnhantucode.aicareercoach.data.neon.NeonUserService.syncUser(user.id, email)
             val neonUser = result.getOrNull() ?: throw IllegalStateException("Failed to sync Neon user")
             
-            com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Cover Letter Generation", authHeader)
+            val creditDescription = "Generate ${type.displayName}"
+            com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, creditDescription, authHeader)
 
             fetchUserProfile(user.id, authHeader)
         }
 
-        val prompt = buildCoverLetterPrompt(
-            companyName = companyName,
-            jobTitle = jobTitle,
-            jobDescription = jobDescription,
+        val prompt = buildEmailPrompt(
+            type = type,
+            inputs = inputs,
             userProfile = userProfile
         )
 
@@ -67,7 +67,7 @@ class CoverLetterRepository(
             val messages = listOf(
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(
                     role = "system",
-                    content = "You are an expert career coach and professional writer specialized in creating compelling cover letters."
+                    content = "You are an expert career coach and professional writer specialized in job search communication."
                 ),
                 com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message(
                     role = "user",
@@ -77,16 +77,17 @@ class CoverLetterRepository(
 
             val content = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
                 messages = messages,
-                model = "google/gemini-2.5-flash-lite" // Can be configured or left to default
+                model = "google/gemini-2.5-flash-lite"
             )
 
             return@withContext GeneratedCoverLetter(content = content.trim())
         } catch (e: Exception) {
-            throw IOException("Failed to generate cover letter: ${e.message}", e)
+            throw IOException("Failed to generate email: ${e.message}", e)
         }
     }
 
     suspend fun saveCoverLetter(
+        type: EmailType,
         companyName: String,
         jobTitle: String,
         jobDescription: String,
@@ -104,12 +105,13 @@ class CoverLetterRepository(
 
             val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
             val payload = JSONObject().apply {
-                // Make random ID
+
                 val randomBytes = ByteArray(12)
                 java.security.SecureRandom().nextBytes(randomBytes)
                 val hexId = randomBytes.joinToString("") { "%02x".format(it) }
                 put("id", hexId)
                 put("userId", userId)
+                put("type", type.id)
                 put("companyName", companyName)
                 put("jobTitle", jobTitle)
                 put("jobDescription", jobDescription)
@@ -130,15 +132,15 @@ class CoverLetterRepository(
             client.newCall(request).execute().use { response ->
                 val bodyString = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw IOException("Failed to save cover letter (${response.code}): $bodyString")
+                    throw IOException("Failed to save email (${response.code}): $bodyString")
                 }
                 if (bodyString.isBlank()) {
-                    throw IOException("Neon returned an empty response when creating cover letter.")
+                    throw IOException("Neon returned an empty response when creating email.")
                 }
 
                 val results = JSONArray(bodyString)
                 if (results.length() == 0) {
-                    throw IOException("Neon did not return the created cover letter.")
+                    throw IOException("Neon did not return the created email.")
                 }
                 return@use parseCoverLetter(results.getJSONObject(0))
             }
@@ -169,15 +171,15 @@ class CoverLetterRepository(
             client.newCall(request).execute().use { response ->
                 val bodyString = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw IOException("Failed to update cover letter (${response.code}): $bodyString")
+                    throw IOException("Failed to update email (${response.code}): $bodyString")
                 }
                 if (bodyString.isBlank()) {
-                    throw IOException("Neon returned an empty response when updating cover letter.")
+                    throw IOException("Neon returned an empty response when updating email.")
                 }
 
                 val results = JSONArray(bodyString)
                 if (results.length() == 0) {
-                    throw IOException("Neon did not return the updated cover letter.")
+                    throw IOException("Neon did not return the updated email.")
                 }
                 return@use parseCoverLetter(results.getJSONObject(0))
             }
@@ -198,46 +200,110 @@ class CoverLetterRepository(
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val bodyString = response.body?.string().orEmpty()
-                    throw IOException("Failed to delete cover letter (${response.code}): $bodyString")
+                    throw IOException("Failed to delete email (${response.code}): $bodyString")
                 }
             }
         }
     }
 
-    private fun buildCoverLetterPrompt(
-        companyName: String,
-        jobTitle: String,
-        jobDescription: String,
+    private fun buildEmailPrompt(
+        type: EmailType,
+        inputs: Map<String, String>,
         userProfile: UserProfile
     ): String {
-        return """
-            Write a professional cover letter for a $jobTitle position at $companyName.
-    
-            About the candidate:
+        val companyName = inputs["companyName"] ?: ""
+        val recipientName = inputs["recipientName"]?.takeIf { it.isNotBlank() } ?: "Hiring Manager"
+        val jobTitle = inputs["jobTitle"] ?: ""
+        
+
+        val userContext = """
+            My Profile:
             - Industry: ${userProfile.industry}
-            - Years of Experience: ${userProfile.experience ?: "Not specified"}
+            - Experience: ${userProfile.experience ?: "Not specified"} years
             - Skills: ${userProfile.skills.joinToString(", ")}
-            - Professional Background: ${userProfile.bio}
-    
-            Job Description:
-            $jobDescription
-    
-            Requirements:
-            1. Use a professional, enthusiastic tone
-            2. Highlight relevant skills and experience
-            3. Show understanding of the company's needs
-            4. Keep it concise (max 400 words)
-            5. Use proper business letter formatting in markdown
-            6. Include specific examples of achievements
-            7. Relate candidate's background to job requirements
-    
-            Format the letter in markdown.
+            - Bio: ${userProfile.bio}
         """.trimIndent()
+
+        return when (type) {
+            EmailType.APPLICATION -> {
+                val jobDescription = inputs["jobDescription"] ?: ""
+                """
+                Role: Expert Career Coach & Professional Copywriter
+                Goal: Write a tailored Cover Letter for a $jobTitle position at $companyName.
+                Recipient: $recipientName
+                
+                $userContext
+                
+                Job Description:
+                $jobDescription
+                
+                Instructions:
+                1. Analyze the JD to identify top 3 critical skills.
+                2. Map my experience to these skills with specific examples.
+                3. Express genuine enthusiasm for the company/role.
+                4. Tone: Professional, Confident, and Persuasive.
+                5. Format: Standard Business Letter (Markdown).
+                """.trimIndent()
+            }
+            EmailType.PROSPECTING -> {
+                val context = inputs["context"] ?: ""
+                val targetRole = inputs["targetRole"] ?: ""
+                """
+                Role: Professional Networker
+                Goal: Write a concise Cold Email to $recipientName at $companyName.
+                Context/Reason for contact: $context
+                Target Role Interest: $targetRole
+                
+                $userContext
+                
+                Instructions:
+                1. Hook the reader immediately in the first sentence (refer to Context).
+                2. Briefly introduce myself and value proposition related to $targetRole.
+                3. Keep it extremely short (under 150 words).
+                4. Include a soft Call-to-Action (e.g., "Open to a 10-min coffee chat?").
+                5. Tone: Polite, Respectful, but Direct. Avoid generic fluff.
+                """.trimIndent()
+            }
+            EmailType.REFERRAL -> {
+                val relationship = inputs["relationship"] ?: ""
+                val targetJob = inputs["targetJob"] ?: ""
+                """
+                Role: Professional Communicator
+                Goal: Write a Referral Request email to $recipientName for a role at $companyName.
+                Relationship Context: $relationship
+                Target Job Link/ID: $targetJob
+                
+                $userContext
+                
+                Instructions:
+                1. Start with a warm, personalized greeting based on the relationship ($relationship).
+                2. Clearly state intention to apply for $companyName.
+                3. Explain briefly why I am a good fit.
+                4. IMPORTANT: Include a "blurb" (short summary) at the end that they can easily copy-paste to forward to HR.
+                5. Tone: Grateful and Low-pressure.
+                """.trimIndent()
+            }
+            EmailType.THANK_YOU -> {
+                val topic = inputs["topic"] ?: ""
+                """
+                Role: Courteous Professional
+                Goal: Write a Thank You Follow-up email to $recipientName (Interviewer) at $companyName.
+                Position Interviewed For: $jobTitle
+                Key Topic Discussed: $topic
+                
+                Instructions:
+                1. Express sincere gratitude for their time.
+                2. Reference the topic "$topic" to show active listening.
+                3. Reiterate excitement for the role and value add.
+                4. Keep it timely (within 24h context).
+                5. Tone: Warm, Professional, and Appreciative.
+                """.trimIndent()
+            }
+        }
     }
 
     private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
         val bearer = if (forceRefresh) {
-            // Get new token
             fetchClerkSessionToken()
         } else {
             fetchClerkSessionToken()
@@ -265,10 +331,8 @@ class CoverLetterRepository(
         return try {
             block(authHeader)
         } catch (e: IOException) {
-            
             if (e.message?.contains("401") == true || e.message?.contains("Unauthorized") == true) {
                 Log.w(TAG, "Got 401 error, refreshing auth token and retrying...")
-                // Refresh and retry
                 authHeader = resolveAuthorizationHeader(forceRefresh = true)
                     ?: throw IllegalStateException("Failed to refresh authentication token.")
                 block(authHeader)
@@ -280,13 +344,10 @@ class CoverLetterRepository(
 
     private suspend fun fetchClerkSessionToken(): String? {
         val session = Clerk.session ?: return null
-
-        // Get fresh token
         return when (val result = session.fetchToken()) {
             is ClerkResult.Success -> result.value.jwt.takeUnless { it.isBlank() }
             is ClerkResult.Failure -> {
                 Log.w(TAG, "Failed to fetch fresh Clerk token: ${result.error}")
-                // Try cached token
                 session.lastActiveToken?.jwt?.takeUnless { it.isBlank() }
             }
             else -> null
@@ -382,6 +443,7 @@ class CoverLetterRepository(
         return CoverLetterRecord(
             id = json.optString("id", ""),
             userId = json.optString("userId", ""),
+            type = EmailType.fromId(json.optString("type", EmailType.APPLICATION.id)),
             companyName = json.optString("companyName", ""),
             jobTitle = json.optString("jobTitle", ""),
             jobDescription = json.optString("jobDescription", ""),
@@ -408,6 +470,7 @@ class CoverLetterRepository(
     data class CoverLetterRecord(
         val id: String,
         val userId: String,
+        val type: EmailType,
         val companyName: String,
         val jobTitle: String,
         val jobDescription: String,
