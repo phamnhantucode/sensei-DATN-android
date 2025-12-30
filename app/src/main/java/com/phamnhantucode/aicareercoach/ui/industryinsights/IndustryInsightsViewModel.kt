@@ -44,10 +44,15 @@ data class IndustryInsightsUiState(
 
 class IndustryInsightsViewModel(
     private val repository: IndustryInsightsRepository = IndustryInsightsRepository(),
+    private val paymentRepository: com.phamnhantucode.aicareercoach.data.payment.PaymentRepository = com.phamnhantucode.aicareercoach.data.payment.PaymentRepository(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(IndustryInsightsUiState())
     val uiState = _uiState.asStateFlow()
+    
+    // Payment specific state
+    private val _paymentState = MutableStateFlow(PaymentState())
+    val paymentState = _paymentState.asStateFlow()
 
     private var loadJob: Job? = null
 
@@ -60,6 +65,73 @@ class IndustryInsightsViewModel(
         }.launchIn(viewModelScope)
 
         refreshInsights()
+    }
+
+    fun preparePaymentSheet() {
+        _paymentState.update { it.copy(isLoading = true, error = null, paymentResult = null) }
+        viewModelScope.launch {
+            try {
+                val token = com.phamnhantucode.aicareercoach.data.neon.NeonAuth.fetchNeonAuthToken()
+                if (token == null) {
+                    _paymentState.update { it.copy(isLoading = false, error = "User not authenticated") }
+                    return@launch
+                }
+
+                val result = paymentRepository.fetchPaymentConfig(token)
+                result.fold(
+                    onSuccess = { config ->
+                        _paymentState.update {
+                            it.copy(
+                                isLoading = false,
+                                isReady = true,
+                                paymentIntent = config.paymentIntent,
+                                ephemeralKey = config.ephemeralKey,
+                                customer = config.customer,
+                                publishableKey = config.publishableKey
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        _paymentState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = error.message ?: "Failed to fetch payment config"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _paymentState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Unknown error"
+                    )
+                }
+            }
+        }
+    }
+
+    fun onPaymentResult(paymentSheetResult: com.stripe.android.paymentsheet.PaymentSheetResult) {
+        when(paymentSheetResult) {
+            is com.stripe.android.paymentsheet.PaymentSheetResult.Completed -> {
+                Log.d("IndustryInsightsViewModel", "Payment completed")
+                _paymentState.update { it.copy(paymentResult = "Payment completed successfully!", isReady = false) }
+                // Refresh credits
+                refreshInsights(forceRefresh = true)
+            }
+            is com.stripe.android.paymentsheet.PaymentSheetResult.Canceled -> {
+                Log.d("IndustryInsightsViewModel", "Payment canceled")
+                _paymentState.update { it.copy(paymentResult = "Payment canceled") }
+            }
+            is com.stripe.android.paymentsheet.PaymentSheetResult.Failed -> {
+                Log.e("IndustryInsightsViewModel", "Payment failed", paymentSheetResult.error)
+                _paymentState.update { it.copy(error = "Payment failed: ${paymentSheetResult.error.localizedMessage}") }
+            }
+        }
+    }
+    
+    fun resetPaymentState() {
+        _paymentState.update { PaymentState() }
     }
 
     fun refreshInsights(forceRefresh: Boolean = false) {
@@ -299,3 +371,14 @@ class IndustryInsightsViewModel(
         private const val TAG = "IndustryInsightsVM"
     }
 }
+
+data class PaymentState(
+    val isLoading: Boolean = false,
+    val isReady: Boolean = false,
+    val paymentIntent: String? = null,
+    val ephemeralKey: String? = null,
+    val customer: String? = null,
+    val publishableKey: String? = null,
+    val error: String? = null,
+    val paymentResult: String? = null
+)

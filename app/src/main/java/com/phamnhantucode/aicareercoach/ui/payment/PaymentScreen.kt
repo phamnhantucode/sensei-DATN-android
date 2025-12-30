@@ -67,10 +67,14 @@ fun PaymentScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.preparePaymentSheet()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Upgrade to Pro") },
+                title = { Text("Processing Payment") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -86,56 +90,44 @@ fun PaymentScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Unlock Unlimited Access",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Get unlimited AI credits for just $9.99/forever",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-
-                if (uiState.isLoading) {
+            if (uiState.isLoading || (uiState.isReady && uiState.paymentResult == null)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
-                } else {
-                     Button(
-                        onClick = viewModel::preparePaymentSheet,
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) {
-                        Text("Pay $9.99")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Preparing secure checkout...")
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (uiState.error != null) {
+                        Text(
+                            text = uiState.error!!,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = viewModel::preparePaymentSheet) {
+                            Text("Retry Payment")
+                        }
                     }
-                }
 
-                if (uiState.error != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = uiState.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                if (uiState.paymentResult != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = uiState.paymentResult!!,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    if (uiState.paymentResult != null) {
+                         Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = uiState.paymentResult!!,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                         if (uiState.paymentResult!!.contains("failed", ignoreCase = true) || uiState.paymentResult!!.contains("canceled", ignoreCase = true)) {
+                             Spacer(modifier = Modifier.height(16.dp))
+                             Button(onClick = viewModel::preparePaymentSheet) {
+                                 Text("Retry Payment")
+                             }
+                         }
+                    }
                 }
             }
         }

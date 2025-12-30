@@ -78,6 +78,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,6 +100,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -130,24 +133,76 @@ fun IndustryInsightsScreen(
     viewModel: IndustryInsightsViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val paymentState by viewModel.paymentState.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    
+    // Stripe Payment Sheet Integration
+    val paymentSheet = com.stripe.android.paymentsheet.rememberPaymentSheet(viewModel::onPaymentResult)
+
+    LaunchedEffect(paymentState.isReady) {
+        if (paymentState.isReady && paymentState.publishableKey != null) {
+             com.stripe.android.PaymentConfiguration.init(context, paymentState.publishableKey!!)
+             
+             paymentState.customer?.let { customer ->
+                 paymentState.ephemeralKey?.let { ephemeralKey ->
+                     paymentState.paymentIntent?.let { paymentIntent ->
+                         paymentSheet.presentWithPaymentIntent(
+                             paymentIntent,
+                             com.stripe.android.paymentsheet.PaymentSheet.Configuration(
+                                 merchantDisplayName = "AI Career Coach",
+                                 customer = com.stripe.android.paymentsheet.PaymentSheet.CustomerConfiguration(
+                                     id = customer,
+                                     ephemeralKeySecret = ephemeralKey
+                                 )
+                             )
+                         )
+                     }
+                 }
+             }
+        }
+    }
+    
+    // Handle payment results (show snackbar)
+    LaunchedEffect(paymentState.paymentResult, paymentState.error) {
+        if (paymentState.paymentResult != null) {
+             snackbarHostState.showSnackbar(paymentState.paymentResult!!)
+             if (paymentState.paymentResult!!.contains("success", ignoreCase = true)) {
+                 // optionally delay or just let the user see the success
+             }
+             viewModel.resetPaymentState()
+        }
+        if (paymentState.error != null) {
+            snackbarHostState.showSnackbar(paymentState.error!!)
+             viewModel.resetPaymentState()
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refreshInsights()
     }
 
-    IndustryInsightsLayout(
-        uiState = uiState,
-        onRefresh = { viewModel.refreshInsights(forceRefresh = true) },
-        onDismissError = viewModel::clearError,
-        onIndustrySelected = viewModel::selectIndustry,
-        onNavigateToResumeBuilder = onNavigateToResumeBuilder,
-        onNavigateToInterviewPrep = onNavigateToInterviewPrep,
-        onNavigateToCoverLetter = onNavigateToCoverLetter,
-        onNavigateToAccountSettings = onNavigateToAccountSettings,
-        creditBalance = uiState.creditBalance,
-        onNavigateToPro = onNavigateToPro,
-        onSubmitOnboarding = { viewModel.submitOnboarding(it) }
-    )
+    Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
+        Box(modifier = Modifier.padding(paddingValues)) {
+            IndustryInsightsLayout(
+                uiState = uiState,
+                onRefresh = { viewModel.refreshInsights(forceRefresh = true) },
+                onDismissError = viewModel::clearError,
+                onIndustrySelected = viewModel::selectIndustry,
+                onNavigateToResumeBuilder = onNavigateToResumeBuilder,
+                onNavigateToInterviewPrep = onNavigateToInterviewPrep,
+                onNavigateToCoverLetter = onNavigateToCoverLetter,
+                onNavigateToAccountSettings = onNavigateToAccountSettings,
+                creditBalance = uiState.creditBalance,
+                onNavigateToPro = viewModel::preparePaymentSheet, // Directly trigger payment
+                onSubmitOnboarding = { viewModel.submitOnboarding(it) },
+                isPaymentLoading = paymentState.isLoading,
+                paymentResult = paymentState.paymentResult
+            )
+        }
+    }
 }
 
 @Composable
@@ -162,7 +217,9 @@ private fun IndustryInsightsLayout(
     onNavigateToAccountSettings: () -> Unit,
     onNavigateToPro: () -> Unit,
     creditBalance: Int?,
-    onSubmitOnboarding: (FormData) -> Unit
+    onSubmitOnboarding: (FormData) -> Unit,
+    isPaymentLoading: Boolean,
+    paymentResult: String?
 ) {
     val selectedInsight = uiState.selectedInsight
 
@@ -185,7 +242,9 @@ private fun IndustryInsightsLayout(
                                 onNavigateToCoverLetter = onNavigateToCoverLetter,
                                 onNavigateToAccountSettings = onNavigateToAccountSettings,
                                 creditBalance = creditBalance,
-                                onNavigateToPro = onNavigateToPro
+                                onNavigateToPro = onNavigateToPro,
+                                isPaymentLoading = isPaymentLoading,
+                                paymentResult = paymentResult
                             )
                         }
 
@@ -237,7 +296,9 @@ private fun IndustryInsightsLayout(
                             onNavigateToCoverLetter = onNavigateToCoverLetter,
                             onNavigateToAccountSettings = onNavigateToAccountSettings,
                             creditBalance = creditBalance,
-                            onNavigateToPro = onNavigateToPro
+                            onNavigateToPro = onNavigateToPro,
+                            isPaymentLoading = isPaymentLoading,
+                            paymentResult = paymentResult
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -294,7 +355,9 @@ private fun HeaderSection(
     onNavigateToCoverLetter: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
     creditBalance: Int?,
-    onNavigateToPro: () -> Unit
+    onNavigateToPro: () -> Unit,
+    isPaymentLoading: Boolean,
+    paymentResult: String?
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -314,13 +377,21 @@ private fun HeaderSection(
         ) {
             var showUpgradeDialog by remember { mutableStateOf(false) }
 
+            // Auto-close dialog on payment success
+            LaunchedEffect(paymentResult) {
+                if (paymentResult?.contains("success", ignoreCase = true) == true) {
+                    showUpgradeDialog = false
+                }
+            }
+
             if (showUpgradeDialog) {
                 UpgradeDialog(
-                    onDismiss = { showUpgradeDialog = false },
+                    onDismiss = { if (!isPaymentLoading) showUpgradeDialog = false },
                     onUpgrade = {
-                        showUpgradeDialog = false
+                        // showUpgradeDialog = false // Don't dismiss immediately, let payment sheet load
                         onNavigateToPro()
-                    }
+                    },
+                    isLoading = isPaymentLoading
                 )
             }
 
@@ -381,34 +452,21 @@ private fun HeaderSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Upgrade Button
-                    Button(
-                        onClick = { showUpgradeDialog = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text(
-                            text = "Upgrade",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
                     // Credit Balance Display
                     if (creditBalance != null) {
                         Surface(
                             shape = RoundedCornerShape(24.dp),
                             color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = { showUpgradeDialog = true }
+                                )
+                            }
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    .clickable { onNavigateToPro() }, // Make clickable to upgrade
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
@@ -857,10 +915,11 @@ private fun IndustrySelector(
 @Composable
 private fun UpgradeDialog(
     onDismiss: () -> Unit,
-    onUpgrade: () -> Unit
+    onUpgrade: () -> Unit,
+    isLoading: Boolean
 ) {
     androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isLoading) onDismiss() },
         title = {
             Text(
                 text = "Upgrade to Pro",
@@ -884,11 +943,20 @@ private fun UpgradeDialog(
         confirmButton = {
             Button(
                 onClick = onUpgrade,
+                enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
+                if (isLoading) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
                 Text("Upgrade Now")
             }
         },
@@ -2194,7 +2262,9 @@ private fun IndustryInsightsScreenPreview() {
             onNavigateToAccountSettings = {},
             onNavigateToPro = {},
             creditBalance = 10,
-            onSubmitOnboarding = {}
+            onSubmitOnboarding = {},
+            isPaymentLoading = false,
+            paymentResult = null
         )
     }
 }

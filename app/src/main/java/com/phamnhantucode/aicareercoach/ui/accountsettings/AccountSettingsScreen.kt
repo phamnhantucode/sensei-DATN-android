@@ -286,20 +286,6 @@ private fun ProfileSection(
             ) {
                 Text("Edit Profile")
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Upgrade to Pro Button
-            Button(
-                onClick = onUpgradeToPro,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-            ) {
-                Text("Upgrade to Pro 🚀")
-            }
         }
     }
 }
