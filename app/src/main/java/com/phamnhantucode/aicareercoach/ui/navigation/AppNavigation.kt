@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
 import com.phamnhantucode.aicareercoach.data.preferences.PreferencesRepository
 import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import com.phamnhantucode.aicareercoach.ui.accountsettings.AccountSettingsScreen
@@ -34,11 +35,24 @@ import com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.ResumeDesignScreen
 import com.phamnhantucode.aicareercoach.ui.purchase.PurchaseScreen
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+
 @Composable
 fun AppNavigation() {
     val context = LocalContext.current
     val preferencesRepository = PreferencesRepository.getInstance(context)
     val themeMode by preferencesRepository.themeModeFlow.collectAsState(initial = ThemeMode.SYSTEM)
+    val isFirstTime by androidx.compose.runtime.produceState<Boolean?>(initialValue = null, preferencesRepository) {
+        preferencesRepository.isFirstTimeFlow.collect { value = it }
+    }
+    
+    // Check if user is logged in via Clerk
+    val isLoggedIn = com.clerk.api.Clerk.session != null
+
     val isSystemInDarkTheme = isSystemInDarkTheme()
 
     val darkTheme = when (themeMode) {
@@ -48,17 +62,41 @@ fun AppNavigation() {
     }
 
     val navController = rememberNavController()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     AppTheme(darkTheme = darkTheme) {
         NetworkAwareContent {
-            NavHost(
-            navController = navController,
-            startDestination = Screen.Intro.route
-        ) {
+            if (isFirstTime == null) {
+                // Show a blank screen or a loading indicator while checking preferences to avoid flash
+                Box(
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                )
+            } else {
+                // Determine start destination based on state
+                val startDestination = when {
+                    isLoggedIn -> Screen.IndustryInsights.route
+                    isFirstTime == true -> Screen.Intro.route
+                    else -> Screen.Login.route
+                }
+
+                NavHost(
+                navController = navController,
+                startDestination = startDestination
+            ) {
         composable(Screen.Intro.route) {
             IntroPage(
-                onGetStarted = { navController.navigate(Screen.IndustryInsights.route) },
-                onSignIn = { navController.navigate(Screen.Login.route) }
+                onGetStarted = { 
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                       preferencesRepository.setFirstTime(false)
+                    }
+                    navController.navigate(Screen.IndustryInsights.route) 
+                },
+                onSignIn = { 
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                       preferencesRepository.setFirstTime(false)
+                    }
+                    navController.navigate(Screen.Login.route) 
+                }
             )
         }
 
@@ -122,8 +160,8 @@ fun AppNavigation() {
             AccountSettingsScreen(
                 onBack = { navController.popBackStack() },
                 onLogout = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Login.route) {
+                    navController.navigate(Screen.Intro.route) {
+                        popUpTo(Screen.Intro.route) {
                             inclusive = true
                         }
                         launchSingleTop = true
@@ -316,6 +354,7 @@ fun AppNavigation() {
             com.phamnhantucode.aicareercoach.ui.payment.PaymentScreen(
                 onBack = { navController.popBackStack() }
             )
+        }
         }
         }
         }

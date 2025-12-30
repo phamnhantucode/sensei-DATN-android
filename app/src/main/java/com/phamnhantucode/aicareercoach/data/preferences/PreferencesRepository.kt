@@ -31,6 +31,7 @@ class PreferencesRepository(private val context: Context) {
 
     companion object {
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        private val IS_FIRST_TIME_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("is_first_time")
 
         @Volatile
         private var INSTANCE: PreferencesRepository? = null
@@ -48,9 +49,20 @@ class PreferencesRepository(private val context: Context) {
             ThemeMode.fromString(value)
         }
 
+    val isFirstTimeFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[IS_FIRST_TIME_KEY] ?: true
+        }
+
     suspend fun setThemeMode(themeMode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[THEME_MODE_KEY] = themeMode.name
+        }
+    }
+
+    suspend fun setFirstTime(isFirstTime: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_FIRST_TIME_KEY] = isFirstTime
         }
     }
 }
