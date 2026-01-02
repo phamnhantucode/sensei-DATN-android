@@ -79,7 +79,6 @@ private enum class InterviewPrepScreen {
 @Composable
 fun InterviewPrepScreen(
     onBack: () -> Unit = {},
-    onNavigateToLiveInterview: () -> Unit = {},
     onNavigateToPurchase: () -> Unit = {},
     viewModel: InterviewPrepViewModel = viewModel(
         factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
@@ -120,7 +119,7 @@ fun InterviewPrepScreen(
                         selectedQuizState = it
                         currentScreen = InterviewPrepScreen.QUIZ_HISTORY_RESULTS
                     },
-                    onNavigateToLiveInterview = onNavigateToLiveInterview,
+
                     onBack = onBack
                 )
 
@@ -269,7 +268,6 @@ private fun HomeScreen(
     onNavigateToProgress: () -> Unit,
     onNavigateToTips: () -> Unit,
     onQuizClick: (QuizState) -> Unit,
-    onNavigateToLiveInterview: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -363,14 +361,6 @@ private fun HomeScreen(
                 icon = Icons.Default.PlayArrow,
                 color = MaterialTheme.colorScheme.primary,
                 onClick = onStartQuiz
-            )
-
-            ActionCard(
-                title = "Live Interview",
-                subtitle = "Voice interview with AI • Speech practice",
-                icon = Icons.Default.Psychology,
-                color = MaterialTheme.colorScheme.secondary,
-                onClick = onNavigateToLiveInterview
             )
 
             // Full Interview feature hidden as per requirements
@@ -917,7 +907,7 @@ private fun HomeScreenPreview() {
             onNavigateToProgress = {},
             onNavigateToTips = {},
             onQuizClick = {},
-            onNavigateToLiveInterview = {},
+
             onBack = {}
         )
     }

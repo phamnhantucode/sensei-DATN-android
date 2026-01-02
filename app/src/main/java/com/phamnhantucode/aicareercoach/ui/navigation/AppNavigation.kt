@@ -154,6 +154,9 @@ fun AppNavigation() {
                 },
                 onNavigateToPro = {
                     navController.navigate(Screen.StripePayment.route)
+                },
+                onNavigateToLiveInterview = {
+                    navController.navigate(Screen.LiveInterviewSetup.route)
                 }
             )
         }
@@ -274,9 +277,7 @@ fun AppNavigation() {
         composable(Screen.InterviewPrep.route) {
             InterviewPrepScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToLiveInterview = {
-                    navController.navigate(Screen.LiveInterviewSetup.route)
-                },
+
                 onNavigateToPurchase = { navController.navigate(Screen.Purchase.route) }
             )
         }

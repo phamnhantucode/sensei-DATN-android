@@ -54,10 +54,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LineAxis
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.TrendingDown
@@ -130,6 +135,7 @@ fun IndustryInsightsScreen(
     onNavigateToCoverLetter: () -> Unit = {},
     onNavigateToAccountSettings: () -> Unit = {},
     onNavigateToPro: () -> Unit = {},
+    onNavigateToLiveInterview: () -> Unit = {},
     viewModel: IndustryInsightsViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -197,6 +203,7 @@ fun IndustryInsightsScreen(
                 onNavigateToAccountSettings = onNavigateToAccountSettings,
                 creditBalance = uiState.creditBalance,
                 onNavigateToPro = viewModel::preparePaymentSheet, // Directly trigger payment
+                onNavigateToLiveInterview = onNavigateToLiveInterview,
                 onSubmitOnboarding = { viewModel.submitOnboarding(it) },
                 isPaymentLoading = paymentState.isLoading,
                 paymentResult = paymentState.paymentResult,
@@ -217,6 +224,7 @@ private fun IndustryInsightsLayout(
     onNavigateToCoverLetter: () -> Unit,
     onNavigateToAccountSettings: () -> Unit,
     onNavigateToPro: () -> Unit,
+    onNavigateToLiveInterview: () -> Unit,
     creditBalance: Int?,
     onSubmitOnboarding: (FormData) -> Unit,
     isPaymentLoading: Boolean,
@@ -245,6 +253,7 @@ private fun IndustryInsightsLayout(
                                 onNavigateToAccountSettings = onNavigateToAccountSettings,
                                 creditBalance = creditBalance,
                                 onNavigateToPro = onNavigateToPro,
+                                onNavigateToLiveInterview = onNavigateToLiveInterview,
                                 isPaymentLoading = isPaymentLoading,
                                 paymentResult = paymentResult,
                                 isPaid = isPaid
@@ -300,6 +309,7 @@ private fun IndustryInsightsLayout(
                             onNavigateToAccountSettings = onNavigateToAccountSettings,
                             creditBalance = creditBalance,
                             onNavigateToPro = onNavigateToPro,
+                            onNavigateToLiveInterview = onNavigateToLiveInterview,
                             isPaymentLoading = isPaymentLoading,
                             paymentResult = paymentResult,
                             isPaid = isPaid
@@ -360,6 +370,7 @@ private fun HeaderSection(
     onNavigateToAccountSettings: () -> Unit,
     creditBalance: Int?,
     onNavigateToPro: () -> Unit,
+    onNavigateToLiveInterview: () -> Unit,
     isPaymentLoading: Boolean,
     paymentResult: String?,
     isPaid: Boolean
@@ -367,7 +378,7 @@ private fun HeaderSection(
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
     val growthTools = remember {
-        listOf("Build Resume", "Cover Letter", "Interview Prep")
+        listOf("Build Resume", "Cover Letter", "Interview Preparation", "Mock Interview")
     }
     val density = LocalDensity.current
 
@@ -528,9 +539,10 @@ private fun HeaderSection(
                     ) {
                         growthTools.forEachIndexed { index, item ->
                             val icon = when (item) {
-                                "Build Resume" -> Icons.Filled.Person
-                                "Interview Prep" -> Icons.Filled.Groups
-                                "Cover Letter" -> Icons.Outlined.Insights
+                                "Build Resume" -> Icons.Filled.Description
+                                "Interview Preparation" -> Icons.Filled.School
+                                "Cover Letter" -> Icons.Filled.Edit
+                                "Mock Interview" -> Icons.Filled.PhotoCamera
                                 else -> Icons.Filled.ChevronRight
                             }
                             DropdownMenuItem(
@@ -556,8 +568,9 @@ private fun HeaderSection(
                                     growthToolsExpanded = false
                                     when (item) {
                                         "Build Resume" -> onNavigateToResumeBuilder()
-                                        "Interview Prep" -> onNavigateToInterviewPrep()
+                                        "Interview Preparation" -> onNavigateToInterviewPrep()
                                         "Cover Letter" -> onNavigateToCoverLetter()
+                                        "Mock Interview" -> onNavigateToLiveInterview()
                                     }
                                 },
                                 modifier = Modifier.padding(horizontal = 4.dp)
@@ -2266,6 +2279,7 @@ private fun IndustryInsightsScreenPreview() {
             onNavigateToCoverLetter = {},
             onNavigateToAccountSettings = {},
             onNavigateToPro = {},
+            onNavigateToLiveInterview = {},
             creditBalance = 10,
             onSubmitOnboarding = {},
             isPaymentLoading = false,
