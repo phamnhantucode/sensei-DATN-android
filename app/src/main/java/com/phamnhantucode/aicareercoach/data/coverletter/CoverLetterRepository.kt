@@ -89,6 +89,7 @@ class CoverLetterRepository(
     suspend fun saveCoverLetter(
         type: EmailType,
         companyName: String,
+        recipient: String,
         jobTitle: String,
         jobDescription: String,
         content: String,
@@ -113,8 +114,9 @@ class CoverLetterRepository(
                 put("userId", userId)
                 put("type", type.id)
                 put("companyName", companyName)
-                put("jobTitle", jobTitle)
-                put("jobDescription", jobDescription)
+                put("recipient", recipient)
+                put("title", jobTitle)
+                put("description", jobDescription)
                 put("content", content)
                 put("status", status)
                 put("createdAt", Instant.now().toString())
@@ -217,7 +219,7 @@ class CoverLetterRepository(
         
 
         val userContext = """
-            My Profile:
+            User Profile:
             - Industry: ${userProfile.industry}
             - Experience: ${userProfile.experience ?: "Not specified"} years
             - Skills: ${userProfile.skills.joinToString(", ")}
@@ -231,15 +233,13 @@ class CoverLetterRepository(
                 Role: Expert Career Coach & Professional Copywriter
                 Goal: Write a tailored Cover Letter for a $jobTitle position at $companyName.
                 Recipient: $recipientName
-                
-                $userContext
-                
-                Job Description:
-                $jobDescription
+                Input Data:
+                - $userContext
+                - Job Description: $jobDescription
                 
                 Instructions:
                 1. Analyze the JD to identify top 3 critical skills.
-                2. Map my experience to these skills with specific examples.
+                2. Map User's experience to these skills with specific examples.
                 3. Express genuine enthusiasm for the company/role.
                 4. Tone: Professional, Confident, and Persuasive.
                 5. Format: Standard Business Letter (Markdown).
@@ -251,14 +251,13 @@ class CoverLetterRepository(
                 """
                 Role: Professional Networker
                 Goal: Write a concise Cold Email to $recipientName at $companyName.
-                Context/Reason for contact: $context
-                Target Role Interest: $targetRole
+                Context: $context
                 
                 $userContext
                 
                 Instructions:
                 1. Hook the reader immediately in the first sentence (refer to Context).
-                2. Briefly introduce myself and value proposition related to $targetRole.
+                2. Briefly introduce yourself and your value proposition related to $targetRole.
                 3. Keep it extremely short (under 150 words).
                 4. Include a soft Call-to-Action (e.g., "Open to a 10-min coffee chat?").
                 5. Tone: Polite, Respectful, but Direct. Avoid generic fluff.
@@ -271,15 +270,15 @@ class CoverLetterRepository(
                 Role: Professional Communicator
                 Goal: Write a Referral Request email to $recipientName for a role at $companyName.
                 Relationship Context: $relationship
-                Target Job Link/ID: $targetJob
+                Target Job: $targetJob
                 
                 $userContext
                 
                 Instructions:
-                1. Start with a warm, personalized greeting based on the relationship ($relationship).
-                2. Clearly state intention to apply for $companyName.
-                3. Explain briefly why I am a good fit.
-                4. IMPORTANT: Include a "blurb" (short summary) at the end that they can easily copy-paste to forward to HR.
+                1. Start with a warm, personalized greeting based on the $relationship.
+                2. Clearly state your intention to apply for $companyName.
+                3. Explain briefly why you are a good fit (so they feel confident referring you).
+                4. Important: Include a "blurb" (short summary) at the end that they can easily copy-paste to forward to HR.
                 5. Tone: Grateful and Low-pressure.
                 """.trimIndent()
             }
@@ -287,14 +286,13 @@ class CoverLetterRepository(
                 val topic = inputs["topic"] ?: ""
                 """
                 Role: Courteous Professional
-                Goal: Write a Thank You Follow-up email to $recipientName (Interviewer) at $companyName.
-                Position Interviewed For: $jobTitle
+                Goal: Write a Thank You Follow-up email to $recipientName at $companyName.
                 Key Topic Discussed: $topic
                 
                 Instructions:
                 1. Express sincere gratitude for their time.
-                2. Reference the topic "$topic" to show active listening.
-                3. Reiterate excitement for the role and value add.
+                2. Reference the $topic to show you were listening and engaged.
+                3. Reiterate your excitement for the role and how you can add value.
                 4. Keep it timely (within 24h context).
                 5. Tone: Warm, Professional, and Appreciative.
                 """.trimIndent()
@@ -445,8 +443,9 @@ class CoverLetterRepository(
             userId = json.optString("userId", ""),
             type = EmailType.fromId(json.optString("type", EmailType.APPLICATION.id)),
             companyName = json.optString("companyName", ""),
-            jobTitle = json.optString("jobTitle", ""),
-            jobDescription = json.optString("jobDescription", ""),
+            recipient = json.optString("recipient", ""),
+            jobTitle = json.optString("title", ""),
+            jobDescription = json.optString("description", ""),
             content = json.optString("content", ""),
             status = json.optString("status", "draft"),
             createdAt = parseInstant(json.optString("createdAt")),
@@ -472,6 +471,7 @@ class CoverLetterRepository(
         val userId: String,
         val type: EmailType,
         val companyName: String,
+        val recipient: String,
         val jobTitle: String,
         val jobDescription: String,
         val content: String,

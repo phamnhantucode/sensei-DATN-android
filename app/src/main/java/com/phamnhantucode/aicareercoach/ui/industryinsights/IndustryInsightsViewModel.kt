@@ -35,6 +35,7 @@ data class IndustryInsightsUiState(
     val creditBalance: Int? = null,
     val isOnboardingRequired: Boolean = false,
     val isSubmittingOnboarding: Boolean = false,
+    val isPaid: Boolean = false,
 ) {
     val selectedInsight: IndustryInsightUiModel?
         get() = selectedIndustryId?.let { id ->
@@ -162,6 +163,27 @@ class IndustryInsightsViewModel(
                 return@launch
             }
 
+            // Sync user to get latest isPaid status, but don't fail properly if it fails (already handled in repo)
+            // Ideally repo.loadIndustryInsights should return the user object or we should fetch it separately purely for UI.
+            // For now, let's just fetch it again or rely on what we have.
+            // Actually, `loadIndustryInsights` already syncs user but doesn't return it.
+            // We should modify repository to return isPaid or fetch it here.
+            // Since repo is complex, let's quickly fetch user here to update UI state isPaid.
+            try {
+                val user = Clerk.user
+                if (user != null) {
+                    val email = user.emailAddresses.firstOrNull()?.emailAddress
+                    if (email != null) {
+                         NeonUserService.syncUser(user.id, email).onSuccess { neonUser ->
+                             _uiState.update { it.copy(isPaid = neonUser.isPaid) }
+                         }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore sync error here as main data loaded
+                Log.w(TAG, "Failed to sync user for premium status check", e)
+            }
+
             handleLoadedInsights(loadResult)
             if (!loadResult.needsRefresh) return@launch
 
@@ -247,6 +269,8 @@ class IndustryInsightsViewModel(
                 val email = user.emailAddresses.firstOrNull()?.emailAddress ?: throw IllegalStateException("User email not found")
                 NeonUserService.syncUser(user.id, email)
 
+                val neonUser = NeonUserService.syncUser(user.id, email).getOrNull()
+                
                 // Step 4: Update additional user profile fields
                 val skills = formData.skills.split(',')
                     .map { it.trim() }

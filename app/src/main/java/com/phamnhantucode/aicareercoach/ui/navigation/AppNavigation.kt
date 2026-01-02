@@ -19,6 +19,8 @@ import com.phamnhantucode.aicareercoach.data.preferences.ThemeMode
 import com.phamnhantucode.aicareercoach.ui.accountsettings.AccountSettingsScreen
 import com.phamnhantucode.aicareercoach.ui.components.NetworkAwareContent
 import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterScreen
+import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterTypeSelectionScreen
+import com.phamnhantucode.aicareercoach.ui.coverletter.CoverLetterInputScreen
 import com.phamnhantucode.aicareercoach.ui.coverletter.editor.CoverLetterEditorScreen
 import com.phamnhantucode.aicareercoach.ui.industryinsights.IndustryInsightsScreen
 import com.phamnhantucode.aicareercoach.ui.interviewprep.InterviewPrepScreen
@@ -292,6 +294,48 @@ fun AppNavigation() {
                             content = entry.content
                         )
                     )
+                },
+                onNavigateToTypeSelection = {
+                    navController.navigate(Screen.CoverLetterTypeSelection.route)
+                }
+            )
+        }
+
+        composable(Screen.CoverLetterTypeSelection.route) {
+            CoverLetterTypeSelectionScreen(
+                onBack = { navController.popBackStack() },
+                onTypeSelected = { type ->
+                    navController.navigate(Screen.CoverLetterInput.buildRoute(type))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.CoverLetterInput.routeWithArgs,
+            arguments = listOf(
+                navArgument(Screen.CoverLetterInput.typeKey()) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val type = backStackEntry.arguments?.getString(Screen.CoverLetterInput.typeKey()) ?: "APPLICATION"
+            CoverLetterInputScreen(
+                type = type,
+                onBack = { navController.popBackStack() },
+                onCoverLetterGenerated = { entry ->
+                     navController.navigate(
+                        Screen.CoverLetterEditor.buildRoute(
+                            id = entry.id,
+                            jobTitle = entry.jobTitle,
+                            company = entry.companyName,
+                            jobDescription = entry.jobDescription,
+                            content = entry.content
+                        )
+                    ) {
+                        popUpTo(Screen.CoverLetter.route) {
+                            inclusive = false
+                        }
+                    }
                 }
             )
         }

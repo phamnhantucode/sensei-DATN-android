@@ -177,7 +177,8 @@ object NeonUserService {
             industry = json.optString("industry").takeIf { it != "null" && it.isNotBlank() },
             experienceYears = json.optInt("experience").takeUnless { json.isNull("experience") },
             skills = skills,
-            bio = json.optString("bio").takeIf { it != "null" && it.isNotBlank() }
+            bio = json.optString("bio").takeIf { it != "null" && it.isNotBlank() },
+            isPaid = json.optBoolean("isPaid", false)
         )
     }
 
@@ -361,6 +362,7 @@ object NeonUserService {
         val experienceYears: Int?,
         val skills: List<String>,
         val bio: String?,
+        val isPaid: Boolean = false,
     )
 
 }

@@ -19,6 +19,7 @@ data class CoverLetterEntry(
     val id: String,
     val type: EmailType,
     val companyName: String,
+    val recipient: String,
     val jobTitle: String,
     val jobDescription: String,
     val content: String = "",
@@ -91,6 +92,7 @@ class CoverLetterViewModel(
                         id = record.id,
                         type = record.type,
                         companyName = record.companyName,
+                        recipient = record.recipient,
                         jobTitle = record.jobTitle,
                         jobDescription = record.jobDescription,
                         content = record.content,
@@ -127,6 +129,7 @@ class CoverLetterViewModel(
 
 
                 val companyName = inputs["companyName"] ?: ""
+                val recipientName = inputs["recipientName"] ?: ""
                 val savedJobTitle = when (type) {
                     EmailType.APPLICATION -> inputs["jobTitle"] ?: ""
                     EmailType.PROSPECTING -> inputs["targetRole"] ?: "Networking"
@@ -146,6 +149,7 @@ class CoverLetterViewModel(
                 val saved = repository.saveCoverLetter(
                     type = type,
                     companyName = companyName,
+                    recipient = recipientName,
                     jobTitle = savedJobTitle,
                     jobDescription = savedJobDescription,
                     content = generated.content,
@@ -156,6 +160,7 @@ class CoverLetterViewModel(
                     id = saved.id,
                     type = saved.type,
                     companyName = saved.companyName,
+                    recipient = saved.recipient,
                     jobTitle = saved.jobTitle,
                     jobDescription = saved.jobDescription,
                     content = saved.content,

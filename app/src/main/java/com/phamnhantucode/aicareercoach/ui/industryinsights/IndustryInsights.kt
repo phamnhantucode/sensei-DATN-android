@@ -199,7 +199,8 @@ fun IndustryInsightsScreen(
                 onNavigateToPro = viewModel::preparePaymentSheet, // Directly trigger payment
                 onSubmitOnboarding = { viewModel.submitOnboarding(it) },
                 isPaymentLoading = paymentState.isLoading,
-                paymentResult = paymentState.paymentResult
+                paymentResult = paymentState.paymentResult,
+                isPaid = uiState.isPaid
             )
         }
     }
@@ -219,7 +220,8 @@ private fun IndustryInsightsLayout(
     creditBalance: Int?,
     onSubmitOnboarding: (FormData) -> Unit,
     isPaymentLoading: Boolean,
-    paymentResult: String?
+    paymentResult: String?,
+    isPaid: Boolean
 ) {
     val selectedInsight = uiState.selectedInsight
 
@@ -244,7 +246,8 @@ private fun IndustryInsightsLayout(
                                 creditBalance = creditBalance,
                                 onNavigateToPro = onNavigateToPro,
                                 isPaymentLoading = isPaymentLoading,
-                                paymentResult = paymentResult
+                                paymentResult = paymentResult,
+                                isPaid = isPaid
                             )
                         }
 
@@ -298,7 +301,8 @@ private fun IndustryInsightsLayout(
                             creditBalance = creditBalance,
                             onNavigateToPro = onNavigateToPro,
                             isPaymentLoading = isPaymentLoading,
-                            paymentResult = paymentResult
+                            paymentResult = paymentResult,
+                            isPaid = isPaid
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -357,7 +361,8 @@ private fun HeaderSection(
     creditBalance: Int?,
     onNavigateToPro: () -> Unit,
     isPaymentLoading: Boolean,
-    paymentResult: String?
+    paymentResult: String?,
+    isPaid: Boolean
 ) {
     var growthToolsExpanded by remember { mutableStateOf(false) }
     var growthToolsButtonWidth by remember { mutableStateOf(0) }
@@ -453,7 +458,7 @@ private fun HeaderSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Credit Balance Display
-                    if (creditBalance != null) {
+                    if (creditBalance != null && !isPaid) {
                         Surface(
                             shape = RoundedCornerShape(24.dp),
                             color = MaterialTheme.colorScheme.surface,
@@ -2264,7 +2269,8 @@ private fun IndustryInsightsScreenPreview() {
             creditBalance = 10,
             onSubmitOnboarding = {},
             isPaymentLoading = false,
-            paymentResult = null
+            paymentResult = null,
+            isPaid = false
         )
     }
 }

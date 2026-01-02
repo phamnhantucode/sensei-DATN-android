@@ -80,6 +80,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,6 +91,7 @@ import kotlinx.coroutines.launch
 fun CoverLetterScreen(
     onBack: () -> Unit = {},
     onOpenEditor: (CoverLetterEntry) -> Unit = {},
+    onNavigateToTypeSelection: () -> Unit = {},
     viewModel: CoverLetterViewModel = viewModel()
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -94,7 +99,6 @@ fun CoverLetterScreen(
     val uiState by viewModel.uiState.collectAsState()
     val generationState by viewModel.generationState.collectAsState()
     val showCreditDialog by viewModel.showCreditDialog.collectAsState()
-    var showCreateDialog by remember { mutableStateOf(false) }
     var letterToDelete by remember { mutableStateOf<CoverLetterEntry?>(null) }
 
     val hasExistingLetters = when (val state = uiState) {
@@ -102,6 +106,19 @@ fun CoverLetterScreen(
         else -> false
     }
 
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadCoverLetters()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(generationState) {
         when (generationState) {
@@ -168,9 +185,7 @@ fun CoverLetterScreen(
 
                     if (hasExistingLetters) {
                         Button(
-                            onClick = {
-                                showCreateDialog = true
-                            },
+                            onClick = onNavigateToTypeSelection,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             ),
@@ -230,7 +245,7 @@ fun CoverLetterScreen(
                             if (state.coverLetters.isEmpty()) {
                                 EmptyCoverLetterState(
                                     modifier = Modifier.fillMaxSize(),
-                                    onCreateNew = { showCreateDialog = true }
+                                    onCreateNew = onNavigateToTypeSelection
                                 )
                             } else {
                                 CoverLetterList(
@@ -295,26 +310,6 @@ fun CoverLetterScreen(
                 CreditExhaustedDialog(
                     onDismiss = { viewModel.dismissCreditDialog() },
                     onPurchase = { viewModel.openPurchaseScreen() }
-                )
-            }
-
-            if (showCreateDialog) {
-                CreateEmailDialog(
-                    isGenerating = generationState is GenerationState.Generating,
-                    onDismiss = { showCreateDialog = false },
-                    onCreate = { type, inputs ->
-                        showCreateDialog = false
-                        viewModel.generateEmail(
-                            type = type,
-                            inputs = inputs,
-                            onSuccess = { entry ->
-                                onOpenEditor(entry)
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("${type.displayName} generated!")
-                                }
-                            }
-                        )
-                    }
                 )
             }
         }
@@ -398,6 +393,14 @@ private fun CoverLetterCard(
                         contentDescription = "Company name",
                         maxLines = 1
                     )
+                     if (entry.recipient.isNotBlank()) {
+                        RowWithIconText(
+                            icon = Icons.Filled.Person,
+                            text = "To: ${entry.recipient}",
+                            contentDescription = "Recipient",
+                            maxLines = 1
+                        )
+                    }
                     if (entry.jobDescription.isNotBlank()) {
                          RowWithIconText(
                             icon = Icons.Filled.Description,
@@ -455,7 +458,7 @@ private fun RowWithIconText(
                 modifier = Modifier
                     .size(24.dp)
                     .padding(4.dp)
-            )
+                )
         }
         Text(
             text = text,
@@ -501,240 +504,4 @@ private fun EmptyCoverLetterState(
 private fun formatTimestamp(instant: Instant): String {
     val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy • h:mm a", Locale.getDefault())
     return instant.atZone(ZoneId.systemDefault()).format(formatter)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateEmailDialog(
-    isGenerating: Boolean = false,
-    onDismiss: () -> Unit,
-    onCreate: (type: EmailType, inputs: Map<String, String>) -> Unit
-) {
-    var selectedType by rememberSaveable { mutableStateOf(EmailType.APPLICATION) }
-    
-
-    var companyName by rememberSaveable { mutableStateOf("") }
-    var recipientName by rememberSaveable { mutableStateOf("") }
-    
-
-    var jobTitle by rememberSaveable { mutableStateOf("") }
-    var jobDescription by rememberSaveable { mutableStateOf("") }
-    var context by rememberSaveable { mutableStateOf("") }
-    var additionalInfo by rememberSaveable { mutableStateOf("") }
-
-    val clipboardManager = LocalClipboardManager.current
-
-    val isCreateEnabled = !isGenerating && companyName.isNotBlank() && when(selectedType) {
-        EmailType.APPLICATION -> jobTitle.isNotBlank() && jobDescription.isNotBlank()
-        EmailType.PROSPECTING -> context.isNotBlank()
-        EmailType.REFERRAL -> recipientName.isNotBlank() && context.isNotBlank()
-        EmailType.THANK_YOU -> jobTitle.isNotBlank() && recipientName.isNotBlank()
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Create Job Search Email") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 0.dp)
-                ) {
-                    items(EmailType.values()) { type ->
-                        FilterChip(
-                            selected = type == selectedType,
-                            onClick = { selectedType = type },
-                            label = { Text(type.displayName) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        )
-                    }
-                }
-                
-                Divider()
-
-
-                Text(
-                    text = "Provide details for ${selectedType.displayName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-
-                OutlinedTextField(
-                    value = companyName,
-                    onValueChange = { companyName = it },
-                    label = { Text("Company name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-
-                val recipientLabel = when(selectedType) {
-                    EmailType.APPLICATION -> "Hiring Manager (Optional)"
-                    EmailType.PROSPECTING -> "Recipient Name (Optional)"
-                    EmailType.REFERRAL -> "Contact Name (Required)"
-                    EmailType.THANK_YOU -> "Interviewer Name (Required)"
-                }
-                OutlinedTextField(
-                    value = recipientName,
-                    onValueChange = { recipientName = it },
-                    label = { Text(recipientLabel) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = if(selectedType == EmailType.REFERRAL || selectedType == EmailType.THANK_YOU) {
-                        { Icon(Icons.Default.Person, contentDescription = null) }
-                    } else null
-                )
-
-
-                when (selectedType) {
-                    EmailType.APPLICATION -> {
-                        OutlinedTextField(
-                            value = jobTitle,
-                            onValueChange = { jobTitle = it },
-                            label = { Text("Job Title") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = jobDescription,
-                            onValueChange = { jobDescription = it },
-                            label = { Text("Job Description") },
-                            minLines = 3,
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    clipboardManager.getText()?.text?.let { jobDescription = it }
-                                }) {
-                                    Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
-                                }
-                            }
-                        )
-                    }
-                    EmailType.PROSPECTING -> {
-                        OutlinedTextField(
-                            value = additionalInfo,
-                            onValueChange = { additionalInfo = it },
-                            label = { Text("Target Role (Optional)") },
-                            placeholder = { Text("e.g. Senior Android Dev") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = context,
-                            onValueChange = { context = it },
-                            label = { Text("Connection / Context") },
-                            placeholder = { Text("Why are you contacting them?") },
-                            minLines = 3,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    EmailType.REFERRAL -> {
-                         OutlinedTextField(
-                            value = context,
-                            onValueChange = { context = it },
-                            label = { Text("Relationship") },
-                            placeholder = { Text("e.g. Ex-colleague, Alumni") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = additionalInfo,
-                            onValueChange = { additionalInfo = it },
-                            label = { Text("Target Job Link/ID (Optional)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    EmailType.THANK_YOU -> {
-                        OutlinedTextField(
-                            value = jobTitle,
-                            onValueChange = { jobTitle = it },
-                            label = { Text("Job Title") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = context,
-                            onValueChange = { context = it },
-                            label = { Text("Key Discussion Topic") },
-                            placeholder = { Text("Something memorable discussed...") },
-                            minLines = 2,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val inputs = mutableMapOf(
-                        "companyName" to companyName.trim(),
-                        "recipientName" to recipientName.trim()
-                    )
-                    when (selectedType) {
-                        EmailType.APPLICATION -> {
-                            inputs["jobTitle"] = jobTitle.trim()
-                            inputs["jobDescription"] = jobDescription.trim()
-                        }
-                        EmailType.PROSPECTING -> {
-                            inputs["targetRole"] = additionalInfo.trim()
-                            inputs["context"] = context.trim()
-                        }
-                        EmailType.REFERRAL -> {
-                            inputs["relationship"] = context.trim()
-                            inputs["targetJob"] = additionalInfo.trim()
-                        }
-                        EmailType.THANK_YOU -> {
-                            inputs["jobTitle"] = jobTitle.trim()
-                            inputs["topic"] = context.trim()
-                        }
-                    }
-                    onCreate(selectedType, inputs)
-                },
-                enabled = isCreateEnabled
-            ) {
-                if (isGenerating) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Text("Generating...")
-                    }
-                } else {
-                    Text("Generate")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun CreateEmailDialogPreview() {
-    AppTheme {
-        CreateEmailDialog(
-            onDismiss = {},
-            onCreate = { _, _ -> }
-        )
-    }
 }

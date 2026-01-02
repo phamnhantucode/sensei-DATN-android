@@ -60,6 +60,18 @@ sealed class Screen(val route: String) {
     }
     object InterviewPrep : Screen("interview_prep")
     object CoverLetter : Screen("cover_letter")
+    object CoverLetterTypeSelection : Screen("cover_letter_type_selection")
+    object CoverLetterInput : Screen("cover_letter_input") {
+        private const val TypeArg = "type"
+
+        val routeWithArgs: String = "$route/{$TypeArg}"
+
+        fun buildRoute(type: String): String {
+            return "$route/${Uri.encode(type)}"
+        }
+
+        fun typeKey(): String = TypeArg
+    }
     object AccountSettings : Screen("account_settings")
     object LiveInterviewSetup : Screen("live_interview_setup")
     object LiveInterviewActive : Screen("live_interview_active")
