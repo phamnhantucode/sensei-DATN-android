@@ -56,6 +56,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.width
 import com.phamnhantucode.aicareercoach.ui.components.InsetAwareColumn
 import com.phamnhantucode.aicareercoach.ui.theme.AppTheme
 import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
@@ -63,6 +70,15 @@ import com.phamnhantucode.aicareercoach.ui.components.CreditExhaustedDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+
 
 // Screen states
 private enum class InterviewPrepScreen {
@@ -87,7 +103,7 @@ fun InterviewPrepScreen(
     ),
 ) {
     var currentScreen by remember { mutableStateOf(InterviewPrepScreen.HOME) }
-    var selectedQuizState by remember { mutableStateOf<QuizState?>(null) }
+    var selectedQuizId by remember { mutableStateOf<String?>(null) }
     val quizState by viewModel.quizState.collectAsStateWithLifecycle()
     val interviewState by viewModel.interviewState.collectAsStateWithLifecycle()
     val userProgress by viewModel.userProgress.collectAsStateWithLifecycle()
@@ -96,6 +112,7 @@ fun InterviewPrepScreen(
     val loadingState by viewModel.loadingState.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val showCreditDialog by viewModel.showCreditDialog.collectAsStateWithLifecycle()
+    val resumes by viewModel.resumes.collectAsStateWithLifecycle()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -105,8 +122,9 @@ fun InterviewPrepScreen(
             when (currentScreen) {
                 InterviewPrepScreen.HOME -> HomeScreen(
                     userProgress = userProgress,
-                    onStartQuiz = {
-                        viewModel.startQuiz()
+                    resumes = resumes,
+                    onStartQuiz = { role, skills, yoes ->
+                        viewModel.startQuiz(role = role, skills = skills, yoes = yoes)
                         currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
                     },
                     onStartInterview = {
@@ -116,7 +134,7 @@ fun InterviewPrepScreen(
                     onNavigateToProgress = { currentScreen = InterviewPrepScreen.PROGRESS },
                     onNavigateToTips = { currentScreen = InterviewPrepScreen.TIPS },
                     onQuizClick = {
-                        selectedQuizState = it
+                        selectedQuizId = it.id
                         currentScreen = InterviewPrepScreen.QUIZ_HISTORY_RESULTS
                     },
 
@@ -141,10 +159,6 @@ fun InterviewPrepScreen(
                 InterviewPrepScreen.QUIZ_RESULTS -> quizState?.let { state ->
                     QuizResultsScreen(
                         quizState = state,
-                        onRetakeQuiz = {
-                            viewModel.startQuiz()
-                            currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
-                        },
                         onBackToHome = {
                             viewModel.resetQuiz()
                             currentScreen = InterviewPrepScreen.HOME
@@ -152,17 +166,28 @@ fun InterviewPrepScreen(
                     )
                 }
 
-                InterviewPrepScreen.QUIZ_HISTORY_RESULTS -> selectedQuizState?.let { state ->
-                    QuizResultsScreen(
-                        quizState = state,
-                        onRetakeQuiz = {
-                            viewModel.startQuiz()
-                            currentScreen = InterviewPrepScreen.QUIZ_ACTIVE
-                        },
-                        onBackToHome = {
-                            currentScreen = InterviewPrepScreen.HOME
-                        }
-                    )
+                InterviewPrepScreen.QUIZ_HISTORY_RESULTS -> {
+                    val selectedQuiz = userProgress.completedQuizStates.find { it.id == selectedQuizId }
+                    if (selectedQuiz != null && selectedQuiz.questions.isNotEmpty()) {
+                        QuizResultsScreen(
+                            quizState = selectedQuiz,
+                            onBackToHome = {
+                                currentScreen = InterviewPrepScreen.HOME
+                            }
+                        )
+                    } else {
+                         // Fallback or loading if needed, though logically it should exist if clicked
+                         // Just going back to home to be safe if not found (e.g. race condition cleared it)
+                         // Or better, showing a loading indicator if we expect it to load
+                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                         // Show Shimmer instead of basic loading
+                         QuizResultShimmer(
+                             onBackToHome = {
+                                 currentScreen = InterviewPrepScreen.HOME
+                             }
+                         )
+                         }
+                    }
                 }
 
                 InterviewPrepScreen.INTERVIEW_ACTIVE -> interviewState?.let { state ->
@@ -207,10 +232,14 @@ fun InterviewPrepScreen(
             }
 
             if (loadingState.isLoading) {
-                LoadingDialog(
-                    progress = loadingState.progress,
-                    description = loadingState.description
-                )
+                 if (currentScreen == InterviewPrepScreen.HOME) {
+                    HomeScreenShimmer(onBack = onBack)
+                 } else {
+                    LoadingDialog(
+                        progress = loadingState.progress,
+                        description = loadingState.description
+                    )
+                 }
             }
 
             errorMessage?.let { message ->
@@ -263,13 +292,16 @@ fun InterviewPrepScreen(
 @Composable
 private fun HomeScreen(
     userProgress: UserProgress,
-    onStartQuiz: () -> Unit,
+    resumes: List<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume>,
+    onStartQuiz: (String?, List<String>?, String?) -> Unit,
     onStartInterview: () -> Unit,
     onNavigateToProgress: () -> Unit,
     onNavigateToTips: () -> Unit,
     onQuizClick: (QuizState) -> Unit,
     onBack: () -> Unit,
 ) {
+    var showQuizDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -329,196 +361,147 @@ private fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-        // Stats Grid
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            StatsCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.EmojiEvents,
-                label = "Avg Score",
-                value = "${userProgress.averageScore}%"
-            )
-            StatsCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.CalendarToday,
-                label = "Streak",
-                value = "${userProgress.streak} days"
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Quick Actions
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            ActionCard(
-                title = "Quick Quiz",
-                subtitle = "10 questions • Multiple choice",
-                icon = Icons.Default.PlayArrow,
-                color = MaterialTheme.colorScheme.primary,
-                onClick = onStartQuiz
-            )
-
-            // Full Interview feature hidden as per requirements
-            // ActionCard(
-            //     title = "Full Interview",
-            //     subtitle = "Mock interview • 30 min",
-            //     icon = Icons.Default.Psychology,
-            //     color = MaterialTheme.colorScheme.secondary,
-            //     onClick = onStartInterview
-            // )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        RecentQuizzesSection(
-            userProgress = userProgress,
-            onStartQuiz = onStartQuiz,
-            onQuizClick = onQuizClick
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Recent Performance
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Column(
+            // Stats Grid (Matched to Web: Avg Score, Questions, Latest Score)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Performance",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.BarChart,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Last 8 quizzes",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // Avg Score
+                StatsCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.EmojiEvents,
+                    label = "Avg Score",
+                    value = String.format("%.1f%%", userProgress.averageScore)
                 )
+                // Questions Practiced
+                StatsCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.MenuBook,
+                    label = "Questions",
+                    value = "${userProgress.questionsAnswered}"
+                )
+                // Latest Score
+                StatsCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.TrendingUp,
+                    label = "Latest",
+                    value = "${userProgress.recentScores.firstOrNull() ?: 0}%"
+                )
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Score bars
-                Row(
+            // Quick Actions (Restored for accessibility as per user request to remove list button)
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ActionCard(
+                    title = "Quick Quiz",
+                    subtitle = "10 questions • Multiple choice",
+                    icon = Icons.Default.PlayArrow,
+                    color = MaterialTheme.colorScheme.primary,
+                    onClick = { showQuizDialog = true }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Recent Performance (Moved up to match Web flow)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.Bottom
+                        .padding(20.dp)
                 ) {
-                    userProgress.recentScores.forEach { score ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight((score / 100f).coerceIn(0.1f, 1f))
-                                .background(
-                                    MaterialTheme.colorScheme.primary,
-                                    shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
-                                )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recent Performance",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Last 8 quizzes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Score bars
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        userProgress.recentScores.forEach { score ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight((score / 100f).coerceIn(0.1f, 1f))
+                                    .background(
+                                        MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                    )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Older",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Recent",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Week 1",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Week 2",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // Stats Cards
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            StatsInfoCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.MenuBook,
-                label = "Questions",
-                value = "${userProgress.questionsAnswered}",
-                subtitle = "Practiced"
+
+
+            // Recent Quizzes List
+            RecentQuizzesSection(
+                userProgress = userProgress,
+                onStartQuiz = { showQuizDialog = true },
+                onQuizClick = onQuizClick
             )
-            StatsInfoCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Default.EmojiEvents,
-                label = "Quizzes",
-                value = "${userProgress.totalQuizzes}",
-                subtitle = "Completed"
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Bottom Navigation
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-//            BottomNavItem(
-//                icon = Icons.Default.Home,
-//                label = "Home",
-//                selected = true,
-//                onClick = {}
-//            )
-//            BottomNavItem(
-//                icon = Icons.Default.TrendingUp,
-//                label = "Progress",
-//                selected = false,
-//                onClick = onNavigateToProgress
-//            )
-//            BottomNavItem(
-//                icon = Icons.Default.Lightbulb,
-//                label = "Tips",
-//                selected = false,
-//                onClick = onNavigateToTips
-//            )
-        }
 
             Spacer(
                 modifier = Modifier.height(
@@ -527,6 +510,94 @@ private fun HomeScreen(
             )
         }
     }
+    
+    if (showQuizDialog) {
+        QuizSetupDialog(
+            onDismiss = { showQuizDialog = false },
+            onStart = { role, skills, yoes -> 
+                showQuizDialog = false
+                onStartQuiz(role, skills, yoes)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuizSetupDialog(
+    onDismiss: () -> Unit,
+    onStart: (String?, List<String>?, String?) -> Unit
+) {
+    // Manual input states
+    var role by remember { mutableStateOf("") }
+    var skills by remember { mutableStateOf("") }
+    var yoes by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Tell us more about knowledge you want to practice",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Add details about your job position/role, Job description and years of experience",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                // Manual Inputs
+                OutlinedTextField(
+                    value = role,
+                    onValueChange = { role = it },
+                    label = { Text("Job position") },
+                    placeholder = { Text("Fullstack, Data engineer,...") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = skills,
+                    onValueChange = { skills = it },
+                    label = { Text("Skills") },
+                    placeholder = { Text("Skills you wanna practice") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = yoes,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) yoes = it },
+                    label = { Text("Years of experience") },
+                    placeholder = { Text("Years of experience") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    val skillsList = if (skills.isNotBlank()) skills.split(",").map { it.trim() } else null
+                    val finalRole = role.takeIf { it.isNotBlank() }
+                    val finalYoes = yoes.takeIf { it.isNotBlank() }
+
+                    onStart(finalRole, skillsList, finalYoes) 
+                },
+                enabled = role.isNotBlank() || skills.isNotBlank()
+            ) {
+                Text("Generate")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -674,23 +745,22 @@ private fun RecentQuizzesSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            OutlinedButton(onClick = onStartQuiz) {
-                Text(text = "Start new Quiz")
-            }
+            // Start button removed as per user request
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            userProgress.completedQuizStates.forEach {
-                QuizItem(quiz = it, onClick = { onQuizClick(it) })
+            userProgress.completedQuizStates.forEachIndexed { index, quiz ->
+                val quizNumber = userProgress.totalQuizzes - index
+                QuizItem(quiz = quiz, title = "Quiz $quizNumber", onClick = { onQuizClick(quiz) })
             }
         }
     }
 }
 
 @Composable
-private fun QuizItem(quiz: QuizState, onClick: () -> Unit) {
+private fun QuizItem(quiz: QuizState, title: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -708,32 +778,43 @@ private fun QuizItem(quiz: QuizState, onClick: () -> Unit) {
         ) {
             Column {
                 Text(
-                    text = "Quiz #${quiz.timeStarted.toLocalDate()}",
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Score: ${quiz.finalScore}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Completed on: ${quiz.timeStarted.toLocalDate()}",
+                    text = "Completed on: ${quiz.timeStarted.format(java.time.format.DateTimeFormatter.ofPattern("MMMM dd, yyyy HH:mm", java.util.Locale.US))}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "Target:",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                 Text(
+                    text = "${quiz.finalScore}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                quiz.questions.map { it.category }.distinct().forEach {
+            }
+        }
+        
+        quiz.improvementTip?.let { tip ->
+            if (tip.isNotBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                     Text(
-                        text = it.name,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        text = tip,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(12.dp),
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
             }
@@ -902,13 +983,144 @@ private fun HomeScreenPreview() {
     AppTheme {
         HomeScreen(
             userProgress = mockProgress,
-            onStartQuiz = {},
+            onStartQuiz = { _, _, _ -> },
             onStartInterview = {},
             onNavigateToProgress = {},
             onNavigateToTips = {},
             onQuizClick = {},
-
+            resumes = emptyList(),
             onBack = {}
         )
+    }
+}
+
+@Composable
+private fun HomeScreenShimmer(
+    onBack: () -> Unit
+) {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 1200,
+                easing = androidx.compose.animation.core.LinearEasing
+            ),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        ),
+        start = Offset(translateAnim - 500f, 0f),
+        end = Offset(translateAnim, 0f)
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Sticky Header Shimmer
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 4.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 16.dp,
+                        top = 12.dp + WindowInsets.systemBars.asPaddingValues()
+                            .calculateTopPadding(),
+                        bottom = 12.dp,
+                        end = 16.dp
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                 Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier
+                            .height(24.dp)
+                            .width(120.dp)
+                            .background(shimmerBrush, RoundedCornerShape(4.dp)))
+                         Box(modifier = Modifier
+                            .height(16.dp)
+                            .width(180.dp)
+                            .background(shimmerBrush, RoundedCornerShape(4.dp)))
+                    }
+                }
+            }
+        }
+
+        // Content Shimmer
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Stats Grid Shimmer
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(3) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(80.dp)
+                            .background(shimmerBrush, RoundedCornerShape(12.dp))
+                    )
+                }
+            }
+
+            // Quick Actions Shimmer
+             Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .background(shimmerBrush, RoundedCornerShape(16.dp))
+            )
+
+            // Performance Shimmer
+             Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .background(shimmerBrush, RoundedCornerShape(16.dp))
+            )
+
+             // List Shimmer
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                 Box(
+                    modifier = Modifier
+                        .width(150.dp)
+                        .height(24.dp)
+                        .background(shimmerBrush, RoundedCornerShape(4.dp))
+                )
+                 repeat(3) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .background(shimmerBrush, RoundedCornerShape(12.dp))
+                    )
+                 }
+            }
+        }
     }
 }

@@ -36,7 +36,9 @@ data class QuizState(
     val answers: Map<Int, Any> = emptyMap(),
     val isComplete: Boolean = false,
     val timeStarted: LocalDateTime = LocalDateTime.now(),
-    val finalScore: Int = 0
+    val finalScore: Int = 0,
+    val improvementTip: String? = null,
+    val id: String? = null
 )
 
 /**

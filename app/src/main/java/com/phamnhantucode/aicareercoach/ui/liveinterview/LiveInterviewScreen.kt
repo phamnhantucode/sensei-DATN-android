@@ -20,6 +20,8 @@ fun LiveInterviewScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val showCreditDialog by viewModel.showCreditDialog.collectAsState()
+    val interviewHistory by viewModel.interviewHistory.collectAsState()
+    val isHistoryLoading by viewModel.isHistoryLoading.collectAsState()
 
     when (val state = uiState) {
         is LiveInterviewUiState.Setup -> {
@@ -27,12 +29,18 @@ fun LiveInterviewScreen(
                 onBack = onBack,
                 onStartInterview = { config ->
                     viewModel.startInterview(config)
-                }
+                },
+                onViewFeedback = { session ->
+                    viewModel.viewInterviewResults(session)
+                },
+                interviewHistory = interviewHistory,
+                isHistoryLoading = isHistoryLoading
             )
         }
         is LiveInterviewUiState.Starting,
         is LiveInterviewUiState.ActiveQuestion,
         is LiveInterviewUiState.AnswerCollection,
+        is LiveInterviewUiState.ReviewingAnswer,
         is LiveInterviewUiState.Processing,
         is LiveInterviewUiState.ViewingFeedback,
         is LiveInterviewUiState.LoadingNextQuestion,
@@ -53,7 +61,9 @@ fun LiveInterviewScreen(
                     // Reset to setup
                     viewModel.abandonInterview()
                 },
-                onRetryInterview = if (viewModel.canRetry()) {
+                onRetryInterview = if (viewModel.canRestart()) {
+                    { viewModel.restartSession() }
+                } else if (viewModel.canRetry()) {
                     { viewModel.retryInterview() }
                 } else null
             )

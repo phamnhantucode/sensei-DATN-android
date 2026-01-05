@@ -100,7 +100,7 @@ import java.util.Locale
 private enum class ResumeBuilderTab(val title: String) {
     FORM("Form"),
     DESIGN("Design"),
-    MARKDOWN("Markdown")
+//    MARKDOWN("Markdown")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -295,9 +295,9 @@ fun ResumeBuilderScreen(
                             onNavigateToGridEditor = onNavigateToGridEditor
                         )
                     }
-                    ResumeBuilderTab.MARKDOWN -> {
-                        ResumeMarkdownContent()
-                    }
+//                    ResumeBuilderTab.MARKDOWN -> {
+//                        ResumeMarkdownContent()
+//                    }
                 }
             }
         }

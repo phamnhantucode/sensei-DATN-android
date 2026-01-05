@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.clerk.api.Clerk
 import com.phamnhantucode.aicareercoach.BuildConfig
+import com.phamnhantucode.aicareercoach.data.ai.PromptFactory
 import com.phamnhantucode.aicareercoach.data.audio.GeminiAudioService
 import com.phamnhantucode.aicareercoach.data.audio.VoskSpeechRecognizer
 import com.phamnhantucode.aicareercoach.data.local.AppDatabase
@@ -84,72 +85,126 @@ class LiveInterviewRepository(
                     return@withContext Result.failure(Exception("Failed to fetch user profile"))
                 }
 
-                // Deduct Credit
-                com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
+                val sessionId: String
+                
+                if (request.sessionId != null) {
+                    // Reuse existing session
+                    sessionId = request.sessionId
+                    Log.d(TAG, "Reusing existing session ID: $sessionId")
+                    // Skip credit deduction for retry
+                } else {
+                    // Deduct Credit
+                    com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
+    
+                    // Use job title as role if available, otherwise fallback to interview type name
+                    val sessionRole = if (request.jobTitle.isNotBlank()) request.jobTitle else request.interviewType.name
+                    val sessionDesc = "Mock interview for $sessionRole"
 
-                // Create new interview session in database
-                Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")
-                val sessionId = createInterviewSession(
-                    userId = neonUser.id,
-                    authHeader = authHeader,
-                    role = request.interviewType.name,
-                    description = "Mock interview for ${request.interviewType.name}",
-                    yoes = request.experienceLevel ?: 0
-                )
-                Log.d(TAG, "Interview session created: ${if (sessionId != null) "SUCCESS (id=$sessionId)" else "NULL (FAILED)"}")
-                if (sessionId == null) {
-                    Log.e(TAG, "Failed to create interview session in database")
-                    return@withContext Result.failure(Exception("Failed to create interview session"))
-                }
-
-                // Generate ALL questions at once
-                Log.d(TAG, "Generating ${request.questionCount} questions for category=${request.interviewType.name}")
-                val questionsResult = geminiAudioService.generateAllQuestions(
-                    category = request.interviewType.name,
-                    questionCount = request.questionCount,
-                    userProfile = buildUserProfileContext(request)
-                )
-                Log.d(TAG, "Batch question generation result: ${if (questionsResult.isSuccess) "SUCCESS" else "FAILED"}")
-
-                if (questionsResult.isFailure) {
-                    val error = questionsResult.exceptionOrNull() ?: Exception("Failed to generate questions")
-                    Log.e(TAG, "Failed to generate questions", error)
-                    
-                    // Provide specific error message based on exception
-                    val userMessage = when {
-                        error.message?.contains("API key not configured") == true ->
-                            "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
-                        error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
-                            "AI Service authentication failed. Please check your API key in local.properties"
-                        error.message?.contains("HTTP 429") == true ->
-                            "AI Service rate limit exceeded. Please try again later"
-                        error.message?.contains("HTTP 5") == true ->
-                            "AI Service server error. Please try again later"
-                        else -> "Failed to generate interview questions: ${error.message}"
+                    // Create new interview session in database
+                    Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=$sessionRole, yoes=${request.experienceLevel ?: 0}")
+                    val newSessionId = createInterviewSession(
+                        userId = neonUser.id,
+                        authHeader = authHeader,
+                        role = sessionRole,
+                        description = sessionDesc,
+                        yoes = request.experienceLevel ?: 0
+                    )
+                    Log.d(TAG, "Interview session created: ${if (newSessionId != null) "SUCCESS (id=$newSessionId)" else "NULL (FAILED)"}")
+                    if (newSessionId == null) {
+                        Log.e(TAG, "Failed to create interview session in database")
+                        return@withContext Result.failure(Exception("Failed to create interview session"))
                     }
-
-                    return@withContext Result.failure(Exception(userMessage))
+                    sessionId = newSessionId
                 }
 
-                val questionResults = questionsResult.getOrNull()!!
+                // Generate ALL questions at once OR reuse existing
+                val questionsPool: List<LiveQuestion>
+                
+                if (request.existingQuestions != null && request.existingQuestions.isNotEmpty()) {
+                    Log.d(TAG, "Reusing ${request.existingQuestions.size} existing questions")
+                    
+                    if (request.sessionId != null) {
+                         // If reusing session, we just use the existing questions as is (with their original IDs)
+                         // But we need to reset them in the database
+                         questionsPool = request.existingQuestions.map { 
+                             it.copy(
+                                 userAnswer = null,
+                                 feedback = null,
+                                 rating = null,
+                                 audioTranscript = null,
+                                 duration = null
+                             )
+                         }
+                         
+                         // Reset these questions in DB
+                         repositoryScope.launch {
+                            resetQuestionsInDatabase(questionsPool, authHeader)
+                         }
+                    } else {
+                        // If NEW session but reusing questions (copying), map to new objects
+                        questionsPool = request.existingQuestions.map { existing ->
+                             LiveQuestion(
+                                liveMockInterviewId = sessionId,
+                                questionText = existing.questionText,
+                                category = existing.category,
+                                correctAnswer = existing.correctAnswer
+                            )
+                        }
+                    }
+                } else {
+                    Log.d(TAG, "Generating ${request.questionCount} questions for category=${request.interviewType.name}")
+                    val questionsResult = geminiAudioService.generateAllQuestions(
+                        context = buildContextStr(request),
+                        category = request.interviewType.name,
+                        questionCount = request.questionCount
+                    )
+                    Log.d(TAG, "Batch question generation result: ${if (questionsResult.isSuccess) "SUCCESS" else "FAILED"}")
+    
+                    if (questionsResult.isFailure) {
+                        val error = questionsResult.exceptionOrNull() ?: Exception("Failed to generate questions")
+                        Log.e(TAG, "Failed to generate questions", error)
+                        
+                        // Provide specific error message based on exception
+                        val userMessage = when {
+                            error.message?.contains("API key not configured") == true ->
+                                "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
+                            error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
+                                "AI Service authentication failed. Please check your API key in local.properties"
+                            error.message?.contains("HTTP 429") == true ->
+                                "AI Service rate limit exceeded. Please try again later"
+                            error.message?.contains("HTTP 5") == true ->
+                                "AI Service server error. Please try again later"
+                            else -> "Failed to generate interview questions: ${error.message}"
+                        }
+    
+                        return@withContext Result.failure(Exception(userMessage))
+                    }
+                    
+                    val questionResults = questionsResult.getOrNull()!!
+                    
+                    questionsPool = questionResults.map { questionData ->
+                        LiveQuestion(
+                            liveMockInterviewId = sessionId,
+                            questionText = questionData.question,
+                            category = request.interviewType.name,
+                            correctAnswer = questionData.idealAnswer
+                        )
+                    }
+                }
                 
                 // Convert to LiveQuestion objects and save to database in background
-                val liveQuestions = questionResults.map { questionData ->
-                    LiveQuestion(
-                        liveMockInterviewId = sessionId,
-                        questionText = questionData.question,
-                        category = request.interviewType.name,
-                        correctAnswer = questionData.idealAnswer
-                    )
-                }
+                val liveQuestions = questionsPool
 
                 // Save all questions to database in background (fire and forget)
-                repositoryScope.launch {
-                    try {
-                        saveAllQuestionsToDatabase(liveQuestions, authHeader)
-                        Log.d(TAG, "All questions saved to database successfully")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to save questions to database", e)
+                // ONLY if it is a new session. If reusing old session, we already reset them above.
+                if (request.sessionId == null) {
+                    repositoryScope.launch {
+                        try {
+                            saveAllQuestionsToDatabase(liveQuestions, authHeader)
+                            Log.d(TAG, "All questions saved to database successfully")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to save questions to database", e)
+                        }
                     }
                 }
 
@@ -206,62 +261,108 @@ class LiveInterviewRepository(
                     return@withContext Result.failure(Exception("Failed to fetch user profile"))
                 }
 
-                // Deduct Credit
-                com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
+                val sessionId: String
+                
+                if (request.sessionId != null) {
+                    sessionId = request.sessionId
+                    Log.d(TAG, "Reusing existing session ID: $sessionId")
+                } else {
+                    // Deduct Credit
+                    com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, "Live Interview Session", authHeader)
+    
+                    // Use job title as role if available, otherwise fallback to interview type name
+                    val sessionRole = if (request.jobTitle.isNotBlank()) request.jobTitle else request.interviewType.name
+                    val sessionDesc = "Mock interview for $sessionRole"
 
-                // Create new interview session in database
-                Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=${request.interviewType.name}, yoes=${request.experienceLevel ?: 0}")
-                val sessionId = createInterviewSession(
-                    userId = neonUser.id,
-                    authHeader = authHeader,
-                    role = request.interviewType.name,
-                    description = "Mock interview for ${request.interviewType.name}",
-                    yoes = request.experienceLevel ?: 0
-                )
-                Log.d(TAG, "Interview session created: ${if (sessionId != null) "SUCCESS (id=$sessionId)" else "NULL (FAILED)"}")
-                if (sessionId == null) {
-                    Log.e(TAG, "Failed to create interview session in database")
-                    return@withContext Result.failure(Exception("Failed to create interview session"))
-                }
-
-                // Generate first question
-                Log.d(TAG, "Generating first question for category=${request.interviewType.name}")
-                val firstQuestionResult = geminiAudioService.generateNextQuestion(
-                    category = request.interviewType.name,
-                    previousQuestions = emptyList(),
-                    userProfile = buildUserProfileContext(request)
-                )
-                Log.d(TAG, "First question generation result: ${if (firstQuestionResult.isSuccess) "SUCCESS" else "FAILED"}")
-
-                if (firstQuestionResult.isFailure) {
-                    val error = firstQuestionResult.exceptionOrNull() ?: Exception("Failed to generate question")
-                    Log.e(TAG, "Failed to generate first question", error)
-
-                    // Provide specific error message based on exception
-                    val userMessage = when {
-                        error.message?.contains("API key not configured") == true ->
-                            "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
-                        error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
-                            "AI Service authentication failed. Please check your API key in local.properties"
-                        error.message?.contains("HTTP 429") == true ->
-                            "AI Service rate limit exceeded. Please try again later"
-                        error.message?.contains("HTTP 5") == true ->
-                            "AI Service server error. Please try again later"
-                        else -> "Failed to generate interview question: ${error.message}"
+                    // Create new interview session in database
+                    Log.d(TAG, "Creating interview session for user=${neonUser.id}, role=$sessionRole, yoes=${request.experienceLevel ?: 0}")
+                    val newSessionId = createInterviewSession(
+                        userId = neonUser.id,
+                        authHeader = authHeader,
+                        role = sessionRole,
+                        description = sessionDesc,
+                        yoes = request.experienceLevel ?: 0
+                    )
+                    Log.d(TAG, "Interview session created: ${if (newSessionId != null) "SUCCESS (id=$newSessionId)" else "NULL (FAILED)"}")
+                    if (newSessionId == null) {
+                        Log.e(TAG, "Failed to create interview session in database")
+                        return@withContext Result.failure(Exception("Failed to create interview session"))
                     }
-
-                    return@withContext Result.failure(Exception(userMessage))
+                    sessionId = newSessionId
                 }
 
-                val questionData = firstQuestionResult.getOrNull()!!
-                val firstQuestion = LiveQuestion(
-                    liveMockInterviewId = sessionId,
-                    questionText = questionData.question,
-                    category = request.interviewType.name,
-                    correctAnswer = questionData.idealAnswer
-                )
+                // Generate first question OR reuse existing
+                val firstQuestion: LiveQuestion
 
-                Log.d(TAG, "Live interview started successfully: sessionId=$sessionId, questionText=${questionData.question.take(50)}...")
+                if (request.existingQuestions != null && request.existingQuestions.isNotEmpty()) {
+                     Log.d(TAG, "Reusing existing question for first question")
+                     val existing = request.existingQuestions.first()
+                     
+                     if (request.sessionId != null) {
+                         // Reusing existing session - just reset the object state locally
+                         // We reset the DB for ALL questions below if needed, or individually
+                         // For immediate mode, we might want to reset them all at start?
+                         // Let's reset all passed questions
+                         
+                          repositoryScope.launch {
+                             resetQuestionsInDatabase(request.existingQuestions, authHeader)
+                         }
+                         
+                         firstQuestion = existing.copy(
+                             userAnswer = null,
+                             feedback = null,
+                             rating = null,
+                             audioTranscript = null,
+                             duration = null
+                         )
+                     } else {
+                         // New session, new question object
+                         firstQuestion = LiveQuestion(
+                            liveMockInterviewId = sessionId,
+                            questionText = existing.questionText,
+                            category = existing.category,
+                            correctAnswer = existing.correctAnswer
+                        )
+                     }
+                } else {
+                    Log.d(TAG, "Generating first question for category=${request.interviewType.name}")
+                    val firstQuestionResult = geminiAudioService.generateNextQuestion(
+                        context = buildContextStr(request),
+                        category = request.interviewType.name,
+                        previousQuestions = emptyList()
+                    )
+                    Log.d(TAG, "First question generation result: ${if (firstQuestionResult.isSuccess) "SUCCESS" else "FAILED"}")
+    
+                    if (firstQuestionResult.isFailure) {
+                        val error = firstQuestionResult.exceptionOrNull() ?: Exception("Failed to generate question")
+                        Log.e(TAG, "Failed to generate first question", error)
+    
+                        // Provide specific error message based on exception
+                        val userMessage = when {
+                            error.message?.contains("API key not configured") == true ->
+                                "OpenRouter API key is not configured. Please add OPENROUTER_API_KEY to local.properties"
+                            error.message?.contains("HTTP 401") == true || error.message?.contains("HTTP 403") == true ->
+                                "AI Service authentication failed. Please check your API key in local.properties"
+                            error.message?.contains("HTTP 429") == true ->
+                                "AI Service rate limit exceeded. Please try again later"
+                            error.message?.contains("HTTP 5") == true ->
+                                "AI Service server error. Please try again later"
+                            else -> "Failed to generate interview question: ${error.message}"
+                        }
+    
+                        return@withContext Result.failure(Exception(userMessage))
+                    }
+    
+                    val questionData = firstQuestionResult.getOrNull()!!
+                    firstQuestion = LiveQuestion(
+                        liveMockInterviewId = sessionId,
+                        questionText = questionData.question,
+                        category = request.interviewType.name,
+                        correctAnswer = questionData.idealAnswer
+                    )
+                }
+
+                Log.d(TAG, "Live interview started successfully: sessionId=$sessionId, questionText=${firstQuestion.questionText.take(50)}...")
 
                 Result.success(StartInterviewResult(sessionId = sessionId, firstQuestion = firstQuestion))
 
@@ -322,7 +423,12 @@ class LiveInterviewRepository(
             Log.d(TAG, "Audio transcribed with Vosk: $transcription")
 
             // Step 2: Get AI feedback from Gemini (uses text, not audio)
+            // We use an empty request context for feedback generation as we don't have the original request here,
+            // but for feedback, the strict prompt requirements are less dependent on user bio than on the Q&A itself.
+            val contextStr = buildContextStr(StartLiveInterviewRequest.createEmpty())
+
             val feedbackResult = geminiAudioService.generateFeedback(
+                context = contextStr,
                 question = question.questionText,
                 userAnswer = transcription,
                 category = question.category
@@ -351,9 +457,9 @@ class LiveInterviewRepository(
             // Step 4: Generate next question if not last
             val nextQuestion = if (!isLastQuestion) {
                 val nextQuestionResult = geminiAudioService.generateNextQuestion(
+                    context = contextStr, // Reuse context
                     category = question.category,
-                    previousQuestions = previousQuestions + question.questionText,
-                    userProfile = null
+                    previousQuestions = previousQuestions + question.questionText
                 )
 
                 if (nextQuestionResult.isSuccess) {
@@ -463,15 +569,29 @@ class LiveInterviewRepository(
     }
 
     // Retrieves interview history
-    suspend fun getInterviewHistory(userId: String): Result<List<LiveMockInterviewSession>> =
+    suspend fun getInterviewHistory(clerkUserId: String): Result<List<LiveMockInterviewSession>> =
         withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "getInterviewHistory() called for clerkUserId=$clerkUserId")
+
                 val authToken = NeonAuth.fetchNeonAuthToken()
                 val authHeader = buildAuthorizationHeader(authToken)
                     ?: return@withContext Result.failure(Exception("Authentication failed"))
 
-                val encodedUserId = URLEncoder.encode(userId, "UTF-8")
+                // First, resolve the Neon User ID from the Clerk User ID
+                val neonUser = fetchNeonUserProfile(clerkUserId, authHeader)
+                if (neonUser == null) {
+                    Log.w(TAG, "Neon user not found for Clerk ID $clerkUserId. Returning empty history.")
+                    return@withContext Result.success(emptyList())
+                }
+
+                val neonUserId = neonUser.id
+                Log.d(TAG, "Resolved Neon User ID: $neonUserId")
+
+                val encodedUserId = URLEncoder.encode(neonUserId, "UTF-8")
                 val url = "${BuildConfig.NEON_API_URL}/LiveMockInterview?select=*&userId=eq.$encodedUserId&order=createdAt.desc&limit=20"
+
+                Log.d(TAG, "Fetching history from URL: $url")
 
                 val request = Request.Builder()
                     .url(url)
@@ -484,13 +604,61 @@ class LiveInterviewRepository(
                 val responseBody = response.body?.string()
 
                 if (!response.isSuccessful) {
+                    Log.e(TAG, "Failed to fetch interview history: HTTP ${response.code}, body=$responseBody")
                     throw IOException("Failed to fetch interview history: ${response.code}")
                 }
 
+                Log.d(TAG, "History fetch successful. Body length: ${responseBody?.length}")
+
                 // Parse response (simplified, you may need to adjust based on actual API response)
                 val sessions = mutableListOf<LiveMockInterviewSession>()
-                // TODO: Parse JSON response and convert to LiveMockInterviewSession objects
+                val jsonArray = JSONArray(responseBody)
+                
+                for (i in 0 until jsonArray.length()) {
+                    val item = jsonArray.getJSONObject(i)
+                    
+                    // Parse dates
+                    val createdAtStr = item.optString("createdAt")
+                    // Robust date parsing
+                    val startedAt = try {
+                        if (createdAtStr.isNotEmpty()) {
+                            try {
+                                java.time.Instant.parse(createdAtStr).toEpochMilli()
+                            } catch (e: Exception) {
+                                try {
+                                    java.time.OffsetDateTime.parse(createdAtStr).toInstant().toEpochMilli()
+                                } catch (e2: Exception) {
+                                    // Fallback for simple ISO local date time (assume UTC)
+                                    java.time.LocalDateTime.parse(createdAtStr).toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
+                                }
+                            }
+                        } else null
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to parse date: $createdAtStr", e)
+                        null 
+                    }
+                    
+                    // Map role to InterviewType if possible, otherwise default
+                    val role = item.optString("role")
+                    val interviewType = try {
+                        InterviewType.valueOf(role)
+                    } catch (e: Exception) {
+                        InterviewType.GENERAL
+                    }
+                    
+                    val session = LiveMockInterviewSession(
+                        id = item.optString("id"),
+                        userId = item.optString("userId"),
+                        interviewType = interviewType,
+                        status = InterviewStatus.COMPLETED, // Assuming history items are past/completed
+                        jobTitle = role, // Use role as job title for display
+                        jobDescription = item.optString("description"),
+                        startedAt = startedAt
+                    )
+                    sessions.add(session)
+                }
 
+                Log.d(TAG, "Parsed ${sessions.size} sessions")
                 Result.success(sessions)
 
             } catch (e: Exception) {
@@ -498,6 +666,92 @@ class LiveInterviewRepository(
                 Result.failure(e)
             }
         }
+
+    // Retrieves questions for a specific session
+    suspend fun getQuestionsForSession(sessionId: String): Result<List<LiveQuestion>> =
+        withContext(Dispatchers.IO) {
+             try {
+                Log.d(TAG, "getQuestionsForSession() called for sessionId=$sessionId")
+                
+                val authToken = NeonAuth.fetchNeonAuthToken()
+                val authHeader = buildAuthorizationHeader(authToken)
+                    ?: return@withContext Result.failure(Exception("Authentication failed"))
+                    
+                val url = "${BuildConfig.NEON_API_URL}/LiveInterviewQuestion?select=*&liveMockInterviewId=eq.$sessionId&order=createdAt.asc"
+                
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", authHeader)
+                    .addHeader("Content-Type", "application/json")
+                    .get()
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
+
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Failed to fetch questions: HTTP ${response.code}")
+                    throw IOException("Failed to fetch questions: ${response.code}")
+                }
+                
+                val questions = mutableListOf<LiveQuestion>()
+                val jsonArray = JSONArray(responseBody)
+                
+                for (i in 0 until jsonArray.length()) {
+                    val item = jsonArray.getJSONObject(i)
+                    val q = LiveQuestion(
+                        id = item.optString("id"),
+                        liveMockInterviewId = item.optString("liveMockInterviewId"),
+                        questionText = item.getString("question"),
+                        category = item.optString("category", "General"),
+                        correctAnswer = item.optString("correctAnswer"),
+                        userAnswer = item.optString("userAnswer").takeIf { it != "null" },
+                        feedback = item.optString("feedback").takeIf { it != "null" },
+                        rating = if (item.isNull("rating")) null else item.getInt("rating")
+                    )
+                    questions.add(q)
+                }
+                
+                Log.d(TAG, "Fetched ${questions.size} questions for session $sessionId")
+                Result.success(questions)
+
+             } catch (e: Exception) {
+                 Log.e(TAG, "Error fetching questions for session", e)
+                 Result.failure(e)
+             }
+        }
+
+
+        
+    private suspend fun resetQuestionsInDatabase(questions: List<LiveQuestion>, authHeader: String) {
+        questions.forEach { question ->
+            try {
+                // Reset fields to null/empty in DB
+                val payload = JSONObject().apply {
+                    put("userAnswer", JSONObject.NULL)
+                    put("feedback", JSONObject.NULL)
+                    put("rating", JSONObject.NULL)
+                    put("updatedAt", java.time.Instant.now().toString())
+                }
+                
+                // Using LiveInterviewQuestion endpoint with PATCH
+                 val url = "${BuildConfig.NEON_API_URL}/LiveInterviewQuestion?id=eq.${question.id}"
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", authHeader)
+                    .addHeader("Content-Type", "application/json")
+                    .patch(payload.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val response = client.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Failed to reset question ${question.id}: ${response.code}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resetting question ${question.id}", e)
+            }
+        }
+    }
 
     // Processes batch answers
     suspend fun processBatchAnswers(
@@ -512,8 +766,11 @@ class LiveInterviewRepository(
                 Triple(question.questionText, transcription, question.category)
             }
 
+            // Fetch context
+            val contextStr = buildContextStr(StartLiveInterviewRequest.createEmpty())
+
             // Generate batch feedback
-            val feedbackResult = geminiAudioService.generateBatchFeedback(feedbackInput)
+            val feedbackResult = geminiAudioService.generateBatchFeedback(contextStr, feedbackInput)
             
             if (feedbackResult.isFailure) {
                 return@withContext Result.failure(
@@ -521,12 +778,11 @@ class LiveInterviewRepository(
                 )
             }
 
+            
             val feedbackList = feedbackResult.getOrNull()!!
             
             // Update questions with feedback and save to database
-            val authToken = NeonAuth.fetchNeonAuthToken()
-            val authHeader = buildAuthorizationHeader(authToken)
-                ?: return@withContext Result.failure(Exception("Authentication failed"))
+            // Auth headers are already available from above
 
             val updatedQuestions = questionsAndAnswers.mapIndexed { index, (question, transcription, _) ->
                 val feedback = if (index < feedbackList.size) feedbackList[index] else null
@@ -537,8 +793,12 @@ class LiveInterviewRepository(
                     feedback = feedback?.feedback,
                     rating = feedback?.rating
                 ).also { updatedQuestion ->
-                    // Update question in database with feedback
-                    updateQuestionInDatabase(updatedQuestion, authHeader)
+                    val authToken = NeonAuth.fetchNeonAuthToken()
+                    val authHeader = buildAuthorizationHeader(authToken)
+                    if (authHeader != null) {
+                        // Update question in database with feedback
+                        updateQuestionInDatabase(updatedQuestion, authHeader)
+                    }
                 }
             }
 
@@ -803,30 +1063,72 @@ class LiveInterviewRepository(
         }
     }
 
-    private fun buildUserProfileContext(request: StartLiveInterviewRequest): String {
-        val parts = mutableListOf<String>()
+    private suspend fun buildContextStr(
+        request: StartLiveInterviewRequest
+    ): String = withContext(Dispatchers.IO) {
+         // Use only Request data (from UI inputs)
+         val contextIndustry = request.industry ?: "Technology"
+         val contextYoE = request.experienceLevel?.toString() ?: "0"
+         val contextSkills = request.skills 
+         
+         // Helper to format resume into bio
+         suspend fun getFormattedResume(): String {
+             val resumeId = request.resumeId ?: return request.resumeContent ?: ""
+             
+             // If we have an ID but content is already filled, prefer content? 
+             // Logic: If user specifically clicked "refresh", the ID is new. 
+             // But StartLiveInterviewRequest might have content passed from a previous screen if manually copied.
+             // We stick to ID if present for freshness.
+             
+             val repo = com.phamnhantucode.aicareercoach.data.resume.ResumeRepository.getInstance(context)
+             val resume = repo.getResume(resumeId).getOrNull() ?: return request.resumeContent ?: ""
+             
+             // Format similar to ResumeEnhancementRepository.buildResumeText but concise
+             return buildString {
+                 appendLine("RESUME SUMMARY:")
+                 appendLine("Profession: ${resume.personalInfo.profession}")
+                 
+                 if (resume.workExperiences.isNotEmpty()) {
+                    appendLine("Experience:")
+                    resume.workExperiences.take(3).forEach { exp ->
+                        appendLine("- ${exp.jobTitle} at ${exp.company}: ${exp.responsibilities.take(2).joinToString("; ")}")
+                    }
+                 }
+                 
+                 if (resume.education.isNotEmpty()) {
+                    val latestEdu = resume.education.first()
+                    appendLine("Education: ${latestEdu.degree} at ${latestEdu.institution}")
+                 }
+                 
+                 if (resume.skills.isNotEmpty()) {
+                    appendLine("Skills: ${resume.skills.joinToString(", ")}")
+                 }
+                 
+                 // Append original content if any as backup or specific notes
+                 if (!request.resumeContent.isNullOrBlank()) {
+                     appendLine(" Additional Notes: ${request.resumeContent}")
+                 }
+             }
+         }
 
-        // Add job context first (most important)
-        if (request.jobTitle.isNotBlank()) {
-            parts.add("Target Job Title: ${request.jobTitle}")
-        }
-        if (request.jobDescription.isNotBlank()) {
-            parts.add("Job Description: ${request.jobDescription}")
-        }
+         val resumeBio = getFormattedResume()
 
-        request.industry?.let { parts.add("Industry: $it") }
-        request.experienceLevel?.let { parts.add("Experience: $it years") }
-
-        if (request.skills.isNotEmpty()) {
-            parts.add("Skills: ${request.skills.joinToString(", ")}")
-        }
-
-        // Add resume context if available
-        if (!request.resumeContent.isNullOrBlank()) {
-            parts.add("Candidate Resume Summary: ${request.resumeContent}")
-        }
-
-        return parts.joinToString(" | ")
+         // Combine Job context into Bio
+         var contextBio = resumeBio
+         if (request.jobTitle.isNotBlank()) {
+             contextBio = "Target Job: ${request.jobTitle}. $contextBio"
+         }
+         if (request.jobDescription.isNotBlank()) {
+             contextBio = "$contextBio. Job Desc: ${request.jobDescription}"
+         }
+         
+         return@withContext """
+             CONTEXT:
+             - Role/Industry: ${contextIndustry}
+             - Experience: ${contextYoE} years
+             - Core Skills: ${contextSkills.joinToString(", ")}
+             - Background: ${contextBio}
+         """.trimIndent()
     }
 
     /**

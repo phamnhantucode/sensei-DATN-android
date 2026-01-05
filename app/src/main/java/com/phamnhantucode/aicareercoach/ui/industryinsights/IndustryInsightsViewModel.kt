@@ -163,26 +163,7 @@ class IndustryInsightsViewModel(
                 return@launch
             }
 
-            // Sync user to get latest isPaid status, but don't fail properly if it fails (already handled in repo)
-            // Ideally repo.loadIndustryInsights should return the user object or we should fetch it separately purely for UI.
-            // For now, let's just fetch it again or rely on what we have.
-            // Actually, `loadIndustryInsights` already syncs user but doesn't return it.
-            // We should modify repository to return isPaid or fetch it here.
-            // Since repo is complex, let's quickly fetch user here to update UI state isPaid.
-            try {
-                val user = Clerk.user
-                if (user != null) {
-                    val email = user.emailAddresses.firstOrNull()?.emailAddress
-                    if (email != null) {
-                         NeonUserService.syncUser(user.id, email).onSuccess { neonUser ->
-                             _uiState.update { it.copy(isPaid = neonUser.isPaid) }
-                         }
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore sync error here as main data loaded
-                Log.w(TAG, "Failed to sync user for premium status check", e)
-            }
+            // User sync is now handled within repository.loadIndustryInsights returning isPaid status.
 
             handleLoadedInsights(loadResult)
             if (!loadResult.needsRefresh) return@launch
@@ -322,7 +303,8 @@ class IndustryInsightsViewModel(
                     errorMessage = null,
                     creditBalance = loadResult.creditBalance,
                     isOnboardingRequired = false,
-                    isSubmittingOnboarding = false
+                    isSubmittingOnboarding = false,
+                    isPaid = loadResult.isPaid
                 )
             }
         } else {
@@ -334,7 +316,8 @@ class IndustryInsightsViewModel(
                     selectedIndustryId = null,
                     errorMessage = null,
                     creditBalance = loadResult.creditBalance,
-                    isOnboardingRequired = true // No insights found means potentially new user
+                    isOnboardingRequired = true, // No insights found means potentially new user
+                    isPaid = loadResult.isPaid
                 )
             }
         }

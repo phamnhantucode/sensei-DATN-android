@@ -53,14 +53,23 @@ class CoverLetterRepository(
             
             val creditDescription = "Generate ${type.displayName}"
             com.phamnhantucode.aicareercoach.data.neon.NeonUserService.deductCredit(neonUser.id, 1, creditDescription, authHeader)
-
-            fetchUserProfile(user.id, authHeader)
+            
+            // We do NOT fetch user profile here to avoid contaminating the prompt with onboarding data.
+            // We rely on inputs provided by the user in the form.
         }
 
-        val prompt = buildEmailPrompt(
+        val candidateProfile = """
+            CANDIDATE PROFILE:
+            - Role/Industry: ${inputs["userIndustry"] ?: "Unspecified"}
+            - Experience: ${inputs["userExperience"] ?: "Not specified"} years
+            - Core Skills: ${inputs["userSkills"] ?: "Not specified"}
+            - Background: ${inputs["userBio"] ?: "Not specified"}
+        """.trimIndent()
+
+        val prompt = com.phamnhantucode.aicareercoach.data.ai.PromptFactory.createCoverLetterPrompt(
+            context = candidateProfile,
             type = type,
-            inputs = inputs,
-            userProfile = userProfile
+            inputs = inputs
         )
 
         try {
@@ -208,97 +217,7 @@ class CoverLetterRepository(
         }
     }
 
-    private fun buildEmailPrompt(
-        type: EmailType,
-        inputs: Map<String, String>,
-        userProfile: UserProfile
-    ): String {
-        val companyName = inputs["companyName"] ?: ""
-        val recipientName = inputs["recipientName"]?.takeIf { it.isNotBlank() } ?: "Hiring Manager"
-        val jobTitle = inputs["jobTitle"] ?: ""
-        
 
-        val userContext = """
-            User Profile:
-            - Industry: ${userProfile.industry}
-            - Experience: ${userProfile.experience ?: "Not specified"} years
-            - Skills: ${userProfile.skills.joinToString(", ")}
-            - Bio: ${userProfile.bio}
-        """.trimIndent()
-
-        return when (type) {
-            EmailType.APPLICATION -> {
-                val jobDescription = inputs["jobDescription"] ?: ""
-                """
-                Role: Expert Career Coach & Professional Copywriter
-                Goal: Write a tailored Cover Letter for a $jobTitle position at $companyName.
-                Recipient: $recipientName
-                Input Data:
-                - $userContext
-                - Job Description: $jobDescription
-                
-                Instructions:
-                1. Analyze the JD to identify top 3 critical skills.
-                2. Map User's experience to these skills with specific examples.
-                3. Express genuine enthusiasm for the company/role.
-                4. Tone: Professional, Confident, and Persuasive.
-                5. Format: Standard Business Letter (Markdown).
-                """.trimIndent()
-            }
-            EmailType.PROSPECTING -> {
-                val context = inputs["context"] ?: ""
-                val targetRole = inputs["targetRole"] ?: ""
-                """
-                Role: Professional Networker
-                Goal: Write a concise Cold Email to $recipientName at $companyName.
-                Context: $context
-                
-                $userContext
-                
-                Instructions:
-                1. Hook the reader immediately in the first sentence (refer to Context).
-                2. Briefly introduce yourself and your value proposition related to $targetRole.
-                3. Keep it extremely short (under 150 words).
-                4. Include a soft Call-to-Action (e.g., "Open to a 10-min coffee chat?").
-                5. Tone: Polite, Respectful, but Direct. Avoid generic fluff.
-                """.trimIndent()
-            }
-            EmailType.REFERRAL -> {
-                val relationship = inputs["relationship"] ?: ""
-                val targetJob = inputs["targetJob"] ?: ""
-                """
-                Role: Professional Communicator
-                Goal: Write a Referral Request email to $recipientName for a role at $companyName.
-                Relationship Context: $relationship
-                Target Job: $targetJob
-                
-                $userContext
-                
-                Instructions:
-                1. Start with a warm, personalized greeting based on the $relationship.
-                2. Clearly state your intention to apply for $companyName.
-                3. Explain briefly why you are a good fit (so they feel confident referring you).
-                4. Important: Include a "blurb" (short summary) at the end that they can easily copy-paste to forward to HR.
-                5. Tone: Grateful and Low-pressure.
-                """.trimIndent()
-            }
-            EmailType.THANK_YOU -> {
-                val topic = inputs["topic"] ?: ""
-                """
-                Role: Courteous Professional
-                Goal: Write a Thank You Follow-up email to $recipientName at $companyName.
-                Key Topic Discussed: $topic
-                
-                Instructions:
-                1. Express sincere gratitude for their time.
-                2. Reference the $topic to show you were listening and engaged.
-                3. Reiterate your excitement for the role and how you can add value.
-                4. Keep it timely (within 24h context).
-                5. Tone: Warm, Professional, and Appreciative.
-                """.trimIndent()
-            }
-        }
-    }
 
     private suspend fun resolveAuthorizationHeader(forceRefresh: Boolean = false): String? {
         val bearer = if (forceRefresh) {

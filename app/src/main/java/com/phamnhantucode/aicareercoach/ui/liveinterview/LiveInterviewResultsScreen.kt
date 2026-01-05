@@ -187,7 +187,7 @@ fun LiveInterviewResultsScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Retry Same Interview",
+                        text = "Restart Session",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }

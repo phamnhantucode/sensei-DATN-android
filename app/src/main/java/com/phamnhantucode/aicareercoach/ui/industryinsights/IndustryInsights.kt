@@ -468,8 +468,47 @@ private fun HeaderSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Credit Balance Display
-                    if (creditBalance != null && !isPaid) {
+                    // Credit Balance or PRO Display
+                    if (isPaid) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp), // Check web usage: rounded-full
+                            color = Color.Transparent, // Using gradient via modifier
+                            shadowElevation = 4.dp, // shadow-lg
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(
+                                                Color(0xFFF59E0B), // amber-500
+                                                Color(0xFFEAB308)  // yellow-500
+                                            )
+                                        )
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp), // px-2 py-1
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp) // gap-1
+                                ) {
+                                    // Crown Icon (using custom asset)
+                                    Icon(
+                                        painter = androidx.compose.ui.res.painterResource(id = com.phamnhantucode.aicareercoach.R.drawable.ic_crown), 
+                                        contentDescription = "PRO Account",
+                                        modifier = Modifier.size(12.dp), // h-3 w-3 (12dp matches approx)
+                                        tint = Color.White
+                                    )
+                                    Text(
+                                        text = "PRO",
+                                        style = MaterialTheme.typography.labelSmall, // text-[10px]
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    } else if (creditBalance != null) {
                         Surface(
                             shape = RoundedCornerShape(24.dp),
                             color = MaterialTheme.colorScheme.surface,

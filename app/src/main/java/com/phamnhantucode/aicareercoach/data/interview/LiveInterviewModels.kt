@@ -89,6 +89,7 @@ data class CategoryPerformance(
 )
 
 // Start request
+
 data class StartLiveInterviewRequest(
     val userId: String,
     val interviewType: InterviewType,
@@ -98,8 +99,28 @@ data class StartLiveInterviewRequest(
     val skills: List<String> = emptyList(),
     val jobTitle: String = "",
     val jobDescription: String = "",
-    val resumeContent: String? = null
-)
+    val resumeContent: String? = null,
+    val resumeId: String? = null,
+    val existingQuestions: List<LiveQuestion>? = null,
+    val sessionId: String? = null
+) {
+    companion object {
+        fun createEmpty() = StartLiveInterviewRequest(
+            userId = "", // userId is required, assuming an empty string for empty state
+            interviewType = InterviewType.BEHAVIORAL,
+            questionCount = 0, // questionCount is required, assuming 0 for empty state
+            jobTitle = "",
+            jobDescription = "",
+            industry = null,
+            experienceLevel = null,
+            skills = emptyList(), // skills is required, assuming emptyList for empty state
+            resumeContent = null,
+            resumeId = null,
+            existingQuestions = null,
+            sessionId = null
+        )
+    }
+}
 
 // Network models
 data class LiveMockInterviewDto(

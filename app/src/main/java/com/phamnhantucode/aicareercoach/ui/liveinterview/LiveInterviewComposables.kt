@@ -1,6 +1,7 @@
 package com.phamnhantucode.aicareercoach.ui.liveinterview
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -130,7 +131,7 @@ fun QuestionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -164,6 +165,7 @@ fun QuestionCard(
 @Composable
 fun FeedbackCard(
     transcription: String,
+    expectedAnswer: String?,
     feedback: String,
     rating: Int,
     modifier: Modifier = Modifier
@@ -209,6 +211,32 @@ fun FeedbackCard(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (!expectedAnswer.isNullOrBlank()) {
+                Text(
+                    text = "Expected Answer",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                ) {
+                    Text(
+                        text = expectedAnswer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Text(
                 text = "AI Feedback",
@@ -507,4 +535,311 @@ private fun StatItem(
 private fun formatDuration(seconds: Long): String {
     val minutes = seconds / 60
     return if (minutes > 0) "${minutes}m" else "${seconds}s"
+}
+
+@Composable
+fun InterviewHistoryShimmerItem(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Icon placeholder
+                    com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape),
+                        shimmerProgress = rememberInfiniteTransition(label = "shimmerIcon").animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "progressIcon"
+                        ).value
+                    )
+                    
+                    // Text placeholder
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                            modifier = Modifier
+                                .width(120.dp)
+                                .height(16.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            shimmerProgress = rememberInfiniteTransition(label = "shimmerTitle").animateFloat(
+                                initialValue = 0f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Restart
+                                ),
+                                label = "progressTitle"
+                            ).value
+                        )
+                         com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                            modifier = Modifier
+                                .width(80.dp)
+                                .height(12.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            shimmerProgress = rememberInfiniteTransition(label = "shimmerDate").animateFloat(
+                                initialValue = 0f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Restart
+                                ),
+                                label = "progressDate"
+                            ).value
+                        )
+                    }
+                }
+                
+                // Status badge placeholder
+                com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                    modifier = Modifier
+                        .width(60.dp)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    shimmerProgress = rememberInfiniteTransition(label = "shimmerStatus").animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "progressStatus"
+                    ).value
+                )
+            }
+        }
+    }
+}
+
+// Shimmer loading view for Live Interview
+@Composable
+fun LiveInterviewLoadingView(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header: Progress indicator placeholder
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                    modifier = Modifier
+                        .width(60.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    shimmerProgress = rememberInfiniteTransition(label = "shimmer").animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "progress"
+                    ).value
+                )
+                com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    shimmerProgress = rememberInfiniteTransition(label = "shimmer2").animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "progress2"
+                    ).value
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                shimmerProgress = rememberInfiniteTransition(label = "shimmer3").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "progress3"
+                ).value
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Body: Question Card placeholder
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(16.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        shimmerProgress = rememberInfiniteTransition(label = "shimmer4").animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "progress4"
+                        ).value
+                    )
+                    com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        shimmerProgress = rememberInfiniteTransition(label = "shimmer5").animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "progress5"
+                        ).value
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Question text lines
+                repeat(3) {
+                    com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                        modifier = Modifier
+                            .fillMaxWidth(if (it == 2) 0.6f else 1f)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        shimmerProgress = rememberInfiniteTransition(label = "shimmerText$it").animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "progressText$it"
+                        ).value
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Loading message centered in card
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                   Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    ) 
+                }
+                
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Footer: Controls placeholder
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Hint Card
+             com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                shimmerProgress = rememberInfiniteTransition(label = "shimmerFooter1").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "progressFooter1"
+                ).value
+            )
+
+            // Mic Button
+            com.phamnhantucode.aicareercoach.ui.components.ShimmerBox(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape),
+                shimmerProgress = rememberInfiniteTransition(label = "shimmerMic").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "progressMic"
+                ).value
+            )
+        }
+    }
 }

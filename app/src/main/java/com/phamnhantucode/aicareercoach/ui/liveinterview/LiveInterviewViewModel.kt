@@ -57,6 +57,55 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
 
     private val _showCreditDialog = MutableStateFlow(false)
     val showCreditDialog: StateFlow<Boolean> = _showCreditDialog.asStateFlow()
+
+    private val _interviewHistory = MutableStateFlow<List<LiveMockInterviewSession>>(emptyList())
+    val interviewHistory: StateFlow<List<LiveMockInterviewSession>> = _interviewHistory.asStateFlow()
+
+    private val _isHistoryLoading = MutableStateFlow(false)
+    val isHistoryLoading: StateFlow<Boolean> = _isHistoryLoading.asStateFlow()
+
+    init {
+        loadInterviewHistory()
+    }
+
+    fun loadInterviewHistory() {
+        val user = com.clerk.api.Clerk.user
+        if (user != null) {
+            viewModelScope.launch {
+                _isHistoryLoading.value = true
+                val result = repository.getInterviewHistory(user.id)
+                if (result.isSuccess) {
+                    _interviewHistory.value = result.getOrNull() ?: emptyList()
+                } else {
+                    Log.e(TAG, "Failed to load interview history", result.exceptionOrNull())
+                }
+                _isHistoryLoading.value = false
+            }
+        }
+    }
+
+    fun viewInterviewResults(session: LiveMockInterviewSession) {
+        viewModelScope.launch {
+            _uiState.value = LiveInterviewUiState.LoadingNextQuestion // Reusing loading state visuals or create a specific one
+            
+            val questionsResult = repository.getQuestionsForSession(session.id)
+            if (questionsResult.isSuccess) {
+                val questions = questionsResult.getOrNull() ?: emptyList()
+                
+                // Calculate summary
+                val summaryResult = repository.completeInterview(session.id, questions)
+                if (summaryResult.isSuccess) {
+                    _uiState.value = LiveInterviewUiState.Completed(summaryResult.getOrNull()!!)
+                } else {
+                    _errorMessage.value = "Failed to load interview summary"
+                    _uiState.value = LiveInterviewUiState.Setup
+                }
+            } else {
+                _errorMessage.value = "Failed to load interview questions"
+                _uiState.value = LiveInterviewUiState.Setup
+            }
+        }
+    }
     
     // Store the last interview config for retry
     private var lastInterviewConfig: InterviewConfig? = null
@@ -96,6 +145,18 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                 _uiState.value = LiveInterviewUiState.Starting
                 _useBatchMode.value = true
 
+                // Check if we are retrying a previous session
+                var existingQuestions: List<LiveQuestion>? = null
+                if (config.previousSessionId != null) {
+                    val historyResult = repository.getQuestionsForSession(config.previousSessionId)
+                    if (historyResult.isSuccess) {
+                        existingQuestions = historyResult.getOrNull()
+                        Log.d(TAG, "Retrieved ${existingQuestions?.size} existing questions for retry")
+                    } else {
+                        Log.w(TAG, "Failed to retrieve existing questions for retry", historyResult.exceptionOrNull())
+                    }
+                }
+
                 val request = StartLiveInterviewRequest(
                     userId = config.userId,
                     interviewType = config.interviewType,
@@ -105,7 +166,9 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     skills = config.skills,
                     jobTitle = config.jobTitle,
                     jobDescription = config.jobDescription,
-                    resumeContent = config.resumeContent
+                    resumeContent = config.resumeContent,
+                    existingQuestions = existingQuestions,
+                    sessionId = config.previousSessionId
                 )
                 Log.d(TAG, "Created StartLiveInterviewRequest: $request")
 
@@ -177,14 +240,65 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         }
     }
     
-    // Retries the last interview with same settings
+    // Restarts the current session with the exact same questions
+    fun restartSession() {
+        val session = _interviewSession.value
+        // Get questions from either allQuestions (batch) or answeredQuestions (immediate)
+        val questionsToReuse = if (_allQuestions.value.isNotEmpty()) {
+            _allQuestions.value
+        } else {
+            answeredQuestions.map { it.copy(userAnswer = null, feedback = null, rating = null) }
+        }
+
+        if (session != null && questionsToReuse.isNotEmpty()) {
+            Log.d(TAG, "Restarting session with ${questionsToReuse.size} existing questions")
+            
+            // 1. Save config and generic reset
+            stopTimer()
+            _interviewDuration.value = 0
+            _currentFeedback.value = null
+            userAnswers.clear()
+            answeredQuestions.clear()
+
+            // 2. Prepare clean existing questions
+            val cleanQuestions = questionsToReuse.map { 
+                it.copy(userAnswer = null, feedback = null, rating = null) 
+            }
+            
+            // 3. Set generic Live data
+            _allQuestions.value = cleanQuestions
+            _currentQuestionIndex.value = 0
+            _currentQuestion.value = cleanQuestions.first()
+            _questionStartTime.value = System.currentTimeMillis()
+
+            // 4. Create new session object based on previous one but reset
+            _interviewSession.value = session.copy(
+                status = InterviewStatus.IN_PROGRESS,
+                currentQuestionIndex = 0,
+                startedAt = System.currentTimeMillis(),
+                questions = cleanQuestions
+            )
+
+            // 5. Navigate
+            if (_useBatchMode.value) {
+                _uiState.value = LiveInterviewUiState.AnswerCollection
+            } else {
+                _uiState.value = LiveInterviewUiState.ActiveQuestion
+            }
+            
+            startTimer()
+        } else {
+            Log.w(TAG, "Cannot restart session: missing session or questions. Falling back to retryInterview.")
+            retryInterview()
+        }
+    }
+
+    // Retries the last interview with same settings (New Questions)
     fun retryInterview() {
         val config = lastInterviewConfig
         if (config != null) {
-            Log.d(TAG, "Retrying interview with saved config")
-            // Reset state first
+            Log.d(TAG, "Retrying interview with saved config (New Questions)")
             resetInterviewState()
-            // Start new interview with same config
             startInterview(config)
         } else {
             Log.w(TAG, "No saved config for retry, going back to setup")
@@ -194,6 +308,9 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
     
     // Checks if retry is available
     fun canRetry(): Boolean = lastInterviewConfig != null
+    
+    // Checks if restart (reuse questions) is available
+    fun canRestart(): Boolean = _allQuestions.value.isNotEmpty() || answeredQuestions.isNotEmpty()
     
     private fun resetInterviewState() {
         stopTimer()
@@ -216,6 +333,18 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                 _uiState.value = LiveInterviewUiState.Starting
                 _useBatchMode.value = false
 
+                // Check if we are retrying a previous session
+                var existingQuestions: List<LiveQuestion>? = null
+                if (config.previousSessionId != null) {
+                    val historyResult = repository.getQuestionsForSession(config.previousSessionId)
+                    if (historyResult.isSuccess) {
+                        existingQuestions = historyResult.getOrNull()
+                        Log.d(TAG, "Retrieved ${existingQuestions?.size} existing questions for retry")
+                    } else {
+                        Log.w(TAG, "Failed to retrieve existing questions for retry", historyResult.exceptionOrNull())
+                    }
+                }
+
                 val request = StartLiveInterviewRequest(
                     userId = config.userId,
                     interviewType = config.interviewType,
@@ -225,7 +354,9 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
                     skills = config.skills,
                     jobTitle = config.jobTitle,
                     jobDescription = config.jobDescription,
-                    resumeContent = config.resumeContent
+                    resumeContent = config.resumeContent,
+                    existingQuestions = existingQuestions,
+                    sessionId = config.previousSessionId
                 )
                 Log.d(TAG, "Created StartLiveInterviewRequest: $request")
 
@@ -379,32 +510,54 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         userAnswers[_currentQuestionIndex.value] = transcription
 
         // Save to database in background
-        repository.saveUserAnswer(question.id, session.id, transcription)
+        // repository.saveUserAnswer(question.id, session.id, transcription)
 
         // Clean up audio file
         audioFile.delete()
 
-        // Move to next question or finish
-        val nextIndex = _currentQuestionIndex.value + 1
-        val allQuestionsList = _allQuestions.value
+        // Move to review state instead of auto-advance
+        _uiState.value = LiveInterviewUiState.ReviewingAnswer(transcription)
+    }
 
-        if (nextIndex >= allQuestionsList.size) {
-            // All questions answered - start batch feedback processing
-            processBatchFeedback(session.id, allQuestionsList)
-        } else {
-            // Move to next question
-            _currentQuestionIndex.value = nextIndex
-            _currentQuestion.value = allQuestionsList[nextIndex]
-            _questionStartTime.value = System.currentTimeMillis()
-            
-            // Update session
-            _interviewSession.value = session.copy(currentQuestionIndex = nextIndex)
-            
-            // Reset audio recorder for next question
-            audioRecorder.reset()
-            
-            _uiState.value = LiveInterviewUiState.AnswerCollection
+    // Confirms answer and moves to next question
+    fun confirmAnswer(finalAnswer: String) {
+        val question = _currentQuestion.value ?: return
+        val session = _interviewSession.value ?: return
+
+        viewModelScope.launch {
+            // Save user answer
+            userAnswers[_currentQuestionIndex.value] = finalAnswer
+
+            // Save to database in background
+            repository.saveUserAnswer(question.id, session.id, finalAnswer)
+
+            // Move to next question or finish
+            val nextIndex = _currentQuestionIndex.value + 1
+            val allQuestionsList = _allQuestions.value
+
+            if (nextIndex >= allQuestionsList.size) {
+                // All questions answered - start batch feedback processing
+                processBatchFeedback(session.id, allQuestionsList)
+            } else {
+                // Move to next question
+                _currentQuestionIndex.value = nextIndex
+                _currentQuestion.value = allQuestionsList[nextIndex]
+                _questionStartTime.value = System.currentTimeMillis()
+
+                // Update session
+                _interviewSession.value = session.copy(currentQuestionIndex = nextIndex)
+
+                // Reset audio recorder for next question
+                audioRecorder.reset()
+
+                _uiState.value = LiveInterviewUiState.AnswerCollection
+            }
         }
+    }
+
+    // Retakes recording
+    fun retakeRecording() {
+        _uiState.value = LiveInterviewUiState.AnswerCollection
     }
 
     private suspend fun processImmediateFeedback(audioFile: File, question: LiveQuestion, session: LiveMockInterviewSession) {
@@ -488,38 +641,84 @@ class LiveInterviewViewModel(application: Application) : AndroidViewModel(applic
         val nextIndex = session.currentQuestionIndex + 1
 
         if (nextIndex >= session.targetQuestionCount) {
-            // Interview complete
-            completeInterview()
+             // If manual "Next" is clicked on last question, it should probably complete or show confirmation
+             // For now, let's treat it as complete if we are at the end
+             if (answeredQuestions.size >= session.targetQuestionCount) {
+                 completeInterview()
+             } else {
+                 // Or loop back / stay? Let's just complete for now or maybe just do nothing if not all answered?
+                 // If "Next" is "Skip", we might want to allow finishing even with skips?
+                 // Let's assume Next on last question = Complete attempt
+                 completeInterview()
+             }
         } else {
-            // Load next question from the feedback result
-            viewModelScope.launch {
-                try {
-                    _uiState.value = LiveInterviewUiState.LoadingNextQuestion
+            // Load next question
+            loadQuestionAtIndex(nextIndex)
+        }
+    }
 
-                    // Get next question from cache or generate new one
-                    val feedback = _currentFeedback.value
-                    val nextQuestion = feedback?.nextQuestion
+    // Go to previous question
+    fun goToPreviousQuestion() {
+        val session = _interviewSession.value ?: return
+        val prevIndex = session.currentQuestionIndex - 1
 
-                    if (nextQuestion != null) {
-                        _interviewSession.value = session.copy(currentQuestionIndex = nextIndex)
-                        _currentQuestion.value = nextQuestion
-                        _currentFeedback.value = null
-                        _questionStartTime.value = System.currentTimeMillis()
-                        
-                        // Reset audio recorder state for next question
-                        audioRecorder.reset()
-                        
-                        _uiState.value = LiveInterviewUiState.ActiveQuestion
+        if (prevIndex >= 0) {
+            loadQuestionAtIndex(prevIndex)
+        }
+    }
+
+    private fun loadQuestionAtIndex(index: Int) {
+         val session = _interviewSession.value ?: return
+         
+         viewModelScope.launch {
+            try {
+                // If moving away from current question, we might want to save draft or cancel recording?
+                // audioRecorder.cancelRecording() // Ensure recording is stopped
+
+                _uiState.value = LiveInterviewUiState.LoadingNextQuestion
+
+                // Get question at index
+                var targetQuestion: LiveQuestion? = null
+                
+                // 1. Check if we have pre-loaded questions (Restart/Reused mode/Batch)
+                if (index < _allQuestions.value.size) {
+                     targetQuestion = _allQuestions.value[index]
+                }
+                
+                // 2. If not found in list, try feedback (Standard Immediate mode - harder for random access)
+                // For Immediate mode, we usually only have history. 
+                // But this feature is primarily for Batch/Live where we have the list.
+                
+                if (targetQuestion != null) {
+                    _interviewSession.value = session.copy(currentQuestionIndex = index)
+                    _currentQuestion.value = targetQuestion
+                    _currentFeedback.value = null
+                    _questionStartTime.value = System.currentTimeMillis()
+                    
+                    // Update index state
+                    _currentQuestionIndex.value = index
+                    
+                    // Reset audio recorder state
+                    audioRecorder.reset()
+                    
+                    // Check if we already have an answer for this question
+                    val existingAnswer = userAnswers[index]
+                    if (existingAnswer != null) {
+                         _uiState.value = LiveInterviewUiState.ReviewingAnswer(existingAnswer)
                     } else {
-                        _errorMessage.value = "Failed to load next question"
-                        _uiState.value = LiveInterviewUiState.ActiveQuestion
+                         _uiState.value = LiveInterviewUiState.AnswerCollection
                     }
 
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error loading next question", e)
-                    _errorMessage.value = e.message ?: "An error occurred"
-                    _uiState.value = LiveInterviewUiState.ActiveQuestion
+                } else {
+                    // Critical failure if we can't find question
+                    _errorMessage.value = "Failed to load question"
+                    _uiState.value = LiveInterviewUiState.AnswerCollection
                 }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading question", e)
+                _errorMessage.value = e.message ?: "An error occurred"
+                _uiState.value = LiveInterviewUiState.AnswerCollection
             }
         }
     }
@@ -638,6 +837,7 @@ sealed class LiveInterviewUiState {
     
     // New states for batch processing
     object AnswerCollection : LiveInterviewUiState()  // Collecting answers without feedback
+    data class ReviewingAnswer(val transcription: String) : LiveInterviewUiState() // Review answer before submitting
     object GeneratingBatchFeedback : LiveInterviewUiState()  // Processing all answers at once
     data class BatchFeedback(val questions: List<LiveQuestion>) : LiveInterviewUiState()  // Show all feedback
 }
@@ -654,7 +854,8 @@ data class InterviewConfig(
     val jobTitle: String = "",
     val jobDescription: String = "",
     val resumeId: String? = null,
-    val resumeContent: String? = null
+    val resumeContent: String? = null,
+    val previousSessionId: String? = null
 )
 
 // Question feedback

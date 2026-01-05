@@ -46,6 +46,9 @@ class InterviewPrepViewModel(
     private val _loadingState = MutableStateFlow(LoadingState(isLoading = true, progress = 0f, description = "Initializing..."))
     val loadingState: StateFlow<LoadingState> = _loadingState.asStateFlow()
 
+    private val _resumes = MutableStateFlow<List<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume>>(emptyList())
+    val resumes: StateFlow<List<com.phamnhantucode.aicareercoach.ui.resumebuilder.Resume>> = _resumes.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -101,16 +104,45 @@ class InterviewPrepViewModel(
                 Log.w(TAG, "Failed to preload question pools in background", e)
             }
         }
+
+        // Load resumes
+        viewModelScope.launch {
+            try {
+                val resumeRepo = com.phamnhantucode.aicareercoach.data.resume.ResumeRepository.getInstance(application)
+                // Use forceRemote=true to ensure fresh list
+                val result = resumeRepo.getAllResumes(forceRemote = true)
+                if (result.isSuccess) {
+                    _resumes.value = result.getOrNull() ?: emptyList()
+                    Log.d(TAG, "Loaded ${_resumes.value.size} resumes for quiz selection")
+                } else {
+                     Log.w(TAG, "Failed to load resumes: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load resumes", e)
+            }
+        }
     }
 
-    fun refreshContent(force: Boolean = false) {
+    fun refreshContent(
+        force: Boolean = false,
+        resumeId: String? = null,
+        role: String? = null,
+        skills: List<String>? = null,
+        yoes: String? = null
+    ) {
         if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
             _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Connecting to server...")
             _errorMessage.value = null
             try {
                 _loadingState.value = LoadingState(isLoading = true, progress = 0.3f, description = "Fetching interview questions...")
-                val content = repository.loadInterviewPrepContent(forceRefreshAuth = force)
+                val content = repository.loadInterviewPrepContent(
+                    forceRefreshAuth = force,
+                    resumeId = resumeId,
+                    customRole = role,
+                    customSkills = skills,
+                    customExperienceYears = yoes
+                )
 
                 _loadingState.value = LoadingState(isLoading = true, progress = 0.5f, description = "Processing quiz questions...")
                 loadContentIntoState(content)
@@ -174,33 +206,132 @@ class InterviewPrepViewModel(
         _errorMessage.value = null
     }
 
-    fun startQuiz() {
-        if (latestQuizQuestions.isEmpty()) {
-            refreshContent(force = true)
-            return
+    fun startQuiz(
+        resumeId: String? = null,
+        role: String? = null,
+        skills: List<String>? = null,
+        yoes: String? = null
+    ) {
+        viewModelScope.launch {
+            // Case 1: Resume or Manual specific (always fetch absolute fresh)
+            if (resumeId != null || role != null) {
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Personalizing quiz...")
+                try {
+                    val content = repository.loadInterviewPrepContent(
+                        forceRefreshAuth = true,
+                        resumeId = resumeId,
+                        customRole = role,
+                        customSkills = skills,
+                        customExperienceYears = yoes
+                    )
+                    loadContentIntoState(content)
+                    initializeQuizState()
+                    _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Ready!")
+                } catch (e: Exception) {
+                    handleError(e)
+                }
+                return@launch
+            }
+
+            // Case 2: Standard (use cache if available)
+            if (latestQuizQuestions.isEmpty()) {
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Loading quiz...")
+                try {
+                    val content = repository.loadInterviewPrepContent(forceRefreshAuth = true)
+                    loadContentIntoState(content)
+                    initializeQuizState()
+                    _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Ready!")
+                } catch (e: Exception) {
+                    handleError(e)
+                }
+            } else {
+                initializeQuizState()
+            }
         }
-        _quizState.value = QuizState(
-            questions = latestQuizQuestions,
-            currentQuestionIndex = 0,
-            answers = emptyMap(),
-            isComplete = false,
-            timeStarted = LocalDateTime.now()
-        )
     }
 
-    fun startInterview() {
-        if (latestInterviewQuestions.isEmpty()) {
-            refreshContent(force = true)
-            return
+    private fun initializeQuizState() {
+        if (latestQuizQuestions.isNotEmpty()) {
+            _quizState.value = QuizState(
+                questions = latestQuizQuestions,
+                currentQuestionIndex = 0,
+                answers = emptyMap(),
+                isComplete = false,
+                timeStarted = LocalDateTime.now()
+            )
+        } else {
+            _errorMessage.value = "No questions available. Please check your connection."
         }
-        _interviewState.value = InterviewState(
-            questions = latestInterviewQuestions,
-            currentQuestionIndex = 0,
-            answers = emptyMap(),
-            timeLeft = INTERVIEW_DURATION_SECONDS,
-            isComplete = false
-        )
-        startTimer()
+    }
+
+    fun startInterview(
+        resumeId: String? = null,
+        role: String? = null,
+        skills: List<String>? = null,
+        yoes: String? = null
+    ) {
+        viewModelScope.launch {
+            // Case 1: Resume or Manual specific (always fetch absolute fresh)
+            if (resumeId != null || role != null) {
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Personalizing interview...")
+                try {
+                    val content = repository.loadInterviewPrepContent(
+                        forceRefreshAuth = true,
+                        resumeId = resumeId,
+                        customRole = role,
+                        customSkills = skills,
+                        customExperienceYears = yoes
+                    )
+                    loadContentIntoState(content)
+                    initializeInterviewState()
+                    _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Ready!")
+                } catch (e: Exception) {
+                    handleError(e)
+                }
+                return@launch
+            }
+
+            // Case 2: Standard (use cache if available)
+            if (latestInterviewQuestions.isEmpty()) {
+                _loadingState.value = LoadingState(isLoading = true, progress = 0.1f, description = "Loading interview...")
+                try {
+                    val content = repository.loadInterviewPrepContent(forceRefreshAuth = true)
+                    loadContentIntoState(content)
+                    initializeInterviewState()
+                    _loadingState.value = LoadingState(isLoading = false, progress = 1f, description = "Ready!")
+                } catch (e: Exception) {
+                    handleError(e)
+                }
+            } else {
+                initializeInterviewState()
+            }
+        }
+    }
+
+    private fun initializeInterviewState() {
+        if (latestInterviewQuestions.isNotEmpty()) {
+            _interviewState.value = InterviewState(
+                questions = latestInterviewQuestions,
+                currentQuestionIndex = 0,
+                answers = emptyMap(),
+                timeLeft = INTERVIEW_DURATION_SECONDS,
+                isComplete = false
+            )
+            startTimer()
+        } else {
+            _errorMessage.value = "No questions available. Please check your connection."
+        }
+    }
+
+    private fun handleError(error: Exception) {
+        if (error is com.phamnhantucode.aicareercoach.data.neon.NeonUserService.InsufficientCreditException) {
+            _showCreditDialog.value = true
+            _loadingState.value = LoadingState(isLoading = false, progress = 0f, description = "Insufficient Credits")
+        } else {
+            Log.e(TAG, "Failed to load content.", error)
+            _errorMessage.value = error.localizedMessage
+            _loadingState.value = LoadingState(isLoading = false, progress = 0f, description = "Error")
+        }
     }
 
     fun answerQuizQuestion(answer: Any) {
@@ -247,7 +378,12 @@ class InterviewPrepViewModel(
         _quizState.value?.let { state ->
             val score = calculateScore(state.questions, state.answers)
             val completedState = state.copy(isComplete = true, finalScore = score)
-            _quizState.value = completedState
+            // Tip will be added after we fetch it or compute it? 
+            // Actually, we record it first. But locally we might want to show it immediately if we have it?
+            // The improvement tip comes from coaching notes generally.
+            val improvementTip = _coachingNotes.value?.improvementAreas?.joinToString()
+            val finalCompletedState = completedState.copy(improvementTip = improvementTip)
+            _quizState.value = finalCompletedState
 
             val snapshots = mergeAnswers(quizBlueprint, state.answers)
             viewModelScope.launch {
@@ -377,13 +513,19 @@ class InterviewPrepViewModel(
             QuestionCategory.SITUATIONAL.name -> QuestionCategory.SITUATIONAL
             else -> QuestionCategory.TECHNICAL
         }
+        val finalOptions = if (resolvedType == QuestionType.MULTIPLE_CHOICE) {
+            if (options.isNotEmpty()) options else listOfNotNull(userAnswer, correctAnswer).distinct()
+        } else {
+            emptyList()
+        }
+
         return InterviewQuestion(
             id = index,
             type = resolvedType,
             category = resolvedCategory,
             question = question,
-            options = if (resolvedType == QuestionType.MULTIPLE_CHOICE) options else emptyList(),
-            correctAnswer = correctAnswerIndex ?: -1,
+            options = finalOptions,
+            correctAnswer = correctAnswerIndex ?: if (resolvedType == QuestionType.MULTIPLE_CHOICE) finalOptions.indexOf(correctAnswer).takeIf { it != -1 } ?: -1 else -1,
             explanation = explanation ?: "",
             placeholder = placeholder ?: DEFAULT_ESSAY_PLACEHOLDER
         )
@@ -476,6 +618,12 @@ class InterviewPrepViewModel(
         val answers = buildMap<Int, Any> {
             questions.forEachIndexed { idx, snapshot ->
                 snapshot.selectedAnswerIndex?.let { put(idx, it) }
+                if (snapshot.selectedAnswerIndex == null && snapshot.userAnswer != null) {
+                    // Use the synthesized options from the UI model we just created
+                    val uiQuestion = questionsUi[idx]
+                    val index = uiQuestion.options.indexOf(snapshot.userAnswer)
+                    if (index != -1) put(idx, index)
+                }
                 snapshot.essayResponse?.takeIf { it.isNotBlank() }?.let { put(idx, it) }
             }
         }
@@ -485,7 +633,9 @@ class InterviewPrepViewModel(
             answers = answers,
             isComplete = true,
             timeStarted = startedAt,
-            finalScore = quizScore.roundToInt()
+            finalScore = quizScore.roundToInt(),
+            improvementTip = improvementTip,
+            id = id
         )
     }
 

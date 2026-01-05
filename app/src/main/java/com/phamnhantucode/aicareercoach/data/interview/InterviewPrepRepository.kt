@@ -40,7 +40,7 @@ class InterviewPrepRepository(
         .readTimeout(360, TimeUnit.SECONDS)
         .writeTimeout(360, TimeUnit.SECONDS)
         .build(),
-    context: Context,
+    private val context: Context,
 ) {
     private val database = AppDatabase.getDatabase(context)
     private val questionPoolDao: QuestionPoolDao = database.questionPoolDao()
@@ -50,6 +50,10 @@ class InterviewPrepRepository(
 
     suspend fun loadInterviewPrepContent(
         forceRefreshAuth: Boolean = false,
+        resumeId: String? = null,
+        customRole: String? = null,
+        customSkills: List<String>? = null,
+        customExperienceYears: String? = null
     ): InterviewPrepContent = withContext(Dispatchers.IO) {
         val user = Clerk.user
             ?: throw IllegalStateException("User session unavailable. Please sign in again.")
@@ -78,70 +82,64 @@ class InterviewPrepRepository(
         // Cache user profile and assessments
         cacheUserProfile(neonUser, user.id)
         cacheAssessments(neonUser.id, assessments)
-
-        // Check question pool availability (using local Room database)
-        val quizPoolCount = getUnusedQuestionsCount(neonUser.id, "quiz")
-        val interviewPoolCount = getUnusedQuestionsCount(neonUser.id, "interview")
-
-        // Generate new questions in batch if pool is low
-        if (quizPoolCount < MINIMUM_POOL_SIZE || interviewPoolCount < MINIMUM_POOL_SIZE) {
-            // Deduct Credit for Batch Generation
-            NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Batch Generation", authHeader)
-            
-            val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
-            val generated = generateInterviewContent(prompt)
-
-            // Store generated questions in the local pool
-            if (quizPoolCount < MINIMUM_POOL_SIZE) {
-                storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
-            }
-            if (interviewPoolCount < MINIMUM_POOL_SIZE) {
-                storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
-            }
-        }
-
-        // Load questions from local pool
-        val quizQuestions = fetchUnusedQuestionsFromPool(neonUser.id, "quiz", QUIZ_QUESTIONS_PER_SESSION)
-        val interviewQuestions = fetchUnusedQuestionsFromPool(neonUser.id, "interview", INTERVIEW_QUESTIONS_PER_SESSION)
-
-        // If pool is still empty (first time user), generate immediately
-        val (finalQuizQuestions, finalInterviewQuestions, practiceTips, coachingNotes) = if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
-            // Deduct Credit for First Time Generation
-            NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Initial Generation", authHeader)
-
-            val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
-            val generated = generateInterviewContent(prompt)
-
-            storeQuestionsInPool(neonUser.id, generated.quizQuestions, "quiz")
-            storeQuestionsInPool(neonUser.id, generated.interviewQuestions, "interview")
-
-            val quiz = fetchUnusedQuestionsFromPool(neonUser.id, "quiz", QUIZ_QUESTIONS_PER_SESSION)
-            val interview = fetchUnusedQuestionsFromPool(neonUser.id, "interview", INTERVIEW_QUESTIONS_PER_SESSION)
-
-            QuestionBundle(quiz, interview, generated.practiceTips, generated.coachingNotes)
+        
+        // Generate Context String and Focus Topic
+        val contextPair = if (customRole != null) {
+             val ctx = """
+            CONTEXT:
+            - Role/Industry: ${customRole}
+            - Experience: ${customExperienceYears ?: "Not specified"} years
+            - Core Skills: ${(customSkills ?: emptyList()).joinToString(", ")}
+            """.trimIndent()
+            Pair(ctx, customRole)
+        } else if (resumeId != null) {
+             val repo = com.phamnhantucode.aicareercoach.data.resume.ResumeRepository.getInstance(context)
+             val resume = repo.getResume(resumeId).getOrNull()
+             if (resume != null) {
+                 val focusTopic = resume.personalInfo.profession.takeIf { it.isNotBlank() } ?: "General"
+                 val resumeSummary = buildString {
+                     appendLine("RESUME SUMMARY:")
+                     appendLine("Profession: ${resume.personalInfo.profession}")
+                     if (resume.workExperiences.isNotEmpty()) {
+                        appendLine("Experience:")
+                        resume.workExperiences.take(3).forEach { exp ->
+                            appendLine("- ${exp.jobTitle}: ${exp.responsibilities.take(2).joinToString("; ")}")
+                        }
+                     }
+                     if (resume.skills.isNotEmpty()) {
+                        appendLine("Skills: ${resume.skills.joinToString(", ")}")
+                     }
+                 }
+                 Pair("CONTEXT (FROM RESUME):\n- Role/Industry: ${resume.personalInfo.profession}\n- Background: $resumeSummary", focusTopic)
+             } else {
+                 Pair("CONTEXT: General Interview (No Resume Context Available)", "General Technical Interview")
+             }
         } else {
-            // Try to load cached tips first, otherwise generate new ones
-            val tipsAndNotes = getCachedTips(neonUser.id) ?: run {
-                // Deduct Credit for Tips Generation
-                NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Tips Verification", authHeader)
-
-                val generated = loadTipsAndCoachingNotes(neonUser, assessments)
-                cacheTips(neonUser.id, generated.first, generated.second)
-                generated
-            }
-            QuestionBundle(quizQuestions, interviewQuestions, tipsAndNotes.first, tipsAndNotes.second)
+             Pair("CONTEXT: General Interview", "General Technical Interview")
         }
 
-        // Cache tips if they were generated for first-time users
-        if (quizQuestions.isEmpty() || interviewQuestions.isEmpty()) {
-            cacheTips(neonUser.id, practiceTips, coachingNotes)
-        }
+        val contextStr = contextPair.first
+        val focusTopic = contextPair.second
 
+        // ALWAYS GENERATE FRESH - NO POOL/CACHING
+        // Deduct Credit for Generation
+        NeonUserService.deductCredit(neonUser.id, 1, "Interview Prep Generation", authHeader)
+
+        val historyContext = buildHistoryContext(assessments)
+        val prompt = com.phamnhantucode.aicareercoach.data.ai.PromptFactory.createInterviewQuestionsPrompt(
+            context = contextStr,
+            focusTopic = focusTopic,
+            questionCount = 5, // Default batch size
+            historyContext = historyContext
+        )
+        val generated = generateInterviewContent(prompt)
+
+        // Return generated content directly
         return@withContext InterviewPrepContent(
-            quizQuestions = finalQuizQuestions,
-            interviewQuestions = finalInterviewQuestions,
-            practiceTips = practiceTips,
-            coachingNotes = coachingNotes,
+            quizQuestions = generated.quizQuestions,
+            interviewQuestions = generated.interviewQuestions,
+            practiceTips = generated.practiceTips,
+            coachingNotes = generated.coachingNotes,
             neonUser = neonUser,
             assessments = assessments,
         )
@@ -383,6 +381,8 @@ class InterviewPrepRepository(
                 selectedAnswerIndex = q.optInt("selectedAnswerIndex").takeUnless { q.isNull("selectedAnswerIndex") },
                 explanation = q.optString("explanation").takeUnless { it.isBlank() },
                 essayResponse = q.optString("essayResponse").takeUnless { it.isBlank() },
+                userAnswer = q.optString("userAnswer").takeUnless { it.isBlank() },
+                correctAnswer = q.optString("answer").takeUnless { it.isBlank() } ?: q.optString("correctAnswer").takeUnless { it.isBlank() }
             )
         }
 
@@ -706,24 +706,30 @@ class InterviewPrepRepository(
         profile: NeonUserProfile,
         assessments: List<AssessmentRecord>,
     ): Pair<List<PracticeTipSpec>, CoachingNotes?> = withContext(Dispatchers.IO) {
-        val prompt = buildTipsPrompt(profile, assessments)
+        val historyContext = buildHistoryContext(assessments)
+        
+        val candidateProfile = """
+            CANDIDATE PROFILE:
+            - Role/Industry: ${profile.industry ?: "Unspecified"}
+            - Experience: ${profile.experienceYears ?: "Not specified"} years
+            - Core Skills: ${profile.skills.joinToString(", ")}
+            - Background: ${profile.bio ?: "Not specified"}
+        """.trimIndent()
+
+        val prompt = com.phamnhantucode.aicareercoach.data.ai.PromptFactory.createTipsPrompt(
+            context = candidateProfile,
+            historyContext = historyContext
+        )
         val generated = generateTipsAndNotes(prompt)
         Pair(generated.first, generated.second)
     }
 
-    private fun buildGeminiPrompt(
-        profile: NeonUserProfile,
-        assessments: List<AssessmentRecord>,
-        generateBatchSize: Boolean = false,
-    ): String {
-        val experienceText = profile.experienceYears?.let { "$it years of experience" } ?: "experience not provided"
-        val skillsText = if (profile.skills.isEmpty()) "skills not provided" else profile.skills.joinToString()
-        val industryText = profile.industry ?: "unspecified industry"
+    private fun buildHistoryContext(assessments: List<AssessmentRecord>): String {
         val recentScores = if (assessments.isEmpty()) {
             "no assessments recorded yet"
         } else {
             assessments.take(5).joinToString { score ->
-                "${score.quizScore.roundToInt()} (${score.category})"
+                "${"$"}{score.quizScore.roundToInt()} (${"$"}{score.category})"
             }
         }
 
@@ -742,108 +748,13 @@ class InterviewPrepRepository(
         }
 
         return """
-            You are an expert technical interview coach. Create targeted interview preparation for the following professional:
-            - Industry: $industryText
-            - Experience: $experienceText
-            - Skills: $skillsText
-            - Bio: ${profile.bio ?: "Not provided"}
-            - Recent scores: $recentScores
-            - Recurring improvement themes: $recurringGaps
-            - Essay responses completed so far: $essayPracticeCount
-
-            Produce STRICT JSON with the following structure and nothing else:
-            {
-              "quizQuestions": [
-                {
-                  "id": "unique string identifier",
-                  "type": "MULTIPLE_CHOICE",
-                  "category": "TECHNICAL" | "BEHAVIORAL" | "SITUATIONAL",
-                  "question": "question text",
-                  "options": ["A", "B", "C", "D"],
-                  "correctAnswerIndex": number,
-                  "explanation": "why this answer is correct"
-                }
-              ],
-              "interviewQuestions": [
-                {
-                  "id": "unique string identifier",
-                  "type": "MULTIPLE_CHOICE" | "ESSAY",
-                  "category": "TECHNICAL" | "BEHAVIORAL" | "SITUATIONAL",
-                  "question": "prompt text",
-                  "options": ["only include for multiple choice"],
-                  "correctAnswerIndex": number | null,
-                  "explanation": "short coaching note or sample approach",
-                  "placeholder": "short writing guidance for essay questions"
-                }
-              ],
-              "practiceTips": [
-                {
-                  "category": "short label",
-                  "icon": "one of: lightbulb, target, chat, rocket, tools, book, graph",
-                  "color": "#RRGGBB",
-                  "tips": ["bullet tip 1", "bullet tip 2", "bullet tip 3"]
-                }
-              ],
-              "coachingNotes": {
-                "summary": "2 sentence overview tailored to the user",
-                "improvementAreas": ["focus area 1", "focus area 2"],
-                "recommendedPracticeFrequency": "short recommendation like '3 sessions per week'"
-              }
-            }
-
-            Requirements:
-            - Provide at least ${if (generateBatchSize) BATCH_QUIZ_SIZE else 10} quizQuestions.
-            - ALL quizQuestions MUST be MULTIPLE_CHOICE type only (no ESSAY questions in quizQuestions).
-            - Provide at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE else 4} interviewQuestions with at least ${if (generateBatchSize) BATCH_INTERVIEW_SIZE / 2 else 2} essay prompts.
-            - All JSON strings must escape quotes properly.
-            - Return ONLY the JSON object without Markdown or commentary.
-            ${if (generateBatchSize) "- Generate diverse questions covering different topics and difficulty levels." else ""}
+            - Recent scores: ${"$"}recentScores
+            - Recurring improvement themes: ${"$"}recurringGaps
+            - Essay responses completed so far: ${"$"}essayPracticeCount
         """.trimIndent()
     }
 
-    private fun buildTipsPrompt(
-        profile: NeonUserProfile,
-        assessments: List<AssessmentRecord>,
-    ): String {
-        val experienceText = profile.experienceYears?.let { "$it years of experience" } ?: "experience not provided"
-        val skillsText = if (profile.skills.isEmpty()) "skills not provided" else profile.skills.joinToString()
-        val industryText = profile.industry ?: "unspecified industry"
-        val recentScores = if (assessments.isEmpty()) {
-            "no assessments recorded yet"
-        } else {
-            assessments.take(5).joinToString { score ->
-                "${score.quizScore.roundToInt()} (${score.category})"
-            }
-        }
 
-        return """
-            You are an expert technical interview coach. Create practice tips and coaching notes for the following professional:
-            - Industry: $industryText
-            - Experience: $experienceText
-            - Skills: $skillsText
-            - Recent scores: $recentScores
-
-            Produce STRICT JSON with the following structure and nothing else:
-            {
-              "practiceTips": [
-                {
-                  "category": "short label",
-                  "icon": "one of: lightbulb, target, chat, rocket, tools, book, graph",
-                  "color": "#RRGGBB",
-                  "tips": ["bullet tip 1", "bullet tip 2", "bullet tip 3"]
-                }
-              ],
-              "coachingNotes": {
-                "summary": "2 sentence overview tailored to the user",
-                "improvementAreas": ["focus area 1", "focus area 2"],
-                "recommendedPracticeFrequency": "short recommendation like '3 sessions per week'"
-              }
-            }
-
-            - All JSON strings must escape quotes properly.
-            - Return ONLY the JSON object without Markdown or commentary.
-        """.trimIndent()
-    }
 
     private suspend fun generateTipsAndNotes(prompt: String): Pair<List<PracticeTipSpec>, CoachingNotes?> {
         val messages = listOf(
@@ -888,8 +799,8 @@ class InterviewPrepRepository(
             throw IOException("AI Service returned invalid JSON: ${error.message}\n$cleaned", error)
         }
 
-        val quizQuestions = json.optJSONArray("quizQuestions").toQuestionSpecs()
-        val interviewQuestions = json.optJSONArray("interviewQuestions").toQuestionSpecs()
+        val quizQuestions = json.optJSONArray("quizQuestions").toQuestionSpecs(defaultType = "MULTIPLE_CHOICE")
+        val interviewQuestions = json.optJSONArray("interviewQuestions").toQuestionSpecs(defaultType = "OPEN_ENDED")
         val practiceTips = json.optJSONArray("practiceTips").toTipSpecs()
         val coachingNotes =
             json.optJSONObject("coachingNotes")?.let { notes ->
@@ -916,16 +827,24 @@ class InterviewPrepRepository(
 
 
 
-    private fun JSONArray?.toQuestionSpecs(): List<RepositoryQuestionSnapshot> {
+    private fun JSONArray?.toQuestionSpecs(defaultType: String? = null): List<RepositoryQuestionSnapshot> {
         if (this == null || length() == 0) return emptyList()
         return List(length()) { index ->
             val json = optJSONObject(index) ?: JSONObject()
             val options = json.optJSONArray("options").toStringList()
+            
+            // Map 'correctAnswer' (PROMPT) to 'explanation' (SNAPSHOT) if explanation is missing
+            val rawExplanation = json.optString("explanation").takeUnless { it.isBlank() }
+            val rawCorrectAnswer = json.optString("correctAnswer").takeUnless { it.isBlank() }
+            val finalExplanation = rawExplanation ?: rawCorrectAnswer
+
+            val type = json.optString("type").takeUnless { it.isBlank() } ?: defaultType
+
             RepositoryQuestionSnapshot(
                 id = json.optString("id").takeUnless { it.isBlank() } ?: "question_${index + 1}",
                 question = json.optString("question"),
                 category = json.optString("category").takeUnless { it.isBlank() },
-                type = json.optString("type").takeUnless { it.isBlank() },
+                type = type,
                 options = options,
                 correctAnswerIndex = json.optInt("correctAnswerIndex").takeUnless { json.isNull("correctAnswerIndex") },
                 explanation = json.optString("explanation").takeUnless { it.isBlank() },
@@ -978,6 +897,7 @@ class InterviewPrepRepository(
         if (isBlank()) return Instant.EPOCH
         return runCatching { Instant.parse(this) }
             .recoverCatching { OffsetDateTime.parse(this).toInstant() }
+            .recoverCatching { java.time.LocalDateTime.parse(this).toInstant(java.time.ZoneOffset.UTC) }
             .getOrElse { Instant.EPOCH }
     }
 
@@ -1001,6 +921,8 @@ class InterviewPrepRepository(
         val explanation: String? = null,
         val placeholder: String? = null,
         val essayResponse: String? = null,
+        val userAnswer: String? = null,
+        val correctAnswer: String? = null,
     )
 
     data class PracticeTipSpec(
@@ -1072,7 +994,22 @@ class InterviewPrepRepository(
                     emptyList()
                 }
 
-                val prompt = buildGeminiPrompt(neonUser, assessments, generateBatchSize = true)
+                val historyContext = buildHistoryContext(assessments)
+                // Construct string from object for prompt
+                 val contextStr = """
+                    CONTEXT:
+                    - Role/Industry: ${neonUser.industry ?: "Unspecified"}
+                    - Experience: ${neonUser.experienceYears ?: "Not specified"} years
+                    - Core Skills: ${neonUser.skills.joinToString(", ")}
+                    - Bio: ${neonUser.bio ?: "None"}
+                """.trimIndent()
+
+                val prompt = com.phamnhantucode.aicareercoach.data.ai.PromptFactory.createInterviewQuestionsPrompt(
+                    context = contextStr,
+                    focusTopic = neonUser.industry ?: "Technical Interview",
+                    questionCount = BATCH_QUIZ_SIZE,
+                    historyContext = historyContext
+                )
                 val generated = generateInterviewContent(prompt)
 
                 // Store generated questions in the local pool

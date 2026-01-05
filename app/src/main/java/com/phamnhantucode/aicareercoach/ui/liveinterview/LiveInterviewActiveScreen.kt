@@ -3,11 +3,12 @@ package com.phamnhantucode.aicareercoach.ui.liveinterview
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,8 +45,7 @@ fun LiveInterviewActiveScreen(
     val interviewSession by viewModel.interviewSession.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
-    var showExitDialog by remember { mutableStateOf(false) }
-    var showPauseDialog by remember { mutableStateOf(false) }
+
 
     // Show error snackbar
     val snackbarHostState = remember { SnackbarHostState() }
@@ -54,6 +54,34 @@ fun LiveInterviewActiveScreen(
             snackbarHostState.showSnackbar(message)
             viewModel.clearError()
         }
+    }
+
+    // Exit confirmation dialog
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text(text = "Exit Interview?") },
+            text = { Text(text = "Are you sure you want to end this interview? Your progress will be lost.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+                        viewModel.abandonInterview()
+                        onExit()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Exit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -73,22 +101,7 @@ fun LiveInterviewActiveScreen(
                         )
                     }
                 },
-                actions = {
-                    // Timer
-                    TimerDisplay(durationSeconds = interviewDuration)
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Pause button
-                    IconButton(onClick = { showPauseDialog = true }) {
-                        Icon(Icons.Filled.Pause, contentDescription = "Pause")
-                    }
-
-                    // Exit button
-                    IconButton(onClick = { showExitDialog = true }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Exit")
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -103,7 +116,7 @@ fun LiveInterviewActiveScreen(
         ) {
             when (uiState) {
                 is LiveInterviewUiState.Starting -> {
-                    LoadingView(message = "Starting interview...")
+                    LiveInterviewLoadingView(message = "Starting interview...")
                 }
                 is LiveInterviewUiState.ActiveQuestion -> {
                     currentQuestion?.let { question ->
@@ -130,13 +143,31 @@ fun LiveInterviewActiveScreen(
                                 recordingState = recordingState,
                                 amplitude = audioAmplitude,
                                 onStartRecording = { viewModel.startRecording() },
-                                onStopRecording = { viewModel.stopRecordingAndProcess() }
+                                onStopRecording = { viewModel.stopRecordingAndProcess() },
+                                onPrevious = { viewModel.goToPreviousQuestion() },
+                                onNext = { viewModel.continueToNextQuestion() },
+                                onExit = { showExitDialog = true }
+                            )
+                        }
+                    }
+                }
+                is LiveInterviewUiState.ReviewingAnswer -> {
+                    val reviewState = uiState as LiveInterviewUiState.ReviewingAnswer
+                    currentQuestion?.let { question ->
+                        interviewSession?.let { session ->
+                            ReviewAnswerView(
+                                question = question,
+                                questionNumber = session.currentQuestionIndex + 1,
+                                totalQuestions = session.targetQuestionCount,
+                                initialAnswer = reviewState.transcription,
+                                onConfirm = { viewModel.confirmAnswer(it) },
+                                onRetake = { viewModel.retakeRecording() }
                             )
                         }
                     }
                 }
                 is LiveInterviewUiState.Processing -> {
-                    LoadingView(message = "Processing your answer...")
+                    LiveInterviewLoadingView(message = "Processing your answer...")
                 }
                 is LiveInterviewUiState.ViewingFeedback -> {
                     currentFeedback?.let { feedback ->
@@ -144,6 +175,7 @@ fun LiveInterviewActiveScreen(
                             val isLastQuestion = session.currentQuestionIndex >= session.targetQuestionCount - 1
                             FeedbackView(
                                 feedback = feedback,
+                                expectedAnswer = currentQuestion?.correctAnswer,
                                 isLastQuestion = isLastQuestion,
                                 onContinue = {
                                     if (isLastQuestion) {
@@ -157,10 +189,10 @@ fun LiveInterviewActiveScreen(
                     }
                 }
                 is LiveInterviewUiState.LoadingNextQuestion -> {
-                    LoadingView(message = "Loading next question...")
+                    LiveInterviewLoadingView(message = "Loading next question...")
                 }
                 is LiveInterviewUiState.GeneratingBatchFeedback -> {
-                    LoadingView(message = "Analyzing all your answers...")
+                   LiveInterviewLoadingView(message = "Analyzing all your answers...")
                 }
                 is LiveInterviewUiState.BatchFeedback -> {
                     val batchState = uiState as LiveInterviewUiState.BatchFeedback
@@ -170,12 +202,12 @@ fun LiveInterviewActiveScreen(
                     )
                 }
                 is LiveInterviewUiState.GeneratingSummary -> {
-                    LoadingView(message = "Generating interview summary...")
+                    LiveInterviewLoadingView(message = "Generating interview summary...")
                 }
                 is LiveInterviewUiState.Paused -> {
                     PausedView(
                         onResume = { viewModel.resumeInterview() },
-                        onExit = { viewModel.abandonInterview(); onExit() }
+                        onExit = { showExitDialog = true }
                     )
                 }
                 else -> {
@@ -185,57 +217,7 @@ fun LiveInterviewActiveScreen(
         }
     }
 
-    // Exit confirmation dialog
-    if (showExitDialog) {
-        AlertDialog(
-            onDismissRequest = { showExitDialog = false },
-            title = { Text("Exit Interview?") },
-            text = { Text("Your progress will be lost if you exit now. Are you sure?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showExitDialog = false
-                        viewModel.abandonInterview()
-                        onExit()
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Exit")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) {
-                    Text("Continue Interview")
-                }
-            }
-        )
-    }
 
-    // Pause confirmation dialog
-    if (showPauseDialog) {
-        AlertDialog(
-            onDismissRequest = { showPauseDialog = false },
-            title = { Text("Pause Interview?") },
-            text = { Text("You can resume the interview from where you left off.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPauseDialog = false
-                        viewModel.pauseInterview()
-                    }
-                ) {
-                    Text("Pause")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPauseDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
 
 @Composable
@@ -266,66 +248,117 @@ private fun QuestionView(
         hasPermission = isGranted
     }
 
+    var showHint by remember { mutableStateOf(false) }
+
+    if (showHint) {
+        AlertDialog(
+            onDismissRequest = { showHint = false },
+            title = {
+                Text(
+                    text = "Expected Answer",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = question.correctAnswer.ifBlank { "No expected answer available." },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showHint = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Progress indicator
+        // Header: Progress indicator
         InterviewProgressIndicator(
             currentQuestion = questionNumber,
             totalQuestions = totalQuestions
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Question card
-        QuestionCard(
-            question = question,
-            questionNumber = questionNumber,
-            totalQuestions = totalQuestions
-        )
-
-        // Recording hint or Visualizer
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ),
-            shape = RoundedCornerShape(12.dp)
+        // Body: Scrollable Question Area
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Top
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (recordingState == RecordingState.RECORDING) {
+            // Question card container
+            Box(modifier = Modifier.fillMaxWidth()) {
+                QuestionCard(
+                    question = question,
+                    questionNumber = questionNumber,
+                    totalQuestions = totalQuestions
+                )
+                
+                // Hint button overlay
+                TextButton(
+                    onClick = { showHint = true },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                ) {
                     Text(
-                        text = "🎤 Recording...",
+                        text = "Hint",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AudioVisualizer(amplitude = amplitude)
-                } else {
-                    Text(
-                        text = "💡 Tip: Think about your answer, then hold the microphone button to speak",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Push-to-talk button
+        // Footer: Controls (Visualizer + Mic)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
+            // Recording hint or Visualizer
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (recordingState == RecordingState.RECORDING) {
+                        Text(
+                            text = "🎤 Recording...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AudioVisualizer(amplitude = amplitude)
+                    } else {
+                        Text(
+                            text = "💡 Tip: Think, then hold to speak",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            // Push-to-talk button
             PushToTalkButton(
                 isRecording = recordingState == RecordingState.RECORDING,
                 onStartRecording = {
@@ -343,14 +376,13 @@ private fun QuestionView(
                 enabled = recordingState == RecordingState.IDLE || recordingState == RecordingState.RECORDING
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
 @Composable
 private fun FeedbackView(
     feedback: QuestionFeedback,
+    expectedAnswer: String?,
     isLastQuestion: Boolean,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
@@ -358,21 +390,29 @@ private fun FeedbackView(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Feedback card
-        FeedbackCard(
-            transcription = feedback.transcription,
-            feedback = feedback.feedback,
-            rating = feedback.rating
-        )
+        // Body: Scrollable Feedback
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Feedback card
+            FeedbackCard(
+                transcription = feedback.transcription,
+                expectedAnswer = expectedAnswer,
+                feedback = feedback.feedback,
+                rating = feedback.rating
+            )
+        }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Continue button
+        // Footer: Continue Button
         Button(
             onClick = onContinue,
             modifier = Modifier
@@ -386,8 +426,6 @@ private fun FeedbackView(
                 fontWeight = FontWeight.Bold
             )
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -461,6 +499,9 @@ private fun BatchQuestionView(
     amplitude: Float,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -483,63 +524,72 @@ private fun BatchQuestionView(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Progress indicator
+        // Header: Progress indicator
         InterviewProgressIndicator(
             currentQuestion = questionNumber,
             totalQuestions = totalQuestions
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Question card
-        QuestionCard(
-            question = question,
-            questionNumber = questionNumber,
-            totalQuestions = totalQuestions
-        )
-
-        // Batch mode hint or Visualizer
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ),
-            shape = RoundedCornerShape(12.dp)
+        // Body: Scrollable Question Area
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Top
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Question card
+            QuestionCard(
+                question = question,
+                questionNumber = questionNumber,
+                totalQuestions = totalQuestions
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Footer: Controls (Visualizer + Mic + Navigation)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Batch mode hint or Visualizer
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                if (recordingState == RecordingState.RECORDING) {
-                    Text(
-                        text = "🎤 Recording...",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AudioVisualizer(amplitude = amplitude)
-                } else {
-                    Text(
-                        text = "📝 Answer Collection Mode: No immediate feedback - answer all questions first, then get comprehensive feedback for everything!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (recordingState == RecordingState.RECORDING) {
+                        Text(
+                            text = "🎤 Recording...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AudioVisualizer(amplitude = amplitude)
+                    } else {
+                        Text(
+                            text = "📝 Answer Collection Mode: No immediate feedback - answer all questions first",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Push-to-talk button
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+            // Push-to-talk button
             PushToTalkButton(
                 isRecording = recordingState == RecordingState.RECORDING,
                 onStartRecording = {
@@ -556,9 +606,42 @@ private fun BatchQuestionView(
                 },
                 enabled = recordingState == RecordingState.IDLE || recordingState == RecordingState.RECORDING
             )
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            // Navigation Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Previous Button
+                OutlinedButton(
+                    onClick = onPrevious,
+                    enabled = questionNumber > 1,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Previous")
+                }
+
+                // Exit Button
+                TextButton(
+                    onClick = onExit,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Exit")
+                }
+
+                // Next Button
+                Button(
+                    onClick = onNext,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(if (questionNumber == totalQuestions) "Finish" else "Next")
+                }
+            }
+        }
     }
 }
 
@@ -571,127 +654,148 @@ private fun BatchFeedbackView(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Header
-        Text(
-            text = "Interview Feedback",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-        
-        Text(
-            text = "Here's your comprehensive feedback for all questions:",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Overall stats
-        val averageRating = questions.mapNotNull { it.rating }.average()
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            ),
-            shape = RoundedCornerShape(12.dp)
+        // Body: Scrollable Feedback List
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Overall Score",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${String.format("%.1f", averageRating)}/10",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
+            // Header information (scrolls with content)
+            Text(
+                text = "Interview Feedback",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = "Here's your comprehensive feedback for all questions:",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-        // Individual question feedback
-        questions.forEachIndexed { index, question ->
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Overall stats
+            val averageRating = questions.mapNotNull { it.rating }.average()
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Question ${index + 1}",
+                        text = "Overall Score",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    
                     Text(
-                        text = question.questionText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "${String.format("%.1f", averageRating)}/10",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    
-                    if (question.userAnswer != null) {
+                }
+            }
+
+            // Individual question feedback
+            questions.forEachIndexed { index, question ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
-                            text = "Your Answer:",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Question ${index + 1}",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
+                        
                         Text(
-                            text = question.userAnswer!!,
+                            text = question.questionText,
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    
-                    if (question.rating != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        
+                        if (question.userAnswer != null) {
                             Text(
-                                text = "Score:",
+                                text = "Your Answer:",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${question.rating}/10",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = when {
-                                    question.rating >= 8 -> MaterialTheme.colorScheme.primary
-                                    question.rating >= 6 -> MaterialTheme.colorScheme.secondary
-                                    else -> MaterialTheme.colorScheme.error
-                                }
+                                text = question.userAnswer!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp)
                             )
                         }
-                    }
-                    
-                    if (question.feedback != null) {
-                        Text(
-                            text = "Feedback:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = question.feedback!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+
+                        if (question.correctAnswer.isNotBlank()) {
+                            Text(
+                                text = "Expected Answer:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = question.correctAnswer,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                        
+                        if (question.rating != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Score:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${question.rating}/10",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when {
+                                        question.rating >= 8 -> MaterialTheme.colorScheme.primary
+                                        question.rating >= 6 -> MaterialTheme.colorScheme.secondary
+                                        else -> MaterialTheme.colorScheme.error
+                                    }
+                                )
+                            }
+                        }
+                        
+                        if (question.feedback != null) {
+                            Text(
+                                text = "Feedback:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = question.feedback!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -699,7 +803,7 @@ private fun BatchFeedbackView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Complete button
+        // Footer: Complete button
         Button(
             onClick = onComplete,
             modifier = Modifier
@@ -713,8 +817,6 @@ private fun BatchFeedbackView(
                 fontWeight = FontWeight.Bold
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -788,6 +890,96 @@ private fun AudioVisualizer(
                         shape = RoundedCornerShape(2.dp)
                     )
             )
+        }
+    }
+}
+
+@Composable
+private fun ReviewAnswerView(
+    question: com.phamnhantucode.aicareercoach.data.interview.LiveQuestion,
+    questionNumber: Int,
+    totalQuestions: Int,
+    initialAnswer: String,
+    onConfirm: (String) -> Unit,
+    onRetake: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var answerText by remember(initialAnswer) { mutableStateOf(initialAnswer) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Header: Progress indicator
+        InterviewProgressIndicator(
+            currentQuestion = questionNumber,
+            totalQuestions = totalQuestions
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Body: Scrollable Content (Title + Question + Input)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Review Your Answer",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Question card
+            QuestionCard(
+                question = question,
+                questionNumber = questionNumber,
+                totalQuestions = totalQuestions
+            )
+
+            // Editable answer field
+            OutlinedTextField(
+                value = answerText,
+                onValueChange = { answerText = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp),
+                label = { Text("Your Answer") },
+                placeholder = { Text("Edit your answer here...") },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Footer: Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = onRetake,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Retake")
+            }
+
+            Button(
+                onClick = { onConfirm(answerText) },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (questionNumber == totalQuestions) "Submit Interview" else "Next Question")
+            }
         }
     }
 }

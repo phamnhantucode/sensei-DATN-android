@@ -21,6 +21,8 @@ val LightOnSurfaceVariant = Color(0xFF64748B) // slate-500
 val LightOutline = Color(0xFFCBD5E1) // slate-300
 val LightOutlineVariant = Color(0xFFE2E8F0) // slate-200
 
+val SuccessGreen = Color(0xFF4CAF50)
+
 // Dark Theme Colors
 val DarkPrimary = Color(0xFF475569) // slate-600
 val DarkOnPrimary = Color(0xFFFFFFFF)

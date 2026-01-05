@@ -183,22 +183,23 @@ class PaginationEngine(
                                 adjustElementPositionForNextPage(splitResult.secondPart)
                             )
                             
-                            // For container splits: add first-part children to current page, second-part children to overflow
-                            if (element is ResumeElement.ContainerElement && splitResult.overflowChildIds.isNotEmpty()) {
+                            // For container splits: handle children including newly created split elements
+                            if (element is ResumeElement.ContainerElement) {
                                 val firstPartChildIds = (splitResult.firstPart as? ResumeElement.ContainerElement)?.children ?: emptyList()
                                 
                                 // Add first-part children to current page
+                                // IMPORTANT: Check newChildElements FIRST because split parts may have same ID as original
                                 firstPartChildIds.forEach { childId ->
-                                    page.elements.find { it.id == childId }?.let { child ->
-                                        currentPageElements.add(child)
-                                    }
+                                    val child = splitResult.newChildElements.find { it.id == childId }
+                                        ?: page.elements.find { it.id == childId }
+                                    child?.let { currentPageElements.add(it) }
                                 }
                                 
                                 // Add overflow children to overflow page
                                 splitResult.overflowChildIds.forEach { childId ->
-                                    page.elements.find { it.id == childId }?.let { child ->
-                                        overflowElements.add(adjustElementPositionForNextPage(child))
-                                    }
+                                    val child = splitResult.newChildElements.find { it.id == childId }
+                                        ?: page.elements.find { it.id == childId }
+                                    child?.let { overflowElements.add(adjustElementPositionForNextPage(it)) }
                                 }
                             }
                             
@@ -349,6 +350,14 @@ class PaginationEngine(
     
     /**
      * Split WorkExperienceElement at item boundary
+     * 
+     * Enhanced logic: Even if no items fit in the remaining space on current page,
+     * we check if individual items can fit on the next page. This prevents the entire
+     * section from moving to page 2 when items could be split across pages.
+     * 
+     * Key insight: If available space is >= 50% of page height and first item doesn't fit,
+     * we should still try to keep the element on this page - it will overflow but the 
+     * pagination will handle it by creating continuation on next page.
      */
     private fun splitWorkExperience(
         element: ResumeElement.WorkExperienceElement,
@@ -362,8 +371,9 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateWorkExperienceItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
-        // Find split point
+        // Find split point - how many items fit in available space
         var splitIndex = 0
         for (itemHeight in itemHeights) {
             if (itemHeight.cumulativeHeightDp > availableContentHeight) {
@@ -377,8 +387,26 @@ class PaginationEngine(
             splitIndex = config.minItemsPerPage
         }
         
-        // If nothing fits, move entire element
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            // Check if we have more than 1 item and first item would fit on a full page
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                
+                // If available space is less than 15% of page, move entire element
+                // This avoids leaving orphaned section headers with tiny content
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                
+                // If first item is larger than full page, we can't split anyway
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
+            
+            // Move entire element to next page
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -387,8 +415,9 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        // Create split elements
+        // Create split elements - both parts get new IDs to distinguish from original
         val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
             items = element.items.take(splitIndex)
         )
         
@@ -416,6 +445,7 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateEducationItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
         var splitIndex = 0
         for (itemHeight in itemHeights) {
@@ -429,7 +459,18 @@ class PaginationEngine(
             splitIndex = config.minItemsPerPage
         }
         
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -437,7 +478,10 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        val firstPart = element.copy(items = element.items.take(splitIndex))
+        val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
+            items = element.items.take(splitIndex)
+        )
         val secondPart = element.copy(
             id = UUID.randomUUID().toString(),
             position = element.position.copy(row = 0),
@@ -462,6 +506,7 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateSkillItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
         var splitIndex = 0
         for (itemHeight in itemHeights) {
@@ -471,7 +516,18 @@ class PaginationEngine(
             splitIndex = itemHeight.itemIndex + 1
         }
         
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -479,7 +535,10 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        val firstPart = element.copy(items = element.items.take(splitIndex))
+        val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
+            items = element.items.take(splitIndex)
+        )
         val secondPart = element.copy(
             id = UUID.randomUUID().toString(),
             position = element.position.copy(row = 0),
@@ -504,6 +563,7 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateProjectItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
         var splitIndex = 0
         for (itemHeight in itemHeights) {
@@ -513,7 +573,18 @@ class PaginationEngine(
             splitIndex = itemHeight.itemIndex + 1
         }
         
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -521,7 +592,10 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        val firstPart = element.copy(items = element.items.take(splitIndex))
+        val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
+            items = element.items.take(splitIndex)
+        )
         val secondPart = element.copy(
             id = UUID.randomUUID().toString(),
             position = element.position.copy(row = 0),
@@ -546,6 +620,7 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateCertificationItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
         var splitIndex = 0
         for (itemHeight in itemHeights) {
@@ -555,7 +630,18 @@ class PaginationEngine(
             splitIndex = itemHeight.itemIndex + 1
         }
         
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -563,7 +649,10 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        val firstPart = element.copy(items = element.items.take(splitIndex))
+        val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
+            items = element.items.take(splitIndex)
+        )
         val secondPart = element.copy(
             id = UUID.randomUUID().toString(),
             position = element.position.copy(row = 0),
@@ -588,6 +677,7 @@ class PaginationEngine(
         val itemHeights = heightCalculator.calculateLanguageItemHeights(element, availableWidthDp)
         val padding = element.padding ?: Padding()
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
         var splitIndex = 0
         for (itemHeight in itemHeights) {
@@ -597,7 +687,18 @@ class PaginationEngine(
             splitIndex = itemHeight.itemIndex + 1
         }
         
+        // If nothing fits in available space
         if (splitIndex == 0) {
+            if (element.items.size > 1) {
+                val firstItemHeight = itemHeights.firstOrNull()?.cumulativeHeightDp ?: 0f
+                val minUsefulSpaceRatio = 0.15f
+                if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+                if (firstItemHeight > fullPageContentHeight) {
+                    return SplitResult(null, element, SplitStrategy.NO_SPLIT)
+                }
+            }
             return SplitResult(null, element, SplitStrategy.NO_SPLIT)
         }
         
@@ -605,7 +706,10 @@ class PaginationEngine(
             return SplitResult(element, null, SplitStrategy.AT_ITEM_BOUNDARY)
         }
         
-        val firstPart = element.copy(items = element.items.take(splitIndex))
+        val firstPart = element.copy(
+            id = UUID.randomUUID().toString(),
+            items = element.items.take(splitIndex)
+        )
         val secondPart = element.copy(
             id = UUID.randomUUID().toString(),
             position = element.position.copy(row = 0),
@@ -617,6 +721,9 @@ class PaginationEngine(
     
     /**
      * Split ContainerElement at child boundary for vertical layout containers
+     * 
+     * Enhanced: If a child element is splittable (like WorkExperienceElement),
+     * we'll try to split it at item boundaries instead of moving it entirely.
      */
     private fun splitContainer(
         element: ResumeElement.ContainerElement,
@@ -646,20 +753,42 @@ class PaginationEngine(
         val padding = element.padding
         val contentWidthDp = availableWidthDp - padding.left - padding.right
         val availableContentHeight = availableHeightDp - padding.top - padding.bottom
+        val fullPageContentHeight = pageHeightDp - padding.top - padding.bottom
         
-        // Calculate cumulative heights of children
+        // Calculate cumulative heights of children and find split point
         var cumulativeHeight = 0f
         var splitIndex = 0
         val childSpacing = 8f // Default spacing between children
         
+        // Track which child needs internal splitting and the split result
+        var childToSplit: ResumeElement? = null
+        var childSplitResult: SplitResult? = null
+        var childToSplitIndex = -1
+        
         for ((index, childId) in element.children.withIndex()) {
             val child = allElements.find { it.id == childId } ?: continue
             val childHeight = heightCalculator.calculateHeight(child, contentWidthDp)
+            val spacingBefore = if (index > 0) childSpacing else 0f
             
             // Check if this child would exceed available height
-            val heightWithChild = cumulativeHeight + childHeight + (if (index > 0) childSpacing else 0f)
+            val heightWithChild = cumulativeHeight + childHeight + spacingBefore
             
             if (heightWithChild > availableContentHeight) {
+                // This child doesn't fully fit - check if it's splittable
+                val remainingHeight = availableContentHeight - cumulativeHeight - spacingBefore
+                
+                if (remainingHeight > 0 && isSplittableElement(child)) {
+                    // Try to split this child element internally
+                    val internalSplitResult = splitElement(child, remainingHeight, contentWidthDp, allElements)
+                    
+                    if (internalSplitResult.firstPart != null && internalSplitResult.secondPart != null) {
+                        // Successfully split the child - include first part on this page
+                        childToSplit = child
+                        childSplitResult = internalSplitResult
+                        childToSplitIndex = index
+                        splitIndex = index + 1 // Include this (partially) in first part
+                    }
+                }
                 break
             }
             
@@ -667,8 +796,18 @@ class PaginationEngine(
             splitIndex = index + 1
         }
         
-        // If nothing fits, move entire container to next page
-        if (splitIndex == 0) {
+        // If nothing fits and no child was split, move entire container to next page
+        if (splitIndex == 0 && childSplitResult == null) {
+            // Check if available space is too small (less than 15% of page)
+            val minUsefulSpaceRatio = 0.15f
+            if (availableContentHeight < fullPageContentHeight * minUsefulSpaceRatio) {
+                return SplitResult(
+                    firstPart = null,
+                    secondPart = element,
+                    strategy = SplitStrategy.NO_SPLIT
+                )
+            }
+            
             return SplitResult(
                 firstPart = null,
                 secondPart = element,
@@ -677,7 +816,7 @@ class PaginationEngine(
         }
         
         // If everything fits, no split needed
-        if (splitIndex >= element.children.size) {
+        if (splitIndex >= element.children.size && childSplitResult == null) {
             return SplitResult(
                 firstPart = element,
                 secondPart = null,
@@ -685,9 +824,35 @@ class PaginationEngine(
             )
         }
         
-        // Split the children list
-        val firstPartChildren = element.children.take(splitIndex)
-        val secondPartChildren = element.children.drop(splitIndex)
+        // Build the split result
+        val firstPartChildren: MutableList<String>
+        val secondPartChildren: MutableList<String>
+        val newElements = mutableListOf<ResumeElement>() // New elements created from splitting
+        
+        if (childSplitResult != null && childToSplitIndex >= 0) {
+            // We have an internally split child
+            firstPartChildren = element.children.take(childToSplitIndex).toMutableList()
+            
+            // Add the first part of the split child
+            childSplitResult.firstPart?.let { 
+                firstPartChildren.add(it.id)
+                newElements.add(it)
+            }
+            
+            // Second part starts with the remainder of the split child
+            secondPartChildren = mutableListOf<String>()
+            childSplitResult.secondPart?.let {
+                secondPartChildren.add(it.id)
+                newElements.add(it)
+            }
+            
+            // Add remaining children after the split child
+            secondPartChildren.addAll(element.children.drop(childToSplitIndex + 1))
+        } else {
+            // Simple split at child boundary
+            firstPartChildren = element.children.take(splitIndex).toMutableList()
+            secondPartChildren = element.children.drop(splitIndex).toMutableList()
+        }
         
         // Create first container with children that fit
         val firstPart = element.copy(
@@ -706,8 +871,24 @@ class PaginationEngine(
             secondPart = secondPart,
             strategy = SplitStrategy.AT_ITEM_BOUNDARY,
             splitAtIndex = splitIndex,
-            overflowChildIds = secondPartChildren // Include child IDs that need to move to next page
+            overflowChildIds = secondPartChildren,
+            newChildElements = newElements // Include newly created elements from child splitting
         )
+    }
+    
+    /**
+     * Check if an element type supports internal splitting at item boundaries
+     */
+    private fun isSplittableElement(element: ResumeElement): Boolean {
+        return when (element) {
+            is ResumeElement.WorkExperienceElement -> element.items.size > 1
+            is ResumeElement.EducationElement -> element.items.size > 1
+            is ResumeElement.SkillElement -> element.items.size > 1
+            is ResumeElement.ProjectElement -> element.items.size > 1
+            is ResumeElement.CertificationElement -> element.items.size > 1
+            is ResumeElement.LanguageElement -> element.items.size > 1
+            else -> false
+        }
     }
     
     // ========================================================================

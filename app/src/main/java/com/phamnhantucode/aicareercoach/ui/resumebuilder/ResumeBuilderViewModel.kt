@@ -156,17 +156,11 @@ class ResumeBuilderViewModel(private val context: Context, private val resumeId:
      */
     suspend fun ensureResumeSaved() {
         val currentResume = _resume.value
-        Log.d(TAG, "Ensuring resume ${currentResume.id} exists in database before Design tab")
+        Log.d(TAG, "Force saving resume ${currentResume.id} to database before Design tab")
         try {
-            // Check if resume already exists to avoid unnecessary (and potentially destructive) updates
-            val existing = repository.getResume(currentResume.id, forceRemote = true)
-            if (existing.isSuccess && existing.getOrNull() != null) {
-                Log.d(TAG, "Resume ${currentResume.id} already exists, skipping ensureResumeSaved")
-                return
-            }
-
-            // Only save if it doesn't exist (newly created)
+            // Force save to ensure latest form data is synced to the design
             repository.saveResume(currentResume, syncToRemote = true)
+            Log.d(TAG, "Resume ${currentResume.id} successfully saved")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to ensure resume saved", e)
         }

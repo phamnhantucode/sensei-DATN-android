@@ -118,7 +118,7 @@ object NeonUserService {
     private fun fetchNeonUser(clerkUserId: String, authorizationHeader: String): NeonUser? {
         val encodedClerkId = URLEncoder.encode(clerkUserId, "UTF-8")
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
-        val url = "$apiUrl/User?select=*&clerkUserId=eq.$encodedClerkId&limit=1"
+        val url = "$apiUrl/User?select=*,UserCredit(isPaid)&clerkUserId=eq.$encodedClerkId&limit=1"
 
         val request = Request.Builder()
             .url(url)
@@ -170,6 +170,12 @@ object NeonUserService {
         val skills = if (skillsJson != null) {
             (0 until skillsJson.length()).map { skillsJson.optString(it) }
         } else emptyList()
+
+        // Extract isPaid from nested UserCredit object or array
+        val userCredit = json.optJSONObject("UserCredit") 
+                         ?: json.optJSONArray("UserCredit")?.optJSONObject(0)
+        
+        val isPaid = userCredit?.optBoolean("isPaid", false) ?: false
         
         return NeonUser(
             id = json.optString("id"),
@@ -178,7 +184,7 @@ object NeonUserService {
             experienceYears = json.optInt("experience").takeUnless { json.isNull("experience") },
             skills = skills,
             bio = json.optString("bio").takeIf { it != "null" && it.isNotBlank() },
-            isPaid = json.optBoolean("isPaid", false)
+            isPaid = isPaid
         )
     }
 
@@ -230,6 +236,10 @@ object NeonUserService {
     /**
      * Deducts credits from the user's balance.
      */
+    /**
+     * Deducts credits from the user's balance.
+     * Skips deduction if the user is a paid user.
+     */
     suspend fun deductCredit(
         userId: String,
         amount: Int,
@@ -240,6 +250,13 @@ object NeonUserService {
             ?: throw IOException("No Neon auth credentials available.")
 
         val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+
+        // Check if user is paid
+        val user = fetchNeonUserByNeonId(userId, authorizationHeader)
+        if (user != null && user.isPaid) {
+            Log.d(TAG, "User $userId is a paid user. Skipping credit deduction for $featureName.")
+            return@withContext
+        }
 
         val balance = fetchCreditBalance(userId, authorizationHeader, apiUrl)
 
@@ -320,6 +337,33 @@ object NeonUserService {
 
                 results.getJSONObject(0).optString("id")
             }
+        }
+    }
+
+    private fun fetchNeonUserByNeonId(neonUserId: String, authorizationHeader: String): NeonUser? {
+        val apiUrl = BuildConfig.NEON_API_URL.trimEnd('/')
+        val url = "$apiUrl/User?select=*,UserCredit(isPaid)&id=eq.$neonUserId&limit=1"
+
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", authorizationHeader)
+            .get()
+            .build()
+            
+        return client.newCall(request).execute().use { response ->
+            val body = response.body?.string()
+            if (response.isSuccessful && !body.isNullOrBlank()) {
+                 val json = JSONArray(body)
+                 // Note: We might not have clerkUserId here if we just fetched by ID, but parseNeonUser expects it.
+                 // However, parseNeonUser uses clerkUserId arg primarily for the object. 
+                 // Let's modify parseNeonUser or extract it from JSON if available.
+                 // Actually, the API returns clerkUserId, so we can use that.
+                 if (json.length() > 0) {
+                     val userJson = json.getJSONObject(0)
+                     val clerkId = userJson.optString("clerkUserId")
+                     parseNeonUser(userJson, clerkId)
+                 } else null
+            } else null
         }
     }
 

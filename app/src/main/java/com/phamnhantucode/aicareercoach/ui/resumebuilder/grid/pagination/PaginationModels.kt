@@ -98,13 +98,15 @@ data class PaginationResult(
  * @param strategy The split strategy that was used
  * @param splitAtIndex For list-based elements, the index where the split occurred
  * @param overflowChildIds For container splits, the IDs of child elements that should move to the next page
+ * @param newChildElements For container splits where a child was internally split, the new elements created
  */
 data class SplitResult(
     val firstPart: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement?,
     val secondPart: com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement?,
     val strategy: SplitStrategy,
     val splitAtIndex: Int? = null,
-    val overflowChildIds: List<String> = emptyList()
+    val overflowChildIds: List<String> = emptyList(),
+    val newChildElements: List<com.phamnhantucode.aicareercoach.ui.resumebuilder.grid.models.ResumeElement> = emptyList()
 )
 
 /**

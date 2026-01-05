@@ -56,7 +56,8 @@ class IndustryInsightsRepository(
                     authorizationHeader = authorizationHeader,
                     insight = null,
                     needsRefresh = false,
-                    creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader)
+                    creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader),
+                    isPaid = neonUser.isPaid
                  )
             }
 
@@ -107,7 +108,8 @@ class IndustryInsightsRepository(
                 authorizationHeader = authorizationHeader,
                 insight = existingInsight,
                 needsRefresh = needsRefresh,
-                creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader)
+                creditBalance = fetchCreditBalance(neonUser.id, authorizationHeader),
+                isPaid = neonUser.isPaid
             )
         }
 
@@ -210,6 +212,7 @@ class IndustryInsightsRepository(
         val insight: IndustryInsightRecord?,
         val needsRefresh: Boolean,
         val creditBalance: Int?,
+        val isPaid: Boolean
     )
 
     private suspend fun resolveAuthorizationHeader(): String? {
@@ -319,25 +322,7 @@ class IndustryInsightsRepository(
     }
 
     private suspend fun generateInsights(industry: String): GeneratedInsights {
-        val prompt = """
-            Analyze the current state of the $industry industry and provide insights in ONLY the following JSON format without any additional notes or explanations:
-            {
-              "salaryRanges": [
-                { "role": "string", "min": number, "max": number, "median": number, "location": "string" }
-              ],
-              "growthRate": number,
-              "demandLevel": "High" | "Medium" | "Low",
-              "topSkills": ["skill1", "skill2"],
-              "marketOutlook": "Positive" | "Neutral" | "Negative",
-              "keyTrends": ["trend1", "trend2"],
-              "recommendedSkills": ["skill1", "skill2"]
-            }
-
-            IMPORTANT: Return ONLY the JSON. No additional text, notes, or markdown formatting.
-            Include at least 5 common roles for salary ranges.
-            Growth rate should be a percentage.
-            Include at least 5 skills and trends.
-        """.trimIndent()
+        val prompt = com.phamnhantucode.aicareercoach.data.ai.PromptFactory.createIndustryInsightsPrompt(industry)
 
         val messages = listOf(
             com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)

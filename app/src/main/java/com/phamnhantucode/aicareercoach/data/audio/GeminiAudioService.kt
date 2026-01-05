@@ -11,6 +11,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import com.phamnhantucode.aicareercoach.data.ai.PromptFactory
+import com.phamnhantucode.aicareercoach.data.ai.OpenRouterService
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -154,21 +156,27 @@ IMPORTANT RULES:
 
     // Generate feedback
     suspend fun generateFeedback(
+        context: String,
         question: String,
         userAnswer: String,
         category: String,
     ): Result<FeedbackResult> = withContext(Dispatchers.IO) {
         try {
-            val prompt = buildFeedbackPrompt(question, userAnswer, category)
+            val prompt = PromptFactory.createAudioFeedbackPrompt(
+                context = context,
+                question = question,
+                userAnswer = userAnswer,
+                category = category
+            )
 
             val messages = listOf(
-                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+                OpenRouterService.Message("user", prompt)
             )
 
             // Use logic from OpenRouterService
-            val feedbackText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+            val feedbackText = OpenRouterService.chatCompletion(
                 messages = messages,
-                model = "google/gemini-2.5-flash-lite" // Consistent with CoverLetter or use default
+                model = "google/gemini-2.5-flash-lite" // Consistent with updated strategy
             )
 
             if (feedbackText.isBlank()) {
@@ -192,16 +200,20 @@ IMPORTANT RULES:
 
     // Batch feedback
     suspend fun generateBatchFeedback(
-        questionsAndAnswers: List<Triple<String, String, String>>
+        context: String,
+        feedbackInput: List<Triple<String, String, String>>
     ): Result<List<FeedbackResult>> = withContext(Dispatchers.IO) {
         try {
-            val prompt = buildBatchFeedbackPrompt(questionsAndAnswers)
-
-            val messages = listOf(
-                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            val prompt = PromptFactory.createBatchFeedbackPrompt(
+                context = context,
+                feedbackInput = feedbackInput
             )
 
-            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+            val messages = listOf(
+                OpenRouterService.Message("user", prompt)
+            )
+
+            val response = OpenRouterService.chatCompletion(
                 messages = messages,
                 model = "google/gemini-2.5-flash-lite"
             )
@@ -210,7 +222,7 @@ IMPORTANT RULES:
                 return@withContext Result.failure(Exception("No feedback found in response"))
             }
 
-            val feedbackList = parseBatchFeedbackResponse(response, questionsAndAnswers.size)
+            val feedbackList = parseBatchFeedbackResponse(response, feedbackInput.size)
             Log.d(TAG, "Generated feedback for ${feedbackList.size} questions")
 
             Result.success(feedbackList)
@@ -223,18 +235,25 @@ IMPORTANT RULES:
 
     // Generate all questions
     suspend fun generateAllQuestions(
+        context: String,
         category: String,
-        questionCount: Int,
-        userProfile: String? = null,
+        questionCount: Int
     ): Result<List<QuestionResult>> = withContext(Dispatchers.IO) {
         try {
-            val prompt = buildBatchQuestionPrompt(category, questionCount, userProfile)
-
-            val messages = listOf(
-                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            val prompt = PromptFactory.createInterviewQuestionsPrompt(
+                context = context,
+                focusTopic = category,
+                questionCount = questionCount,
+                historyContext = "", // Could pass recent performance if available
+                includeQuiz = false,
+                includeOpenEnded = true
             )
 
-            val response = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+            val messages = listOf(
+                OpenRouterService.Message("user", prompt)
+            )
+
+            val response = OpenRouterService.chatCompletion(
                 messages = messages,
                 model = "google/gemini-2.5-flash-lite"
             )
@@ -247,9 +266,11 @@ IMPORTANT RULES:
             if (questions.isEmpty()) {
                 return@withContext Result.failure(Exception("Failed to parse questions from response"))
             }
+            // Ensure we only return 'questionCount' items if AI over-generated
+            val limitedQuestions = questions.take(questionCount)
 
-            Log.d(TAG, "Generated ${questions.size} questions for category: $category")
-            Result.success(questions)
+            Log.d(TAG, "Generated ${limitedQuestions.size} questions for category: $category")
+            Result.success(limitedQuestions)
 
         } catch (e: Exception) {
             Log.e(TAG, "Error generating batch questions", e)
@@ -259,18 +280,22 @@ IMPORTANT RULES:
 
     // Generate next question
     suspend fun generateNextQuestion(
+        context: String,
         category: String,
-        previousQuestions: List<String>,
-        userProfile: String? = null,
+        previousQuestions: List<String>
     ): Result<QuestionResult> = withContext(Dispatchers.IO) {
         try {
-            val prompt = buildQuestionPrompt(category, previousQuestions, userProfile)
-
-            val messages = listOf(
-                com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.Message("user", prompt)
+            val prompt = PromptFactory.createSingleInterviewQuestionPrompt(
+                context = context,
+                focusTopic = category,
+                previousQuestions = previousQuestions
             )
 
-            val questionText = com.phamnhantucode.aicareercoach.data.ai.OpenRouterService.chatCompletion(
+            val messages = listOf(
+                OpenRouterService.Message("user", prompt)
+            )
+
+            val questionText = OpenRouterService.chatCompletion(
                 messages = messages,
                 model = "google/gemini-2.5-flash-lite"
             )
@@ -304,247 +329,106 @@ IMPORTANT RULES:
         }
     }
 
-    private fun buildFeedbackPrompt(
-        question: String,
-        userAnswer: String,
-        category: String,
-    ): String {
-        return """
-            You are an expert interview coach. Evaluate this candidate's interview answer and provide constructive feedback.
+    private val CODE_FENCE_REGEX = Regex("```(?:json)?")
 
-            Question: $question
-            Category: $category
-            Candidate's Answer: $userAnswer
 
-            Please provide:
-            1. A rating from 1-10 (where 10 is excellent)
-            2. Specific, actionable feedback on the answer
-            3. Highlight strengths using **bold** for key points
-            4. Suggest improvements
 
-            Format your response as:
-            RATING: [number]
-            FEEDBACK: [your detailed feedback - use **bold** for important points and key terms]
-        """.trimIndent()
-    }
 
-    private fun buildQuestionPrompt(
-        category: String,
-        previousQuestions: List<String>,
-        userProfile: String?,
-    ): String {
-        val profileContext = userProfile?.let { "\n\nCandidate Profile: $it" } ?: ""
-        val previousContext = if (previousQuestions.isNotEmpty()) {
-            "\n\nPreviously asked questions (avoid duplicates):\n${
-                previousQuestions.joinToString(
-                    "\n- ",
-                    "- "
-                )
-            }"
-        } else {
-            ""
+
+
+
+    private fun parseQuestionResponse(questionText: String): QuestionResult {
+        val cleaned = CODE_FENCE_REGEX.replace(questionText, "").trim()
+        return try {
+            val json = JSONObject(cleaned)
+            val answer = json.optString("idealAnswer").takeIf { it.isNotBlank() }
+                ?: json.optString("correctAnswer").takeIf { it.isNotBlank() }
+                ?: json.optString("explanation")
+                
+            QuestionResult(
+                question = json.optString("question"),
+                idealAnswer = answer
+            )
+        } catch (e: Exception) {
+            // Fallback for non-JSON response
+            Log.w(TAG, "Failed to parse JSON question: $cleaned")
+             QuestionResult(question = cleaned, idealAnswer = "")
         }
-
-        return """
-            You are an expert interviewer conducting a live mock interview via voice.
-            Generate a single $category interview question that can be answered in 30-60 seconds.
-            $profileContext
-            $previousContext
-
-            IMPORTANT REQUIREMENTS:
-            - The question must be concise and focused on ONE specific point
-            - Avoid multi-part questions or questions with multiple sub-questions
-            - The expected answer should be brief (2-4 key sentences)
-            - Questions should be answerable without lengthy explanations
-            - For TECHNICAL questions: ask about a single concept, not multiple
-            - For BEHAVIORAL questions: focus on one specific situation/example
-            - For SITUATIONAL questions: present one clear scenario
-
-            Format your response as:
-            QUESTION: [the interview question - keep it short and focused]
-            IDEAL_ANSWER: [2-4 key bullet points for a good answer]
-        """.trimIndent()
     }
 
-    private fun buildBatchQuestionPrompt(
-        category: String,
-        questionCount: Int,
-        userProfile: String?,
-    ): String {
-        val profileContext = userProfile?.let { "\n\nCandidate Profile: $it" } ?: ""
-
-        return """
-            You are an expert interviewer conducting a live mock interview via voice.
-            Generate exactly $questionCount different $category interview questions for a complete interview session.
-            Each question should be answerable in 30-60 seconds.
-            $profileContext
-
-            IMPORTANT REQUIREMENTS:
-            - Each question must be unique and cover different aspects of $category skills
-            - Questions should be concise and focused on ONE specific point each
-            - Avoid multi-part questions or questions with multiple sub-questions
-            - The expected answers should be brief (2-4 key sentences each)
-            - Questions should be answerable without lengthy explanations
-            - For TECHNICAL questions: ask about different concepts/technologies
-            - For BEHAVIORAL questions: focus on different situations/examples
-            - For GENERAL questions: cover different interview aspects
-            - Create a progression from easier to more challenging questions
-
-            Format your response as:
-            QUESTION_1: [first interview question]
-            IDEAL_ANSWER_1: [2-4 key bullet points for a good answer]
-
-            QUESTION_2: [second interview question]
-            IDEAL_ANSWER_2: [2-4 key bullet points for a good answer]
-
-            ... and so on for all $questionCount questions.
-        """.trimIndent()
+    private fun parseBatchQuestionResponse(responseText: String): List<QuestionResult> {
+         val cleaned = CODE_FENCE_REGEX.replace(responseText, "").trim()
+         return try {
+             val json = JSONObject(cleaned)
+             val questionsArray = json.optJSONArray("interviewQuestions") ?: JSONArray()
+             val results = mutableListOf<QuestionResult>()
+             for (i in 0 until questionsArray.length()) {
+                 val q = questionsArray.getJSONObject(i)
+                 val answer = q.optString("explanation").takeIf { it.isNotBlank() }
+                     ?: q.optString("correctAnswer").takeIf { it.isNotBlank() }
+                     ?: q.optString("idealAnswer")
+                 
+                 results.add(QuestionResult(
+                     question = q.optString("question"),
+                     idealAnswer = answer
+                 ))
+             }
+             results
+         } catch (e: Exception) {
+             Log.e(TAG, "Failed to parse batch JSON questions", e)
+             emptyList()
+         }
     }
 
-    private fun buildBatchFeedbackPrompt(
-        questionsAndAnswers: List<Triple<String, String, String>>
-    ): String {
-        val questionsText = questionsAndAnswers.mapIndexed { index, (question, answer, category) ->
-            """
-            QUESTION_${index + 1} ($category):
-            Q: $question
-            A: $answer
-            """.trimIndent()
-        }.joinToString("\n\n")
-
-        return """
-            You are an expert interview coach evaluating a candidate's complete interview performance.
-            Analyze ALL the questions and answers together to provide comprehensive feedback.
-
-            INTERVIEW SESSION:
-            $questionsText
-
-            For EACH question, provide:
-            1. A rating from 1-10 (where 10 is excellent)
-            2. Specific, actionable feedback on the answer
-            3. Highlight strengths using **bold** for key points
-            4. Suggest improvements
-
-            Consider the overall interview performance and look for patterns across answers.
-
-            Format your response as:
-            FEEDBACK_1:
-            RATING: [number]
-            FEEDBACK: [detailed feedback for question 1]
-
-            FEEDBACK_2:
-            RATING: [number] 
-            FEEDBACK: [detailed feedback for question 2]
-
-            ... and so on for all questions.
-        """.trimIndent()
+    private fun parseBatchFeedbackResponse(responseText: String, expectedCount: Int): List<FeedbackResult> {
+         val cleaned = CODE_FENCE_REGEX.replace(responseText, "").trim()
+         return try {
+             val json = JSONObject(cleaned)
+             val feedbackArray = json.optJSONArray("feedbackList") ?: JSONArray()
+             val results = mutableListOf<FeedbackResult>()
+             for (i in 0 until feedbackArray.length()) {
+                 val f = feedbackArray.getJSONObject(i)
+                 results.add(FeedbackResult(
+                     rating = f.optInt("rating", 5),
+                     feedback = f.optString("feedback")
+                 ))
+             }
+             results
+         } catch (e: Exception) {
+             Log.e(TAG, "Failed to parse batch JSON feedback", e)
+             emptyList()
+         }
     }
 
     private fun parseFeedbackResponse(feedbackText: String): FeedbackResult {
-        val lines = feedbackText.lines()
-        var rating = 5 // Default rating
-        var feedback = feedbackText
+         val cleaned = CODE_FENCE_REGEX.replace(feedbackText, "").trim()
+         return try {
+             val json = JSONObject(cleaned)
+             FeedbackResult(
+                 rating = json.optInt("rating", 5),
+                 feedback = json.optString("feedback")
+             )
+         } catch (e: Exception) {
+             parseFeedbackText(cleaned)
+         }
+    }
 
-        // Try to extract rating
+    fun parseFeedbackText(text: String): FeedbackResult {
+        val lines = text.lines()
+        var rating = 5
+        var feedback = text
+
         lines.forEach { line ->
             if (line.startsWith("RATING:", ignoreCase = true)) {
                 val ratingStr = line.substringAfter(":").trim()
                 rating = ratingStr.toIntOrNull() ?: 5
             }
         }
-
-        // Try to extract feedback section
-        val feedbackIndex = feedbackText.indexOf("FEEDBACK:", ignoreCase = true)
+        val feedbackIndex = text.indexOf("FEEDBACK:", ignoreCase = true)
         if (feedbackIndex != -1) {
-            feedback = feedbackText.substring(feedbackIndex + 9).trim()
+            feedback = text.substring(feedbackIndex + 9).trim()
         }
-
-        return FeedbackResult(rating = rating, feedback = feedback)
-    }
-
-    private fun parseQuestionResponse(questionText: String): QuestionResult {
-        val lines = questionText.lines()
-        var question = ""
-        var idealAnswer = ""
-
-        lines.forEach { line ->
-            when {
-                line.startsWith("QUESTION:", ignoreCase = true) -> {
-                    question = line.substringAfter(":").trim()
-                }
-
-                line.startsWith("IDEAL_ANSWER:", ignoreCase = true) -> {
-                    idealAnswer = line.substringAfter(":").trim()
-                }
-            }
-        }
-
-        // If parsing failed, use the whole text as question
-        if (question.isBlank()) {
-            question = questionText.trim()
-        }
-
-        return QuestionResult(question = question, idealAnswer = idealAnswer)
-    }
-
-    private fun parseBatchQuestionResponse(responseText: String): List<QuestionResult> {
-        val questions = mutableListOf<QuestionResult>()
-        val lines = responseText.lines()
-        
-        var currentQuestion = ""
-        var currentIdealAnswer = ""
-        var questionNumber = 1
-
-        lines.forEach { line ->
-            when {
-                line.startsWith("QUESTION_$questionNumber:", ignoreCase = true) -> {
-                    currentQuestion = line.substringAfter(":").trim()
-                }
-                line.startsWith("IDEAL_ANSWER_$questionNumber:", ignoreCase = true) -> {
-                    currentIdealAnswer = line.substringAfter(":").trim()
-                    
-                    // Add the completed question
-                    if (currentQuestion.isNotBlank()) {
-                        questions.add(QuestionResult(
-                            question = currentQuestion,
-                            idealAnswer = currentIdealAnswer
-                        ))
-                    }
-                    
-                    // Reset for next question
-                    currentQuestion = ""
-                    currentIdealAnswer = ""
-                    questionNumber++
-                }
-            }
-        }
-
-        return questions
-    }
-
-    private fun parseBatchFeedbackResponse(responseText: String, expectedCount: Int): List<FeedbackResult> {
-        val feedbackList = mutableListOf<FeedbackResult>()
-        
-        for (i in 1..expectedCount) {
-            val feedbackPattern = "FEEDBACK_$i:"
-            val nextFeedbackPattern = "FEEDBACK_${i + 1}:"
-            
-            val startIndex = responseText.indexOf(feedbackPattern, ignoreCase = true)
-            if (startIndex == -1) continue
-            
-            val endIndex = responseText.indexOf(nextFeedbackPattern, ignoreCase = true)
-            val feedbackSection = if (endIndex != -1) {
-                responseText.substring(startIndex, endIndex)
-            } else {
-                responseText.substring(startIndex)
-            }
-            
-            // Parse this feedback section
-            val feedback = parseFeedbackResponse(feedbackSection)
-            feedbackList.add(feedback)
-        }
-        
-        return feedbackList
+        return FeedbackResult(rating, feedback)
     }
 }
 
